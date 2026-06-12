@@ -65,7 +65,10 @@ Formato exato:
 ]
 Tipos permitidos: economia, gasto, sugestao, padrao`;
 
-        const API_KEY = "AQ.Ab8RN6Jq-tR42cvtNKzx_5cRtN1hJXb_BWNKCLg1UNJk5LLCtw";
+        const API_KEY = process.env.GEMINI_API_KEY;
+        if (!API_KEY) {
+            return res.status(500).json({ error: 'API_KEY não configurada' });
+        }
         const url_gemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
         const geminiRes = await fetch(url_gemini, {
