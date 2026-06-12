@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import rotasUsuarios from "./src/routes/rotasUsuarios.js";
 import rotasTransacoes from "./src/routes/rotasTransacoes.js";
