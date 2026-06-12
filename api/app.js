@@ -21,11 +21,45 @@ import cors from 'cors';
 const app = express();
 app.use(express.json());
 
-
 app.get('/', async (req, res) => {
     await testarConexao();
     // res.status(200).json('API FUNCIONANDO ✅');
     res.redirect('/swagger')
+});
+
+// Rota de teste para verificar Gemini API
+app.get('/test-gemini', async (req, res) => {
+    try {
+        const API_KEY = process.env.GEMINI_API_KEY;
+        console.log('[TEST-GEMINI] API_KEY carregada:', API_KEY ? 'SIM' : 'NAO');
+        
+        if (!API_KEY) {
+            return res.status(500).json({ erro: 'GEMINI_API_KEY nao configurada!' });
+        }
+        
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
+        console.log('[TEST-GEMINI] Testando API...');
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Ola! Voce funciona?' }] }]
+            })
+        });
+        
+        console.log('[TEST-GEMINI] Status:', response.status);
+        const data = await response.json();
+        
+        res.json({
+            status: response.status,
+            api_key_loaded: !!API_KEY,
+            response: data
+        });
+    } catch (error) {
+        console.error('[TEST-GEMINI] Erro:', error.message);
+        res.status(500).json({ erro: error.message });
+    }
 });
 
 app.use(cors());
