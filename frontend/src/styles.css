@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --font-brand: "Space Grotesk", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+
+  /* Alterando as cores para aplicar o verde e o branco pedidos */
+  --color-finance-primary: #10B981;          /* Verde principal */
+  --color-finance-secondary: #059669;         /* Verde mais escuro */
+  --color-finance-accent: #34D399;            /* Verde mais claro */
+
+  --color-finance-primary-hover: #047857;
+  
+  --color-finance-bg-light: #ffffff; /* Fundo totalmente branco */
+  
+  --color-finance-card-light: #ffffff;
+
+  --color-finance-error: #EF4444;             /* Vermelho (para despesas, erros) */
+  --color-finance-success: #10B981;          /* Verde (para entradas, sucessos) */
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-body);
+    background-color: var(--color-finance-bg-light);
+    color: #111827; /* Cinza escuro para texto, substituindo a necessidade de "dark mode" */
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-brand);
+  }
+}
+
+@layer utilities {
+  .finance-card {
+    @apply bg-white border border-gray-100 rounded-xl shadow-sm backdrop-blur-md transition-all duration-300;
+  }
+  
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .gradient-hero {
+    background: linear-gradient(135deg, var(--color-finance-primary) 0%, var(--color-finance-accent) 100%);
+  }
+}
