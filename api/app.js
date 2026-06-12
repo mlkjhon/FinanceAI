@@ -37,7 +37,7 @@ app.get('/test-gemini', async (req, res) => {
             return res.status(500).json({ erro: 'GEMINI_API_KEY nao configurada!' });
         }
         
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
         console.log('[TEST-GEMINI] Testando API...');
         
         const response = await fetch(url, {

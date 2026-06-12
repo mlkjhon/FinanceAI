@@ -69,35 +69,36 @@ Tipos permitidos: economia, gasto, sugestao, padrao`;
         if (!API_KEY) {
             return res.status(500).json({ error: 'API_KEY não configurada' });
         }
-        const url_gemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
-        const geminiRes = await fetch(url_gemini, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: promptInsights }] }]
-            })
-        });
+        const url_gemini = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
-        const geminiData = await geminiRes.json();
+        try {
+            const response = await fetch(url_gemini, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: promptInsights }] }]
+                })
+            });
 
-        if (geminiData.error) {
-            return res.status(500).json({ error: 'Erro na IA: ' + geminiData.error.message });
+            const data = await response.json();
+
+            if (data.error) {
+                return res.status(500).json({ error: 'Erro na IA: ' + data.error.message });
+            }
+
+            const textoResposta = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+            const textoLimpo = textoResposta.replace(/```json|```/g, '').trim();
+            const dicas = JSON.parse(textoLimpo);
+            const dicasComId = dicas.map((d, i) => ({ ...d, id: String(i + 1) }));
+            return res.status(200).json(dicasComId);
+        } catch (error) {
+            console.error('Erro ao gerar insights:', error.message);
+            return res.status(500).json({ error: 'Erro ao gerar dicas personalizadas: ' + error.message });
         }
-
-        const textoResposta = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-
-        const textoLimpo = textoResposta.replace(/```json|```/g, '').trim();
-
-        const dicas = JSON.parse(textoLimpo);
-
-        const dicasComId = dicas.map((d, i) => ({ ...d, id: String(i + 1) }));
-
-        return res.status(200).json(dicasComId);
-
-    } catch (error) {
-        console.error('Erro ao gerar insights:', error.message);
-        return res.status(500).json({ error: 'Erro ao gerar dicas personalizadas.' });
+    } catch (dbError) {
+        console.error('Erro no banco de dados:', dbError.message);
+        return res.status(500).json({ error: 'Erro ao processar dados: ' + dbError.message });
     }
 });
 

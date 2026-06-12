@@ -32,7 +32,6 @@ router.post('/chat', async (req, res) => {
         if (!API_KEY) {
             return res.status(500).json({ error: 'API_KEY não configurada' });
         }
-        const url_gemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
         
         const resumoQuery = `
             SELECT 
@@ -81,40 +80,46 @@ Regras obrigatórias:
 - Respostas diretas, no máximo 3 parágrafos curtos
 - Fale português brasileiro informal`;
 
-        const response = await fetch(url_gemini, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: `${systemPrompt}\n\nUsuário diz: ${mensagem}` }] }]
-            })
-        });
+        const url_gemini = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
-        const data = await response.json();
-        
         let resposta_ia = "Não consegui formular uma resposta.";
-        if (data.error) {
-            resposta_ia = `O Gemini IA recusou a resposta (Erro 404): Verifique se a sua Chave de API foi digitada corretamente. => ${data.error.message}`;
-        } else if (data && data.candidates && data.candidates.length > 0) {
-            resposta_ia = data.candidates[0].content.parts[0].text;
+        try {
+            const response = await fetch(url_gemini, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `${systemPrompt}\n\nUsuário diz: ${mensagem}` }] }]
+                })
+            });
+
+            const data = await response.json();
             
-            // Interceptar ações da IA (ex: {"acao": "transacao", "descricao": "...", "valor": 100, "tipo": "E"})
-            const matchIndex = resposta_ia.indexOf('{"acao"');
-            if (matchIndex !== -1) {
-                try {
-                    const jsonStr = resposta_ia.substring(matchIndex);
-                    const action = JSON.parse(jsonStr.trim());
-                    
-                    if (action.acao === 'transacao') {
-                        await BD.query(
-                            `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria) VALUES ($1, $2, $3, $4, NULL)`,
-                            [id_usuario, action.descricao, action.valor, action.tipo]
-                        );
+            if (data.error) {
+                resposta_ia = `Erro na IA: ${data.error.message}`;
+            } else if (data && data.candidates && data.candidates.length > 0) {
+                resposta_ia = data.candidates[0].content.parts[0].text;
+                
+                const matchIndex = resposta_ia.indexOf('{"acao"');
+                if (matchIndex !== -1) {
+                    try {
+                        const jsonStr = resposta_ia.substring(matchIndex);
+                        const action = JSON.parse(jsonStr.trim());
+                        
+                        if (action.acao === 'transacao') {
+                            await BD.query(
+                                `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria) VALUES ($1, $2, $3, $4, NULL)`,
+                                [id_usuario, action.descricao, action.valor, action.tipo]
+                            );
+                        }
+                        resposta_ia = resposta_ia.substring(0, matchIndex).trim();
+                    } catch (e) {
+                        console.error('Erro ao processar JSON da IA:', e.message);
                     }
-                    resposta_ia = resposta_ia.substring(0, matchIndex).trim();
-                } catch (e) {
-                    console.error('Erro ao processar JSON da IA:', e.message);
                 }
             }
+        } catch (geminiError) {
+            console.error('Erro ao chamar Gemini:', geminiError.message);
+            resposta_ia = 'Desculpe, não consegui gerar uma resposta no momento. Tente novamente em instantes!';
         }
 
         const comando = `INSERT INTO chat (id_usuario, mensagem, resposta) VALUES ($1, $2, $3) RETURNING *`;

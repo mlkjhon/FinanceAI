@@ -148,7 +148,7 @@ function ParticleGraph() {
     { x: 45, y: 48 }, { x: 58, y: 55 }, { x: 70, y: 35 },
     { x: 82, y: 28 }, { x: 92, y: 20 },
   ];
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x}% ${p.y}%`).join(' ');
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -165,7 +165,7 @@ function ParticleGraph() {
         {points.map((p, i) => (
           <motion.circle
             key={i}
-            cx={`${p.x}%`} cy={`${p.y}%`} r="0.8"
+            cx={p.x} cy={p.y} r="0.8"
             fill="var(--color-finance-secondary)"
             initial={{ opacity: 0, scale: 0 }}
             animate={{ opacity: [0, 1, 0], scale: [0, 1, 0] }}
