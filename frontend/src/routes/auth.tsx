@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { TrendingUp, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { TrendingUp, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 
@@ -139,8 +139,12 @@ export default function AuthPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-[var(--color-finance-bg-light)] dark:bg-[var(--color-finance-bg-dark)]">
-        <div className="w-full max-w-md">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[var(--color-finance-bg-light)] dark:bg-[var(--color-finance-bg-dark)] relative">
+        <Link to="/" className="absolute top-8 left-8 flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
+          <ArrowLeft size={16} />
+          Voltar para Home
+        </Link>
+        <div className="w-full max-w-md mt-12 sm:mt-0">
           {/* Mobile brand */}
           <div className="flex lg:hidden items-center gap-2 justify-center mb-8">
             <div className="w-9 h-9 rounded-xl gradient-hero flex items-center justify-center">

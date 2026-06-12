@@ -80,7 +80,7 @@ Regras obrigatórias:
 - Respostas diretas, no máximo 3 parágrafos curtos
 - Fale português brasileiro informal`;
 
-        const url_gemini = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        const url_gemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
         let resposta_ia = "Não consegui formular uma resposta.";
         try {

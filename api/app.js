@@ -11,6 +11,7 @@ import rotasSubcategorias from "./src/routes/rotasSubcategorias.js";
 import rotasMetas from "./src/routes/rotasMetas.js";
 import rotasOrcamentos from "./src/routes/rotasOrcamentos.js";
 import rotasInsights from "./src/routes/rotasInsights.js";
+import rotasOpenFinance from "./src/routes/rotasOpenFinance.js";
 
 import { BD, testarConexao } from "./db.js";
 
@@ -74,6 +75,7 @@ app.use(rotasSubcategorias);
 app.use(rotasMetas);
 app.use(rotasOrcamentos);
 app.use(rotasInsights);
+app.use(rotasOpenFinance);
 
 app.get('/swagger', (req, res) => {
     res.send(`<!DOCTYPE html>

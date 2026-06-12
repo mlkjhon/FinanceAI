@@ -11,6 +11,7 @@ const navLinks = [
   { href: '/transactions', label: 'Transações' },
   { href: '/budgets', label: 'Orçamentos' },
   { href: '/goals', label: 'Metas' },
+  { href: '/bancos', label: 'Bancos' },
   { href: '/insights', label: 'Insights IA' },
 ];
 

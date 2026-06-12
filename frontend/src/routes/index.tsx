@@ -1,10 +1,14 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { motion, useInView } from 'framer-motion';
 import { TrendingUp, Shield, Zap, Target, ArrowRight, Star, BarChart3, Wallet, Brain } from 'lucide-react';
 import { useRef } from 'react';
 import { Navbar } from '../components/Navbar';
 
 export const Route = createFileRoute('/')({
+  beforeLoad: () => {
+    const token = localStorage.getItem('finance_token');
+    if (token) throw redirect({ to: '/dashboard' });
+  },
   component: LandingPage,
 });
 

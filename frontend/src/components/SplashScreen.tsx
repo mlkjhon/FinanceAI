@@ -42,7 +42,7 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
 
   if (type === 'ai') {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white">
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-black">
         <NeuralWave />
         <motion.p
           key={message}
@@ -59,7 +59,7 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
 
   if (type === 'transition') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-black">
         <div className="w-full max-w-sm px-6 space-y-4">
           {[1, 2, 3].map((i) => (
             <motion.div
@@ -82,7 +82,7 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.5 }}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white overflow-hidden"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-black overflow-hidden"
     >
       {/* Floating particles */}
       <ParticleGraph />
@@ -101,7 +101,7 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
               <polyline points="16 7 22 7 22 13"/>
             </svg>
           </div>
-          <span className="text-3xl font-brand font-bold text-white tracking-tight">Finance<span className="text-[var(--color-finance-accent)]">AI</span></span>
+          <span className="text-3xl font-brand font-bold text-gray-900 dark:text-white tracking-tight">Finance<span className="text-[var(--color-finance-accent)]">AI</span></span>
         </motion.div>
 
         {/* Animated counter */}
@@ -121,7 +121,7 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.5 }}
-          className="text-white/50 text-sm text-center max-w-xs"
+          className="text-gray-500 dark:text-gray-400 text-sm text-center max-w-xs"
         >
           {financialMessages[currentMessage]}
         </motion.p>

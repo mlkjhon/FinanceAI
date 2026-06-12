@@ -58,13 +58,20 @@ router.get('/dashboard', async (req, res) => {
         
         const selecaoCategorias = `
         SELECT 
-            COALESCE(c.nome, 'Sem categoria') as nome, 
+            CASE 
+                WHEN t.descricao ILIKE 'Investido na meta:%' THEN 'Metas'
+                ELSE COALESCE(c.nome, 'Sem categoria')
+            END as nome, 
             COALESCE(SUM(t.valor), 0) as total
         FROM transacoes t
         LEFT JOIN subcategorias s ON t.id_subcategoria = s.id_subcategoria
         LEFT JOIN categorias c ON s.id_categoria = c.id_categoria
-        WHERE t.tipo = 'S' AND t.id_usuario = $1 AND t.descricao NOT ILIKE 'Investido na meta:%'
-        GROUP BY c.nome
+        WHERE t.tipo = 'S' AND t.id_usuario = $1
+        GROUP BY 
+            CASE 
+                WHEN t.descricao ILIKE 'Investido na meta:%' THEN 'Metas'
+                ELSE COALESCE(c.nome, 'Sem categoria')
+            END
         ORDER BY total DESC
         LIMIT 6
         `;

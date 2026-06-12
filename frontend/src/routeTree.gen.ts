@@ -15,6 +15,7 @@ import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as GoalsRouteImport } from './routes/goals'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BudgetsRouteImport } from './routes/budgets'
+import { Route as BancosRouteImport } from './routes/bancos'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as R404RouteImport } from './routes/404'
 import { Route as IndexRouteImport } from './routes/index'
@@ -49,6 +50,11 @@ const BudgetsRoute = BudgetsRouteImport.update({
   path: '/budgets',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BancosRoute = BancosRouteImport.update({
+  id: '/bancos',
+  path: '/bancos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/404': typeof R404Route
   '/auth': typeof AuthRoute
+  '/bancos': typeof BancosRoute
   '/budgets': typeof BudgetsRoute
   '/dashboard': typeof DashboardRoute
   '/goals': typeof GoalsRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/404': typeof R404Route
   '/auth': typeof AuthRoute
+  '/bancos': typeof BancosRoute
   '/budgets': typeof BudgetsRoute
   '/dashboard': typeof DashboardRoute
   '/goals': typeof GoalsRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/404': typeof R404Route
   '/auth': typeof AuthRoute
+  '/bancos': typeof BancosRoute
   '/budgets': typeof BudgetsRoute
   '/dashboard': typeof DashboardRoute
   '/goals': typeof GoalsRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/404'
     | '/auth'
+    | '/bancos'
     | '/budgets'
     | '/dashboard'
     | '/goals'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/404'
     | '/auth'
+    | '/bancos'
     | '/budgets'
     | '/dashboard'
     | '/goals'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/404'
     | '/auth'
+    | '/bancos'
     | '/budgets'
     | '/dashboard'
     | '/goals'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R404Route: typeof R404Route
   AuthRoute: typeof AuthRoute
+  BancosRoute: typeof BancosRoute
   BudgetsRoute: typeof BudgetsRoute
   DashboardRoute: typeof DashboardRoute
   GoalsRoute: typeof GoalsRoute
@@ -191,6 +204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BudgetsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bancos': {
+      id: '/bancos'
+      path: '/bancos'
+      fullPath: '/bancos'
+      preLoaderRoute: typeof BancosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R404Route: R404Route,
   AuthRoute: AuthRoute,
+  BancosRoute: BancosRoute,
   BudgetsRoute: BudgetsRoute,
   DashboardRoute: DashboardRoute,
   GoalsRoute: GoalsRoute,

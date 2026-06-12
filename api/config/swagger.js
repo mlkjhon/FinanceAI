@@ -23,6 +23,7 @@ const swagger = {
         { name: "Transações", description: "Operações de transações financeiras" },
         { name: "Categorias", description: "Operações de categorias" },
         { name: "Subcategorias", description: "Operações de subcategorias" },
+        { name: "Open Finance", description: "Operações de integração bancária" },
     ],
     paths: {
         "/usuarios": {
@@ -493,6 +494,49 @@ const swagger = {
                     200: { description: "Transação deletada com sucesso" },
                     404: { description: "Transação não encontrada" },
                     500: { description: "Erro no Servidor" }
+                }
+            }
+        },
+        "/link-token": {
+            post: {
+                tags: ["Open Finance"],
+                summary: "Gerar token de widget (Polp)",
+                description: "Gera um token seguro de autenticação para o frontend abrir o widget do banco.",
+                requestBody: {
+                    required: true,
+                    content: { "application/json": { schema: { type: "object", properties: { id_usuario: { type: "integer", example: 1 } } } } }
+                },
+                responses: {
+                    200: { description: "Token gerado com sucesso" },
+                    400: { description: "Dados obrigatórios faltando" }
+                }
+            }
+        },
+        "/conexoes": {
+            post: {
+                tags: ["Open Finance"],
+                summary: "Salvar conexão bancária",
+                description: "Grava os dados retornados pelo widget após a autenticação bem-sucedida do usuário no open finance.",
+                requestBody: {
+                    required: true,
+                    content: { "application/json": { schema: { type: "object", properties: { id_usuario: { type: "integer", example: 1 }, public_token: { type: "string" }, instituicao: { type: "string" } } } } }
+                },
+                responses: {
+                    201: { description: "Conexão salva com sucesso" },
+                    400: { description: "Dados obrigatórios faltando" }
+                }
+            }
+        },
+        "/conexoes/{id_usuario}": {
+            get: {
+                tags: ["Open Finance"],
+                summary: "Sincronizar bancos e cartões",
+                description: "Lista as conexões ativas e os cartões vinculados a este usuário.",
+                parameters: [
+                    { name: "id_usuario", in: "path", required: true, schema: { type: 'integer' } }
+                ],
+                responses: {
+                    200: { description: "Lista de conexões e contas obtida com sucesso" }
                 }
             }
         }
