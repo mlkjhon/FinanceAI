@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Plus, ArrowRight } from 'lucide-react';
 import { dashboardApi, transactionsApi } from '../lib/api';
 import { StatCard, FinanceCard, SkeletonCard } from '../components/ui';
@@ -92,64 +93,56 @@ function DonutChart({ data }: { data: { categoria: string; valor: number; cor?: 
   );
 }
 
-// Gráfico de linha para evolução do saldo
+// Gráfico de linha para evolução do saldo com Recharts
 function LineChart({ data }: { data: { mes: string; saldo: number }[] }) {
-  if (!data.length) return <p className="text-sm text-gray-400 text-center pt-12">Nenhum dado disponível</p>;
+  if (!data || !data.length) return <p className="text-sm text-gray-400 text-center pt-12">Nenhum dado disponível</p>;
 
   // Se houver apenas 1 mês, cria um mês fictício anterior igual para desenhar uma linha
-  const chartData = data.length === 1 ? [{ mes: '...', saldo: data[0].saldo }, ...data] : data;
+  const chartData = data.length === 1 ? [{ mes: '', saldo: data[0].saldo }, ...data] : data;
 
-  const max = Math.max(...chartData.map((d) => d.saldo), 0);
-  const min = Math.min(...chartData.map((d) => d.saldo), 0);
-  const range = max - min || 1;
-  const w = 400, h = 100;
-
-  const points = chartData.map((d, i) => ({
-    x: (i / (chartData.length - 1)) * w,
-    y: h - ((d.saldo - min) / range) * h,
-  }));
-
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  const areaD = `${pathD} L${points[points.length - 1].x},${h} L${points[0].x},${h} Z`;
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white border border-gray-100 shadow-lg rounded-xl p-3">
+          <p className="text-xs text-gray-500 mb-1">{label}</p>
+          <p className="text-sm font-bold text-gray-900">
+            {formatCurrency(payload[0].value)}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="areaGrad" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#10B981" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <motion.path
-        d={areaD}
-        fill="url(#areaGrad)"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-      />
-      <motion.path
-        d={pathD}
-        fill="none"
-        stroke="#10B981"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ duration: 1.2 }}
-      />
-      {points.map((p, i) => (
-        <motion.circle
-          key={i}
-          cx={p.x} cy={p.y} r="4"
-          fill="#10B981"
-          stroke="white" strokeWidth="2"
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 1 + i * 0.05 }}
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="colorSaldo" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+            <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+        <XAxis 
+          dataKey="mes" 
+          axisLine={false} 
+          tickLine={false} 
+          tick={{ fontSize: 12, fill: '#9CA3AF' }}
+          dy={10}
         />
-      ))}
-    </svg>
+        <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} />
+        <Area 
+          type="monotone" 
+          dataKey="saldo" 
+          stroke="#10B981" 
+          strokeWidth={3}
+          fillOpacity={1} 
+          fill="url(#colorSaldo)" 
+          activeDot={{ r: 6, fill: '#10B981', stroke: '#fff', strokeWidth: 2 }}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -250,19 +243,12 @@ function DashboardContent() {
         <div className="lg:col-span-2">
           <FinanceCard className="h-full">
             <h2 className="font-semibold text-gray-900 mb-4">Evolução do Saldo</h2>
-            <div className="h-40">
+            <div className="h-48 mt-4">
               {summaryLoading
                 ? <SkeletonCard lines={1} className="h-full border-0 shadow-none" />
                 : <LineChart data={summary?.evolucao_saldo || []} />
               }
             </div>
-            {summary?.evolucao_saldo && summary.evolucao_saldo.length > 0 && (
-              <div className="flex justify-between mt-3">
-                {summary.evolucao_saldo.map((d) => (
-                  <span key={d.mes} className="text-xs text-gray-400">{d.mes}</span>
-                ))}
-              </div>
-            )}
           </FinanceCard>
         </div>
 

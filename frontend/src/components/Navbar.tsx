@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from '@tanstack/react-router';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -24,7 +24,7 @@ export function Navbar() {
       initial={{ y: -60, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="sticky top-0 z-40 glass border-b border-white/10"
+      className="sticky top-0 z-50 glass border-b border-white/10"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
@@ -72,9 +72,9 @@ export function Navbar() {
                 </div>
                 <button
                   onClick={() => setMenuOpen(!menuOpen)}
-                  className="md:hidden p-2 rounded-lg text-gray-500 hover:text-[var(--color-finance-primary)] transition-colors"
+                  className="md:hidden p-2 rounded-lg text-gray-500 hover:text-[var(--color-finance-primary)] bg-gray-50 transition-colors"
                 >
-                  {menuOpen ? <X size={20} /> : <Menu size={20} />}
+                  <Menu size={20} />
                 </button>
               </>
             ) : (
@@ -89,31 +89,58 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {menuOpen && isAuthenticated && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="md:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[var(--color-finance-card-dark)] px-4 py-3 space-y-1"
-        >
-          {navLinks.slice(1).map((link) => (
-            <Link
-              key={link.href}
-              to={link.href}
+      {/* Mobile menu Overlay & Drawer */}
+      <AnimatePresence>
+        {menuOpen && isAuthenticated && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               onClick={() => setMenuOpen(false)}
-              className="block px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-[var(--color-finance-primary)]/5 transition-colors"
+              className="md:hidden fixed inset-0 z-[60] bg-black/20 backdrop-blur-sm"
+            />
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="md:hidden fixed top-0 right-0 h-screen w-64 z-[70] bg-white shadow-2xl flex flex-col p-6"
             >
-              {link.label}
-            </Link>
-          ))}
-          <button
-            onClick={() => { logout(); setMenuOpen(false); }}
-            className="block w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            Sair
-          </button>
-        </motion.div>
-      )}
+              <div className="flex justify-between items-center mb-8">
+                <span className="font-brand font-bold text-lg text-[var(--color-finance-primary)]">
+                  Menu
+                </span>
+                <button onClick={() => setMenuOpen(false)} className="p-2 text-gray-500 hover:text-gray-900 bg-gray-100 rounded-full transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="flex flex-col gap-2 overflow-y-auto">
+                {navLinks.slice(1).map((link) => (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="px-4 py-3 rounded-xl text-sm font-medium text-gray-600 hover:bg-[var(--color-finance-primary)]/10 hover:text-[var(--color-finance-primary)] transition-colors"
+                    activeProps={{ className: 'text-[var(--color-finance-primary)] bg-[var(--color-finance-primary)]/10' }}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+                <hr className="my-4 border-gray-100" />
+                <button
+                  onClick={() => { logout(); setMenuOpen(false); }}
+                  className="text-left px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  Sair da conta
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </motion.nav>
   );
 }
