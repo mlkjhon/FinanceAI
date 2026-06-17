@@ -24,6 +24,8 @@ function formatCurrency(val: number | string | null) {
 export default function BancosPage() {
   const { user } = useAuth();
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
+  const [pendingConnection, setPendingConnection] = useState<any>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -39,25 +41,39 @@ export default function BancosPage() {
 
   const handleWidgetEvent = async (event: string, eventData?: any) => {
     if (event === 'SUCCESS') {
-      try {
-        const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
-        
-        // Envia os dados do item (banco conectado) para o backend salvar no banco de dados
-        await fetch(`${API_URL}/conexoes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id_usuario: user?.id,
-            public_token: eventData?.item?.id || 'pluggy-item-id',
-            instituicao: eventData?.item?.connector?.name || 'Pluggy Bank'
-          })
-        });
+      // Guarda os dados pendentes para o modal de confirmação em vez de salvar direto
+      setPendingConnection(eventData);
+    }
+  };
 
-        // Atualiza a tela de conexões com o novo banco adicionado
-        queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
-      } catch (error) {
-        console.error('Erro ao salvar a conexão no banco de dados:', error);
-      }
+  const handleConfirmSync = async (substituir: boolean) => {
+    if (!substituir) {
+      // "caso negativa nao mude NADA"
+      setPendingConnection(null);
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+      
+      await fetch(`${API_URL}/conexoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_usuario: user?.id,
+          public_token: pendingConnection?.item?.id || 'pluggy-item-id',
+          instituicao: pendingConnection?.item?.connector?.name || 'Pluggy Bank',
+          substituirTransacoes: substituir // Enviado para o backend
+        })
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
+      setPendingConnection(null);
+    } catch (error) {
+      console.error('Erro ao salvar a conexão no banco de dados:', error);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -90,7 +106,6 @@ export default function BancosPage() {
           </div>
         ) : (
           <div className="space-y-12">
-            {/* Lista de Conexões */}
             <section>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Instituições Conectadas</h2>
               
@@ -123,7 +138,6 @@ export default function BancosPage() {
                         </div>
                       </div>
                       
-                      {/* Contas pertencentes a esta conexão */}
                       <div className="space-y-3">
                         {data?.contas.filter(c => c.id_conexao === conexao.id).map(conta => (
                           <div key={conta.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
@@ -157,6 +171,41 @@ export default function BancosPage() {
       <AnimatePresence>
         {isWidgetOpen && (
           <OpenFinanceWidget onEvent={handleWidgetEvent} onClose={() => setIsWidgetOpen(false)} />
+        )}
+
+        {/* Modal de confirmação de sincronização */}
+        {pendingConnection && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-md bg-white dark:bg-[var(--color-finance-card-dark)] rounded-2xl shadow-2xl p-6"
+            >
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Conexão Estabelecida!</h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
+                Atenção: Para garantir que seu dashboard reflita exatamente o seu saldo bancário, 
+                precisamos apagar as transações manuais antigas e importar o histórico oficial do banco. 
+                Deseja prosseguir e substituir os dados?
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => handleConfirmSync(true)}
+                  disabled={isSyncing}
+                  className="w-full py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold flex items-center justify-center transition-colors disabled:opacity-50"
+                >
+                  {isSyncing ? "Sincronizando banco..." : "Sim, apagar antigas e sincronizar banco"}
+                </button>
+                <button
+                  onClick={() => handleConfirmSync(false)}
+                  disabled={isSyncing}
+                  className="w-full py-3 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold flex items-center justify-center transition-colors disabled:opacity-50"
+                >
+                  Não, cancelar conexão
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
