@@ -15,17 +15,28 @@ export function OpenFinanceWidget({ onEvent, onClose }: OpenFinanceWidgetProps) 
     async function fetchToken() {
       try {
         const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
-        // Busca o Connect Token do nosso backend (seguro, sem expor credenciais no browser)
-        const res = await fetch(`${API_URL}/pluggy/connect-token`, { method: 'POST' });
+        console.log('[Pluggy] Buscando connect token em:', `${API_URL}/pluggy/connect-token`);
+        
+        const res = await fetch(`${API_URL}/pluggy/connect-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const body = await res.json();
+        console.log('[Pluggy] Resposta do backend:', res.status, body);
 
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Erro ${res.status} ao gerar token`);
+          throw new Error(body.error || `Erro ${res.status}`);
         }
 
-        const { connectToken: token } = await res.json();
-        setConnectToken(token);
+        if (!body.connectToken) {
+          throw new Error('Backend não retornou connectToken');
+        }
+
+        console.log('[Pluggy] Token obtido com sucesso, abrindo widget...');
+        setConnectToken(body.connectToken);
       } catch (err: any) {
+        console.error('[Pluggy] Erro ao buscar token:', err);
         setError(err.message);
       }
     }
