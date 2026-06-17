@@ -37,10 +37,27 @@ export default function BancosPage() {
     enabled: !!user?.id,
   });
 
-  const handleWidgetEvent = (event: string, eventData?: any) => {
+  const handleWidgetEvent = async (event: string, eventData?: any) => {
     if (event === 'SUCCESS') {
-      // Atualiza a tela de conexões com o novo banco adicionado
-      queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+        
+        // Envia os dados do item (banco conectado) para o backend salvar no banco de dados
+        await fetch(`${API_URL}/conexoes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id_usuario: user?.id,
+            public_token: eventData?.item?.id || 'pluggy-item-id',
+            instituicao: eventData?.item?.connector?.name || 'Pluggy Bank'
+          })
+        });
+
+        // Atualiza a tela de conexões com o novo banco adicionado
+        queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
+      } catch (error) {
+        console.error('Erro ao salvar a conexão no banco de dados:', error);
+      }
     }
   };
 
@@ -81,7 +98,7 @@ export default function BancosPage() {
                 <div className="text-center py-16 bg-white dark:bg-[var(--color-finance-card-dark)] rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
                   <ShieldCheck size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Nenhum banco conectado</h3>
-                  <p className="text-gray-500 max-w-sm mx-auto mb-6">Seus dados ficarão sincronizados de forma automática conectando sua conta através do Open Finance da Polp.</p>
+                  <p className="text-gray-500 max-w-sm mx-auto mb-6">Seus dados ficarão sincronizados de forma automática conectando sua conta através do Open Finance da Pluggy.</p>
                   <button
                     onClick={() => setIsWidgetOpen(true)}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-[var(--color-finance-primary)] text-[var(--color-finance-primary)] font-medium hover:bg-[var(--color-finance-primary)] hover:text-white transition-colors"
