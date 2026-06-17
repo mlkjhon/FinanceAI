@@ -219,13 +219,18 @@ export const goalsApi = {
 
 // Dashboard
 export const dashboardApi = {
-  summary: async () => {
+  summary: async (id_conexao?: string) => {
     const user = getUserData();
-    const data = await request<any>(`/dashboard?id_usuario=${user?.id}`);
+    let url = `/dashboard?id_usuario=${user?.id}`;
+    if (id_conexao && id_conexao !== 'all') {
+      url += `&id_conexao=${id_conexao}`;
+    }
+    const data = await request<any>(url);
     const receitas = typeof data.resumoMes?.entradas === 'string' ? parseFloat(data.resumoMes?.entradas) : (data.resumoMes?.entradas || 0);
     const despesas = typeof data.resumoMes?.saidas === 'string' ? parseFloat(data.resumoMes?.saidas) : (data.resumoMes?.saidas || 0);
+    const saldoTotal = typeof data.saldoTotal === 'string' ? parseFloat(data.saldoTotal) : (data.saldoTotal || 0);
     return {
-      saldo_total: typeof data.resumoMes?.saldo === 'string' ? parseFloat(data.resumoMes?.saldo) : (data.resumoMes?.saldo || 0),
+      saldo_total: saldoTotal,
       receitas_mes: receitas,
       despesas_mes: despesas,
       economia_mes: Math.max(receitas - despesas, 0),

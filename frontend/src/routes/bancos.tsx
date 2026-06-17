@@ -26,6 +26,8 @@ export default function BancosPage() {
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
   const [pendingConnection, setPendingConnection] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; nome: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -48,7 +50,6 @@ export default function BancosPage() {
 
   const handleConfirmSync = async (substituir: boolean) => {
     if (!substituir) {
-      // "caso negativa nao mude NADA"
       setPendingConnection(null);
       return;
     }
@@ -57,21 +58,32 @@ export default function BancosPage() {
       setIsSyncing(true);
       const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
       
-      await fetch(`${API_URL}/conexoes`, {
+      const res = await fetch(`${API_URL}/conexoes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id_usuario: user?.id,
           public_token: pendingConnection?.item?.id || 'pluggy-item-id',
           instituicao: pendingConnection?.item?.connector?.name || 'Pluggy Bank',
-          substituirTransacoes: substituir // Enviado para o backend
+          substituirTransacoes: substituir
         })
       });
+
+      const result = await res.json();
+      
+      if (!res.ok) {
+        alert(`❌ Erro ao sincronizar: ${result.error}`);
+      } else {
+        const totalTx = result.totalTransacoes ?? 0;
+        const totalContas = result.contas?.length ?? 0;
+        alert(`✅ Sincronização concluída!\n${totalContas} conta(s) importada(s)\n${totalTx} transação(ões) importada(s)`);
+      }
 
       queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
       setPendingConnection(null);
     } catch (error) {
       console.error('Erro ao salvar a conexão no banco de dados:', error);
+      alert('❌ Erro de conexão. Tente novamente.');
     } finally {
       setIsSyncing(false);
     }
@@ -125,10 +137,17 @@ export default function BancosPage() {
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {data?.conexoes.map(conexao => (
                     <FinanceCard key={conexao.id} className="relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-4">
+                      <div className="absolute top-0 right-0 p-4 flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" title="Sincronização Ativa" />
+                        <button
+                          onClick={() => setDeleteConfirm({ id: conexao.id, nome: conexao.instituicao })}
+                          className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                          title="Remover conexão"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        </button>
                       </div>
-                      <div className="flex items-center gap-4 mb-6">
+                      <div className="flex items-center gap-4 mb-6 mt-2">
                         <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                           <Building2 size={24} className="text-gray-500" />
                         </div>
@@ -176,32 +195,101 @@ export default function BancosPage() {
         {/* Modal de confirmação de sincronização */}
         {pendingConnection && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="w-full max-w-md bg-white dark:bg-[var(--color-finance-card-dark)] rounded-2xl shadow-2xl p-6"
+              className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6"
             >
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Conexão Estabelecida!</h3>
-              <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
-                Atenção: Para garantir que seu dashboard reflita exatamente o seu saldo bancário, 
-                precisamos apagar as transações manuais antigas e importar o histórico oficial do banco. 
-                Deseja prosseguir e substituir os dados?
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                  <ShieldCheck size={20} className="text-green-500" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Conexão Estabelecida!</h3>
+              </div>
+              <p className="text-gray-600 text-sm mb-6 leading-relaxed">
+                Para garantir que seu dashboard reflita exatamente o saldo bancário, precisamos importar
+                o histórico oficial do banco. <strong>Deseja apagar os dados manuais antigos e substituí-los pelos dados reais?</strong>
               </p>
-              
               <div className="flex flex-col gap-3">
                 <button
                   onClick={() => handleConfirmSync(true)}
                   disabled={isSyncing}
-                  className="w-full py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold flex items-center justify-center transition-colors disabled:opacity-50"
+                  className="w-full py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                 >
-                  {isSyncing ? "Sincronizando banco..." : "Sim, apagar antigas e sincronizar banco"}
+                  {isSyncing ? (
+                    <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Sincronizando (isso pode levar até 1 minuto)...</>
+                  ) : 'Sim, apagar e sincronizar com banco'}
                 </button>
                 <button
                   onClick={() => handleConfirmSync(false)}
                   disabled={isSyncing}
-                  className="w-full py-3 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold flex items-center justify-center transition-colors disabled:opacity-50"
+                  className="w-full py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition-colors disabled:opacity-50"
                 >
-                  Não, cancelar conexão
+                  Não, cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Modal de confirmação de exclusão de banco */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden"
+            >
+              {/* Header vermelho */}
+              <div className="bg-red-50 px-6 pt-6 pb-4 flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Remover Banco</h3>
+                  <p className="text-sm text-gray-500 mt-0.5">{deleteConfirm.nome}</p>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-4">
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Tem certeza que deseja remover <strong>{deleteConfirm.nome}</strong>?<br />
+                  <span className="text-red-500 font-medium">Esta ação irá apagar todas as contas e transações vinculadas a este banco e não pode ser desfeita.</span>
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="px-6 pb-6 flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      setIsDeleting(true);
+                      const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+                      await fetch(`${API_URL}/conexoes/${deleteConfirm.id}`, { method: 'DELETE' });
+                      queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
+                      setDeleteConfirm(null);
+                    } catch (e) {
+                      console.error('Erro ao remover', e);
+                    } finally {
+                      setIsDeleting(false);
+                    }
+                  }}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Removendo...</>
+                  ) : 'Sim, remover'}
                 </button>
               </div>
             </motion.div>

@@ -1,8 +1,9 @@
 import {Pool} from 'pg';
 
 const BD = new Pool ({
-    connectionString: "postgresql://postgres.okfbdtdhqcqlzbhgqejs:BancodeDados@aws-1-us-west-2.pooler.supabase.com:5432/postgres",
-    ssl: { rejectUnauthorized: false}
+    connectionString: "postgresql://postgres.okfbdtdhqcqlzbhgqejs:BancodeDados@aws-1-us-west-2.pooler.supabase.com:6543/postgres",
+    ssl: { rejectUnauthorized: false},
+    connectionTimeoutMillis: 5000 // Falha rápida se não conectar
 });
 
 // const BD = new Pool({

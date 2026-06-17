@@ -14,6 +14,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as GoalsRouteImport } from './routes/goals'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as BudgetsRouteImport } from './routes/budgets'
 import { Route as BancosRouteImport } from './routes/bancos'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -43,6 +44,11 @@ const GoalsRoute = GoalsRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoriasRoute = CategoriasRouteImport.update({
+  id: '/categorias',
+  path: '/categorias',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BudgetsRoute = BudgetsRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/bancos': typeof BancosRoute
   '/budgets': typeof BudgetsRoute
+  '/categorias': typeof CategoriasRoute
   '/dashboard': typeof DashboardRoute
   '/goals': typeof GoalsRoute
   '/insights': typeof InsightsRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/bancos': typeof BancosRoute
   '/budgets': typeof BudgetsRoute
+  '/categorias': typeof CategoriasRoute
   '/dashboard': typeof DashboardRoute
   '/goals': typeof GoalsRoute
   '/insights': typeof InsightsRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/bancos': typeof BancosRoute
   '/budgets': typeof BudgetsRoute
+  '/categorias': typeof CategoriasRoute
   '/dashboard': typeof DashboardRoute
   '/goals': typeof GoalsRoute
   '/insights': typeof InsightsRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/bancos'
     | '/budgets'
+    | '/categorias'
     | '/dashboard'
     | '/goals'
     | '/insights'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/bancos'
     | '/budgets'
+    | '/categorias'
     | '/dashboard'
     | '/goals'
     | '/insights'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/bancos'
     | '/budgets'
+    | '/categorias'
     | '/dashboard'
     | '/goals'
     | '/insights'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BancosRoute: typeof BancosRoute
   BudgetsRoute: typeof BudgetsRoute
+  CategoriasRoute: typeof CategoriasRoute
   DashboardRoute: typeof DashboardRoute
   GoalsRoute: typeof GoalsRoute
   InsightsRoute: typeof InsightsRoute
@@ -195,6 +208,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/categorias': {
+      id: '/categorias'
+      path: '/categorias'
+      fullPath: '/categorias'
+      preLoaderRoute: typeof CategoriasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/budgets': {
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BancosRoute: BancosRoute,
   BudgetsRoute: BudgetsRoute,
+  CategoriasRoute: CategoriasRoute,
   DashboardRoute: DashboardRoute,
   GoalsRoute: GoalsRoute,
   InsightsRoute: InsightsRoute,

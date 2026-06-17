@@ -1,10 +1,10 @@
-import { Suspense } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Plus, ArrowRight } from 'lucide-react';
-import { dashboardApi, transactionsApi } from '../lib/api';
+import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Plus, ArrowRight, ArrowUpRight, Building2 } from 'lucide-react';
+import { dashboardApi, transactionsApi, getUserData } from '../lib/api';
 import { StatCard, FinanceCard, SkeletonCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
 import { formatCurrency, formatDate } from '../lib/utils';
@@ -119,26 +119,26 @@ function LineChart({ data }: { data: { mes: string; saldo: number }[] }) {
       <AreaChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="colorSaldo" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-            <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-        <XAxis 
-          dataKey="mes" 
-          axisLine={false} 
-          tickLine={false} 
+        <XAxis
+          dataKey="mes"
+          axisLine={false}
+          tickLine={false}
           tick={{ fontSize: 12, fill: '#9CA3AF' }}
           dy={10}
         />
         <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} />
-        <Area 
-          type="monotone" 
-          dataKey="saldo" 
-          stroke="#10B981" 
+        <Area
+          type="monotone"
+          dataKey="saldo"
+          stroke="#10B981"
           strokeWidth={3}
-          fillOpacity={1} 
-          fill="url(#colorSaldo)" 
+          fillOpacity={1}
+          fill="url(#colorSaldo)"
           activeDot={{ r: 6, fill: '#10B981', stroke: '#fff', strokeWidth: 2 }}
         />
       </AreaChart>
@@ -193,9 +193,28 @@ function BarChart({ data }: { data: { mes: string; entradas?: number; saidas?: n
 }
 
 function DashboardContent() {
+  const [idConexao, setIdConexao] = useState('all');
+  const [conexoes, setConexoes] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchConexoes = async () => {
+      try {
+        const user = getUserData();
+        if (!user) return;
+        const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+        const res = await fetch(`${API_URL}/conexoes/${user.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setConexoes(data.conexoes || []);
+        }
+      } catch (err) { }
+    };
+    fetchConexoes();
+  }, []);
+
   const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['dashboard-summary'],
-    queryFn: dashboardApi.summary,
+    queryKey: ['dashboard-summary', idConexao],
+    queryFn: () => dashboardApi.summary(idConexao),
     retry: false,
   });
 
@@ -215,21 +234,68 @@ function DashboardContent() {
   return (
     <div className="space-y-8 pb-16">
       {/* Cabeçalho */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="font-bold text-2xl text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-1">Visão geral das suas finanças</p>
         </div>
-        <Link
-          to="/transactions"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-hero text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow shadow-[var(--color-finance-primary)]/30"
-        >
-          <Plus size={16} />
-          Nova transação
-        </Link>
-      </div>
 
-      {/* Cards de resumo */}
+        <div className="flex items-center gap-3">
+          {conexoes.length > 0 && (
+            <div className="relative flex items-center gap-2">
+              <div className="relative">
+                <select
+                  value={idConexao}
+                  onChange={(e) => setIdConexao(e.target.value)}
+                  className="appearance-none bg-white border border-gray-200 text-gray-700 py-2.5 pl-10 pr-8 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] shadow-sm cursor-pointer transition-all hover:bg-gray-50"
+                >
+                  {conexoes.map(c => (
+                    <option key={c.id} value={c.id}>{c.instituicao}</option>
+                  ))}
+                </select>
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <Building2 size={16} />
+                </div>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                </div>
+              </div>
+
+              <button
+                onClick={async () => {
+                  try {
+                    const nomeStr = prompt("Nome da área de testes:", "Área de Teste (Em Branco)");
+                    if (!nomeStr) return;
+                    const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+                    const user = getUserData();
+                    await fetch(`${API_URL}/conexoes/manual`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id_usuario: user?.id, nome: nomeStr })
+                    });
+                    window.location.reload();
+                  } catch (e) {
+                    console.error('Erro ao criar banco manual', e);
+                  }
+                }}
+                className="px-3 py-2.5 text-sm font-medium bg-[var(--color-finance-primary)] text-white rounded-xl hover:bg-[var(--color-finance-primary)]/90 transition-colors shadow-sm flex items-center gap-1"
+                title="Criar novo espaço em branco"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                Criar
+              </button>
+            </div>
+          )}
+
+          <Link
+            to="/transactions"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-hero text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow shadow-[var(--color-finance-primary)]/30"
+          >
+            <Plus size={16} />
+            Nova transação
+          </Link>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {summaryLoading
           ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} lines={2} />)
@@ -254,11 +320,11 @@ function DashboardContent() {
 
         {/* Gastos por categoria */}
         <FinanceCard>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <h2 className="font-semibold text-gray-900">Gastos por Categoria</h2>
-            <Link to="/budgets" className="flex items-center gap-1 text-sm text-[var(--color-finance-primary)] hover:underline">
-              Ver orçamentos <ArrowRight size={14} />
-            </Link>
+            <a href="/categorias" className="text-sm text-[var(--color-finance-primary)] font-medium hover:underline flex items-center gap-1">
+              Ver detalhes <ArrowUpRight size={16} />
+            </a>
           </div>
           {summaryLoading
             ? <SkeletonCard lines={3} className="border-0 shadow-none" />
@@ -295,10 +361,10 @@ function DashboardContent() {
             Ver todas <ArrowRight size={14} />
           </Link>
         </div>
-        {txLoading
+        {summaryLoading
           ? <SkeletonCard lines={4} className="border-0 shadow-none" />
-          : txData?.data.length
-            ? txData.data.map((t) => <TransactionRow key={t.id} t={t} />)
+          : summary?.ultimas_transacoes?.length
+            ? summary.ultimas_transacoes.map((t) => <TransactionRow key={t.id} t={t} />)
             : <p className="text-sm text-gray-400 text-center py-6">Nenhuma transação encontrada</p>
         }
       </FinanceCard>
