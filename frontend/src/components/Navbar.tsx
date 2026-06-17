@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
-import { TrendingUp, Menu, X, Moon, Sun } from 'lucide-react';
+import { TrendingUp, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 
@@ -18,12 +18,6 @@ const navLinks = [
 export function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const [dark, setDark] = React.useState(() => document.body.classList.contains('dark'));
-
-  const toggleDark = () => {
-    document.body.classList.toggle('dark');
-    setDark((prev) => !prev);
-  };
 
   return (
     <motion.nav
@@ -62,13 +56,6 @@ export function Navbar() {
 
           {/* Right actions */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={toggleDark}
-              className="p-2 rounded-lg text-gray-500 hover:text-[var(--color-finance-primary)] hover:bg-[var(--color-finance-primary)]/5 transition-colors"
-              aria-label="Toggle dark mode"
-            >
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
 
             {isAuthenticated ? (
               <>
