@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PluggyConnect } from 'react-pluggy-connect';
+import { Loader2, X } from 'lucide-react';
 
 interface OpenFinanceWidgetProps {
   onEvent: (event: string, data?: any) => void;
@@ -7,28 +8,88 @@ interface OpenFinanceWidgetProps {
 }
 
 export function OpenFinanceWidget({ onEvent, onClose }: OpenFinanceWidgetProps) {
-  // Token real fornecido para conectar na API do Open Finance (Pluggy)
-  const [connectToken] = useState('eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjoiMGZhZjkzODU3NTEyODAzNDg2NWIwNDY0NGVlNmFjMjY6NjhhMGYzZTk3ODQ0YTllNzA2NWYwZmM1OWE1ZDliYWExZGU1MmY4MTdjYTM1ZmY5MmZjNmYyYWJiNzZhNjY5YTA4ZTYzYjMzN2NhMzRjMjdlZTE2NTM0OTMzYjUzYWI5NDkzMmE3YWNmM2EwZjQ3NWMwYTk4MTNmYzRmYTY1NzRmOWUwYjFlODkxMWZmYzk5ZmM4NzYyOTQ2MzJmMjA3YSIsImlhdCI6MTc4MTcxNTgyNSwiZXhwIjoxNzgxNzIzMDI1fQ.ZD8wH635sut_SEwFZlf4U7cKsSb1OzQXIgvhvxhJhjq_Y-c2X59btjcWWBROPSajgCX4MEoUgLZgbf8uBOWBUL_1JJ29FxyE-IOdktLTLnE9e5acYqYFPN0Jo2tZLfICMMMnzyG7fdbdOZfZ2h0eYzvLIOI4JoJprSj8mhlrmnUE1SFGYmoCv6WuIN0tUqxq2VEgUOJufSEKUz_76sFsDs3lKrKCAcrzri3DY49rmmuM90yusDuKUPpWr4xCYTZZp5ppRyJPWM6EEmpv7PW0BVOc8jKUK_yOM5b_d6vjdhbs6APGglzRIkP8Gfl1NRt-AhnWZnBCkTw4j5j_kXimHw');
+  const [connectToken, setConnectToken] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchToken() {
+      try {
+        const clientId = 'f8e57dd0-2c03-41b5-b2d8-6b63f2672751';
+        const clientSecret = '54aac48c-1d05-4594-9ab9-eed8810c2e72';
+
+        const authRes = await fetch('https://api.pluggy.ai/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clientId, clientSecret })
+        });
+        
+        if (!authRes.ok) throw new Error('Falha na autenticação da API Pluggy');
+        const authData = await authRes.json();
+        
+        const ctRes = await fetch('https://api.pluggy.ai/connect_token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-KEY': authData.apiKey
+          }
+        });
+
+        if (!ctRes.ok) throw new Error('Falha ao gerar o Connect Token');
+        const ctData = await ctRes.json();
+        
+        setConnectToken(ctData.accessToken);
+      } catch (err: any) {
+        setError(err.message);
+      }
+    }
+
+    fetchToken();
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-0">
-      <div className="w-full max-w-md h-[90vh] sm:h-[600px] bg-white dark:bg-[#1C1C1E] rounded-2xl overflow-hidden shadow-2xl">
-        <PluggyConnect
-          connectToken={connectToken}
-          includeSandbox={true}
-          theme="dark"
-          onSuccess={(itemData) => {
-            onEvent('SUCCESS', itemData);
-            onClose();
-          }}
-          onError={(error) => {
-            console.error('Pluggy Error:', error);
-            onEvent('ERROR', error);
-          }}
-          onClose={() => {
-            onClose();
-          }}
-        />
+      <div className="w-full max-w-md h-[90vh] sm:h-[600px] bg-white rounded-2xl overflow-hidden relative shadow-2xl flex flex-col">
+        {!connectToken && !error && (
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <Loader2 className="w-10 h-10 text-[var(--color-finance-primary)] animate-spin mb-4" />
+            <p className="text-gray-500 font-medium">Iniciando ambiente seguro...</p>
+          </div>
+        )}
+        
+        {error && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <X className="w-6 h-6 text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Erro de Conexão</h3>
+            <p className="text-sm text-gray-500 mb-6">{error}</p>
+            <button 
+              onClick={onClose}
+              className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+            >
+              Voltar
+            </button>
+          </div>
+        )}
+
+        {connectToken && (
+          <PluggyConnect
+            connectToken={connectToken}
+            includeSandbox={true}
+            theme="light"
+            onSuccess={(itemData) => {
+              onEvent('SUCCESS', itemData);
+              onClose();
+            }}
+            onError={(error) => {
+              console.error('Pluggy Error:', error);
+              onEvent('ERROR', error);
+            }}
+            onClose={() => {
+              onClose();
+            }}
+          />
+        )}
       </div>
     </div>
   );
