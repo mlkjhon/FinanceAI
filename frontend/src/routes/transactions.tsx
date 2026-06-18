@@ -169,14 +169,12 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
                   <select {...register('id_subcategoria')}
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-black/20 text-sm outline-none focus:border-[var(--color-finance-primary)]">
                     <option value="">Selecione...</option>
-                    {(subcats ?? []).map((s: any) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nome}
-                      </option>
+                    {(subcats as any[] | undefined)?.map((s) => (
+                      <option key={s.id} value={s.id}>{s.nome}</option>
                     ))}
                   </select>
                 </div>
-             
+
             </div>
           )}
 
