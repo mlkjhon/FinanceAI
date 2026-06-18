@@ -164,8 +164,6 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
                   {filteredCats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 </select>
               </div>
-
-              {id_categoria && subcats && (subcats as any[]).length > 0 && (
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Subcategoria</label>
                   <select {...register('id_subcategoria')}
@@ -174,7 +172,7 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
                     {(subcats as any[]).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                   </select>
                 </div>
-              )}
+             
             </div>
           )}
 
