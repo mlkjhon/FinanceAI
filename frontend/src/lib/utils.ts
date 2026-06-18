@@ -10,7 +10,10 @@ export function formatCurrency(value: number, locale = 'pt-BR', currency = 'BRL'
 }
 
 export function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('pt-BR');
+  if (!dateStr) return '';
+  const datePart = dateStr.split('T')[0];
+  const [year, month, day] = datePart.split('-');
+  return `${day}/${month}/${year}`;
 }
 
 export function formatDateRelative(dateStr: string) {

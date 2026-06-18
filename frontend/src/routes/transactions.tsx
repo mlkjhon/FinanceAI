@@ -37,6 +37,8 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
       descricao: tx.descricao,
       valor: tx.valor,
       tipo: tx.tipo,
+      id_categoria: tx.id_categoria || '',
+      id_subcategoria: tx.id_subcategoria || '',
       data: tx.data?.split('T')[0],
     } : { tipo: 'despesa' },
   });
@@ -88,7 +90,9 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
       descricao: data.descricao,
       valor: data.valor,
       tipo: data.tipo,
+      id_categoria: data.id_categoria || undefined,
       id_subcategoria: data.id_subcategoria || undefined,
+      data: data.data || undefined,
     };
     if (tx) await updateMut.mutateAsync({ id: tx.id, data: payload });
     else await createMut.mutateAsync(payload);
@@ -151,13 +155,26 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
 
           {/* Categoria - auto-seleciona subcategoria ao escolher */}
           {filteredCats.length > 0 && (
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Categoria</label>
-              <select {...register('id_categoria')} onChange={(e) => handleCatChange(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-black/20 text-sm outline-none focus:border-[var(--color-finance-primary)]">
-                <option value="">Selecione uma categoria</option>
-                {filteredCats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Categoria</label>
+                <select {...register('id_categoria')} onChange={(e) => handleCatChange(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-black/20 text-sm outline-none focus:border-[var(--color-finance-primary)]">
+                  <option value="">Selecione uma categoria</option>
+                  {filteredCats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+
+              {id_categoria && subcats && (subcats as any[]).length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Subcategoria</label>
+                  <select {...register('id_subcategoria')}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-black/20 text-sm outline-none focus:border-[var(--color-finance-primary)]">
+                    <option value="">Selecione...</option>
+                    {(subcats as any[]).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
           )}
 

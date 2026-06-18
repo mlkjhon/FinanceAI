@@ -71,21 +71,39 @@ export const authApi = {
 
 // Transactions
 export const transactionsApi = {
-  list: async (_params?: TransactionFilters) => {
+  list: async (params?: TransactionFilters) => {
     const data = await request<any[]>('/transacoes');
+    let filtered = data.map(d => ({
+      id: String(d.id_transacao),
+      descricao: d.descricao,
+      valor: typeof d.valor === 'string' ? parseFloat(d.valor) : d.valor,
+      tipo: d.tipo === 'E' ? 'receita' : 'despesa',
+      id_categoria: d.id_categoria ? String(d.id_categoria) : undefined,
+      id_subcategoria: d.id_subcategoria ? String(d.id_subcategoria) : undefined,
+      categoria_nome: d.categoria_nome,
+      data: d.data_registro || d.data_pagamento || d.created_at,
+      created_at: d.data_registro || d.created_at
+    }));
+
+    if (params?.busca) {
+      const lowerBusca = params.busca.toLowerCase();
+      filtered = filtered.filter(t => t.descricao.toLowerCase().includes(lowerBusca));
+    }
+    if (params?.tipo) {
+      filtered = filtered.filter(t => t.tipo === params.tipo);
+    }
+
+    const page = parseInt(params?.page || '1', 10);
+    const limit = parseInt(params?.limit || '10', 10);
+    const start = (page - 1) * limit;
+    const paginated = filtered.slice(start, start + limit);
+
     return {
-      data: data.map(d => ({
-        id: String(d.id_transacao),
-        descricao: d.descricao,
-        valor: typeof d.valor === 'string' ? parseFloat(d.valor) : d.valor,
-        tipo: d.tipo === 'E' ? 'receita' : 'despesa',
-        id_subcategoria: d.id_subcategoria ? String(d.id_subcategoria) : undefined,
-        categoria_nome: d.categoria_nome,
-        data: d.data_registro,
-        created_at: d.data_registro
-      })),
-      total: data.length,
-      page: 1, limit: 100, totalPages: 1
+      data: paginated,
+      total: filtered.length,
+      page,
+      limit,
+      totalPages: Math.ceil(filtered.length / limit) || 1
     } as PaginatedResponse<Transaction>;
   },
   create: async (data: CreateTransaction) => {
@@ -97,7 +115,11 @@ export const transactionsApi = {
         descricao: data.descricao,
         valor: data.valor,
         tipo: data.tipo === 'receita' ? 'E' : 'S',
+        id_categoria: data.id_categoria ?? undefined,
         id_subcategoria: data.id_subcategoria ?? undefined,
+        data_registro: data.data,
+        data_pagamento: data.data,
+        data: data.data,
       })
     });
   },
@@ -108,7 +130,11 @@ export const transactionsApi = {
         descricao: data.descricao,
         valor: data.valor,
         tipo: data.tipo === 'receita' ? 'E' : 'S',
+        id_categoria: data.id_categoria ?? undefined,
         id_subcategoria: data.id_subcategoria ?? null,
+        data_registro: data.data,
+        data_pagamento: data.data,
+        data: data.data,
       })
     });
   },
@@ -305,7 +331,8 @@ export interface Transaction {
   descricao: string;
   valor: number;
   tipo: 'receita' | 'despesa';
-  categoria_id?: string;
+  id_categoria?: string;
+  id_subcategoria?: string;
   categoria_nome?: string;
   data: string;
   created_at: string;
@@ -321,6 +348,7 @@ export interface CreateTransaction {
   descricao: string;
   valor: number;
   tipo: 'receita' | 'despesa';
+  id_categoria?: string;
   id_subcategoria?: string;
   data?: string;
 }

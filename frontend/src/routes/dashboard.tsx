@@ -244,46 +244,9 @@ function DashboardContent() {
           {conexoes.length > 0 && (
             <div className="relative flex items-center gap-2">
               <div className="relative">
-                <select
-                  value={idConexao}
-                  onChange={(e) => setIdConexao(e.target.value)}
-                  className="appearance-none bg-white border border-gray-200 text-gray-700 py-2.5 pl-10 pr-8 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] shadow-sm cursor-pointer transition-all hover:bg-gray-50"
-                >
-                  {conexoes.map(c => (
-                    <option key={c.id} value={c.id}>{c.instituicao}</option>
-                  ))}
-                </select>
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                  <Building2 size={16} />
-                </div>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
-                </div>
               </div>
 
-              <button
-                onClick={async () => {
-                  try {
-                    const nomeStr = prompt("Nome da área de testes:", "Área de Teste (Em Branco)");
-                    if (!nomeStr) return;
-                    const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
-                    const user = getUserData();
-                    await fetch(`${API_URL}/conexoes/manual`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ id_usuario: user?.id, nome: nomeStr })
-                    });
-                    window.location.reload();
-                  } catch (e) {
-                    console.error('Erro ao criar banco manual', e);
-                  }
-                }}
-                className="px-3 py-2.5 text-sm font-medium bg-[var(--color-finance-primary)] text-white rounded-xl hover:bg-[var(--color-finance-primary)]/90 transition-colors shadow-sm flex items-center gap-1"
-                title="Criar novo espaço em branco"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                Criar
-              </button>
+             
             </div>
           )}
 

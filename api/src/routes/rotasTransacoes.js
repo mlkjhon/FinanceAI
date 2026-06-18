@@ -37,10 +37,13 @@ router.get('/transacoes/:id_transacao', async (req, res) => {
 });
 
 router.post('/transacoes', async (req, res) => {
-    const { id_usuario, descricao, valor, tipo, id_subcategoria } = req.body;
+    const { id_usuario, descricao, valor, tipo, id_subcategoria, data_registro } = req.body;
     try {
-        let comando = `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria) VALUES ($1, $2, $3, $4, $5)`;
+        // Se data_registro não for fornecida, o banco usa o valor default
+        let comando = `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria${data_registro ? ', data_registro' : ''}) VALUES ($1, $2, $3, $4, $5${data_registro ? ', $6' : ''})`;
         let valores = [id_usuario, descricao, valor, tipo, id_subcategoria || null];
+        if (data_registro) valores.push(data_registro);
+        
         await BD.query(comando, valores);
         return res.status(201).json({ message: 'Transação cadastrada com sucesso' });
     } catch (error) {
@@ -50,13 +53,20 @@ router.post('/transacoes', async (req, res) => {
 
 router.put('/transacoes/:id_transacao', async (req, res) => {
     const { id_transacao } = req.params;
-    const { descricao, valor, tipo, id_subcategoria } = req.body;
+    const { descricao, valor, tipo, id_subcategoria, data_registro } = req.body;
     try {
         const verificar = await BD.query(`SELECT id_transacao FROM transacoes WHERE id_transacao = $1`, [id_transacao]);
         if (verificar.rowCount === 0) return res.status(404).json({ message: 'Transação não encontrada' });
 
-        const comando = `UPDATE transacoes SET descricao=$1, valor=$2, tipo=$3, id_subcategoria=$5 WHERE id_transacao=$4`;
+        let comando = `UPDATE transacoes SET descricao=$1, valor=$2, tipo=$3, id_subcategoria=$5`;
         const valores = [descricao, valor, tipo, id_transacao, id_subcategoria || null];
+        
+        if (data_registro) {
+            comando += `, data_registro=$6`;
+            valores.push(data_registro);
+        }
+        comando += ` WHERE id_transacao=$4`;
+
         await BD.query(comando, valores);
         return res.status(200).json({ message: 'Transação atualizada com sucesso' });
     } catch (error) {
