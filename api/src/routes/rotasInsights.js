@@ -1,15 +1,12 @@
 import { Router } from "express";
 import { BD } from "../../db.js";
+import { autenticar } from "../middlewares/autenticar.js";
 
 const router = Router();
 
 
-router.get('/insights', async (req, res) => {
-    const { id_usuario } = req.query;
-
-    if (!id_usuario) {
-        return res.status(400).json({ error: 'O id_usuario é obrigatório.' });
-    }
+router.get('/insights', autenticar, async (req, res) => {
+    const id_usuario = req.usuario.id;
 
     try {
         // Busca um resumo dos gastos do usuário por categoria

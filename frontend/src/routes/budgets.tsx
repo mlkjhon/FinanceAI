@@ -10,7 +10,7 @@ import { formatCurrency } from '../lib/utils';
 
 export const Route = createFileRoute('/budgets')({
   beforeLoad: () => {
-    if (!localStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
+    if (!localStorage.getItem('finance_token') && !sessionStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
   },
   component: BudgetsPage,
 });

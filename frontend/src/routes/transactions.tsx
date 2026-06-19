@@ -13,7 +13,7 @@ import { formatCurrency, formatDate, cn } from '../lib/utils';
 
 export const Route = createFileRoute('/transactions')({
   beforeLoad: () => {
-    if (!localStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
+    if (!localStorage.getItem('finance_token') && !sessionStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
   },
   component: TransactionsPage,
 });

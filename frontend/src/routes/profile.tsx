@@ -11,7 +11,7 @@ import { useNavigate } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/profile')({
   beforeLoad: () => {
-    if (!localStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
+    if (!localStorage.getItem('finance_token') && !sessionStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
   },
   component: ProfilePage,
 });

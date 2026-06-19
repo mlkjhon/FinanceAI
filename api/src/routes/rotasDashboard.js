@@ -1,14 +1,12 @@
 import { Router } from "express"
 import { BD } from "../../db.js"
+import { autenticar } from "../middlewares/autenticar.js";
 
 const router = Router();
 
-router.get('/dashboard', async (req, res) => {
-    const { id_usuario, id_conexao } = req.query;
-
-    if (!id_usuario) {
-        return res.status(400).json({ error: 'O id_usuario é obrigatório para o Dashboard.' });
-    }
+router.get('/dashboard', autenticar, async (req, res) => {
+    const { id_conexao } = req.query;
+    const id_usuario = req.usuario.id;
 
     try{
         let filtroConexao = '';

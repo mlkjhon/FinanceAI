@@ -12,7 +12,7 @@ import { Link } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/dashboard')({
   beforeLoad: () => {
-    const token = localStorage.getItem('finance_token');
+    const token = localStorage.getItem('finance_token') || sessionStorage.getItem('finance_token');
     if (!token) throw redirect({ to: '/auth' });
   },
   component: DashboardPage,

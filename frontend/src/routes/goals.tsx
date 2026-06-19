@@ -10,7 +10,7 @@ import { formatCurrency, formatDate } from '../lib/utils';
 
 export const Route = createFileRoute('/goals')({
   beforeLoad: () => {
-    if (!localStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
+    if (!localStorage.getItem('finance_token') && !sessionStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
   },
   component: GoalsPage,
 });

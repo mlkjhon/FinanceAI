@@ -1,14 +1,11 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
+import { autenticar } from "../middlewares/autenticar.js";
 
 const router = Router();
 
-router.get('/metas', async (req, res) => {
-    const { id_usuario } = req.query;
-
-    if (!id_usuario) {
-        return res.status(400).json({ error: 'O id_usuario é obrigatório para listar as metas.' });
-    }
+router.get('/metas', autenticar, async (req, res) => {
+    const id_usuario = req.usuario.id;
 
     try {
         const comando = `
@@ -27,11 +24,12 @@ router.get('/metas', async (req, res) => {
     }
 });
 
-router.post('/metas', async (req, res) => {
-    const { id_usuario, titulo, descricao, valor_meta, valor_atual, data_objetivo } = req.body;
+router.post('/metas', autenticar, async (req, res) => {
+    const id_usuario = req.usuario.id;
+    const { titulo, descricao, valor_meta, valor_atual, data_objetivo } = req.body;
 
-    if (!id_usuario || !titulo || !valor_meta) {
-        return res.status(400).json({ error: 'Os campos id_usuario, titulo e valor_meta são obrigatórios.' });
+    if (!titulo || !valor_meta) {
+        return res.status(400).json({ error: 'Os campos titulo e valor_meta são obrigatórios.' });
     }
 
     try {
@@ -59,12 +57,13 @@ router.post('/metas', async (req, res) => {
 });
 
 
-router.delete('/metas/:id_meta', async (req, res) => {
+router.delete('/metas/:id_meta', autenticar, async (req, res) => {
     const { id_meta } = req.params;
+    const id_usuario = req.usuario.id;
 
     try {
-        const comando = `DELETE FROM metas_financeiras WHERE id_meta = $1`;
-        await BD.query(comando, [id_meta]);
+        const comando = `DELETE FROM metas_financeiras WHERE id_meta = $1 AND id_usuario = $2`;
+        await BD.query(comando, [id_meta, id_usuario]);
         return res.status(200).json({ message: 'Meta deletada com sucesso.' });
     } catch (error) {
         console.error('Erro ao deletar meta:', error.message);
@@ -73,12 +72,13 @@ router.delete('/metas/:id_meta', async (req, res) => {
 });
 
 
-router.patch('/metas/:id_meta/adicionar', async (req, res) => {
+router.patch('/metas/:id_meta/adicionar', autenticar, async (req, res) => {
     const { id_meta } = req.params;
-    const { valor, id_usuario } = req.body;
+    const id_usuario = req.usuario.id;
+    const { valor } = req.body;
 
-    if (!valor || !id_usuario || isNaN(Number(valor)) || Number(valor) <= 0) {
-        return res.status(400).json({ error: 'Informe um valor positivo e o id_usuario.' });
+    if (!valor || isNaN(Number(valor)) || Number(valor) <= 0) {
+        return res.status(400).json({ error: 'Informe um valor positivo e válido.' });
     }
 
     try {

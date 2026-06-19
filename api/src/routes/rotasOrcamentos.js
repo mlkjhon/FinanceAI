@@ -1,15 +1,12 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
+import { autenticar } from "../middlewares/autenticar.js";
 
 const router = Router();
 
 
-router.get('/orcamentos', async (req, res) => {
-    const { id_usuario } = req.query;
-
-    if (!id_usuario) {
-        return res.status(400).json({ error: 'O id_usuario é obrigatório para listar os orçamentos.' });
-    }
+router.get('/orcamentos', autenticar, async (req, res) => {
+    const id_usuario = req.usuario.id;
 
     try {
        
@@ -47,10 +44,11 @@ router.get('/orcamentos', async (req, res) => {
 });
 
 
-router.post('/orcamentos', async (req, res) => {
-    const { id_usuario, id_categoria, mes, ano, valor_limite } = req.body;
+router.post('/orcamentos', autenticar, async (req, res) => {
+    const id_usuario = req.usuario.id;
+    const { id_categoria, mes, ano, valor_limite } = req.body;
 
-    if (!id_usuario || !id_categoria || !mes || !ano || !valor_limite) {
+    if (!id_categoria || !mes || !ano || !valor_limite) {
         return res.status(400).json({ error: 'Todos os campos são obrigatórios para criar um orçamento.' });
     }
 
@@ -72,12 +70,13 @@ router.post('/orcamentos', async (req, res) => {
 });
 
 
-router.delete('/orcamentos/:id_orcamento', async (req, res) => {
+router.delete('/orcamentos/:id_orcamento', autenticar, async (req, res) => {
     const { id_orcamento } = req.params;
+    const id_usuario = req.usuario.id;
 
     try {
-        const comando = `DELETE FROM orcamentos WHERE id_orcamento = $1`;
-        await BD.query(comando, [id_orcamento]);
+        const comando = `DELETE FROM orcamentos WHERE id_orcamento = $1 AND id_usuario = $2`;
+        await BD.query(comando, [id_orcamento, id_usuario]);
         return res.status(200).json({ message: 'Orçamento deletado com sucesso.' });
     } catch (error) {
         console.error('Erro ao deletar orçamento:', error.message);

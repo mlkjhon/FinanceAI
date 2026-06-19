@@ -10,7 +10,7 @@ import { OpenFinanceWidget } from '../components/OpenFinanceWidget';
 
 export const Route = createFileRoute('/bancos')({
   beforeLoad: () => {
-    const token = localStorage.getItem('finance_token');
+    const token = localStorage.getItem('finance_token') || sessionStorage.getItem('finance_token');
     if (!token) throw redirect({ to: '/auth' });
   },
   component: BancosPage,

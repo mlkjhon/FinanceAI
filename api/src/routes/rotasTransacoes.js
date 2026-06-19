@@ -7,23 +7,15 @@ const router = Router();
 // Listar transações
 router.get('/transacoes', autenticar, async (req, res) => {
     try {
-        const { id_usuario } = req.query;
+        const id_usuario = req.usuario.id;
         let comando = `
             SELECT t.*, c.nome as categoria_nome 
             FROM transacoes t 
             LEFT JOIN subcategorias s ON t.id_subcategoria = s.id_subcategoria 
             LEFT JOIN categorias c ON s.id_categoria = c.id_categoria 
+            WHERE t.id_usuario = $1
         `;
-        let valores = [];
-
-        if (id_usuario) {
-            const checkUser = await BD.query('SELECT id_usuario FROM usuarios WHERE id_usuario = $1', [id_usuario]);
-            if (checkUser.rowCount === 0) {
-                return res.status(404).json({ error: 'Usuário não encontrado' });
-            }
-            comando += ` WHERE t.id_usuario = $1`;
-            valores.push(id_usuario);
-        }
+        let valores = [id_usuario];
 
         comando += ` ORDER BY t.id_transacao DESC`;
 
@@ -56,7 +48,8 @@ router.get('/transacoes/:id_transacao', autenticar,  async (req, res) => {
 });
 
 router.post('/transacoes', autenticar, async (req, res) => {
-    const { id_usuario, descricao, valor, tipo, id_subcategoria, data_registro } = req.body;
+    const id_usuario = req.usuario.id;
+    const { descricao, valor, tipo, id_subcategoria, data_registro } = req.body;
     try {
         // Se data_registro não for fornecida, o banco usa o valor default
         let comando = `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria${data_registro ? ', data_registro' : ''}) VALUES ($1, $2, $3, $4, $5${data_registro ? ', $6' : ''})`;

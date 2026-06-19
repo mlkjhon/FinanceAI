@@ -11,7 +11,7 @@ import { SplashScreen } from '../components/SplashScreen';
 
 export const Route = createFileRoute('/insights')({
   beforeLoad: () => {
-    if (!localStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
+    if (!localStorage.getItem('finance_token') && !sessionStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
   },
   component: InsightsPage,
 });

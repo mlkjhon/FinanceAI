@@ -13,6 +13,7 @@ export function getUserData(): User | null {
 }
 
 export function setUserData(user: User, token?: string, remember: boolean = false) {
+  removeUserData();
   const storage = remember ? localStorage : sessionStorage;
   storage.setItem('finance_user', JSON.stringify(user));
   if (token) {
