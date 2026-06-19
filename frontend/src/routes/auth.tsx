@@ -73,6 +73,7 @@ function InputField({
 export default function AuthPage() {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [apiError, setApiError] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
   const { login, register } = useAuth();
 
@@ -82,7 +83,7 @@ export default function AuthPage() {
   const onLogin = async (data: LoginForm) => {
     setApiError('');
     try {
-      await login(data.email, data.password);
+      await login(data.email, data.password, rememberMe);
       navigate({ to: '/dashboard' });
     } catch (e: unknown) {
       setApiError(e instanceof Error ? e.message : 'Erro ao fazer login');
@@ -203,6 +204,19 @@ export default function AuthPage() {
                   error={loginForm.formState.errors.password?.message}
                   {...loginForm.register('password')}
                 />
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-[var(--color-finance-primary)] focus:ring-[var(--color-finance-primary)] transition-all"
+                  />
+                  <label htmlFor="rememberMe" className="text-sm text-gray-600 dark:text-gray-300 cursor-pointer">
+                    Lembrar de mim
+                  </label>
+                </div>
 
                 {apiError && (
                   <div className="p-3 rounded-xl bg-[var(--color-finance-error)]/10 text-[var(--color-finance-error)] text-sm">

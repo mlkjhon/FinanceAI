@@ -8,22 +8,25 @@ export class ApiError extends Error {
 }
 
 export function getUserData(): User | null {
-  const data = localStorage.getItem('finance_user');
+  const data = localStorage.getItem('finance_user') || sessionStorage.getItem('finance_user');
   return data ? JSON.parse(data) : null;
 }
 
-export function setUserData(user: User) {
-  localStorage.setItem('finance_user', JSON.stringify(user));
-  localStorage.setItem('finance_token', user.id); // pseudo-token compatibility
+export function setUserData(user: User, remember: boolean = false) {
+  const storage = remember ? localStorage : sessionStorage;
+  storage.setItem('finance_user', JSON.stringify(user));
+  storage.setItem('finance_token', user.id); // pseudo-token compatibility
 }
 
 export function removeUserData() {
   localStorage.removeItem('finance_user');
   localStorage.removeItem('finance_token');
+  sessionStorage.removeItem('finance_user');
+  sessionStorage.removeItem('finance_token');
 }
 
 export function getToken(): string | null {
-  return localStorage.getItem('finance_token');
+  return localStorage.getItem('finance_token') || sessionStorage.getItem('finance_token');
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
