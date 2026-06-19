@@ -66,37 +66,75 @@ const swagger = {
                         description: "Usuario cadastrado com sucesso"
                     },
                     400: {
-                        description: "Erro na requisição(preencha todos os campos)"
+                        description: "Erro de validação (campos obrigatórios ou duplicados)",
+                        content: {
+                            "application/json": {
+                                examples: {
+                                    emailDuplicado: { value: { error: "Email já cadastrado" } },
+                                    camposFaltando: { value: { error: "Preencha todos os campos" } }
+                                }
+                            }
+                        }
                     },
                     500: {
-                        description: "Erro interno so Servidor"
+                        description: "Erro interno no servidor"
                     }
                 }
             }
         },
         "/usuarios/{id_usuario}": {
-            delete: {
+            put: {
                 tags: ["Usuários"],
-                summary: "Deasativar o usuário",
-                description: "Desativa o usuário",
+                summary: "Atualizar usuário",
+                description: "Atualiza os dados do usuário. Todos os campos são opcionais — apenas os campos enviados serão atualizados. IDs e tipo_acesso não podem ser alterados.",
+                security: [{ bearerAuth: [] }],
                 parameters: [
                     {
                         name: "id_usuario",
                         in: "path",
                         required: true,
-                        description: "Id do usuário a ser desativado",
+                        description: "Id do usuário a ser atualizado",
+                        schema: { type: 'integer' },
+                        example: 1
+                    }
+                ],
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: { $ref: "#/components/schemas/Atualizar_Usuario" }
+                        }
+                    }
+                },
+                responses: {
+                    200: { description: "Usuário atualizado com sucesso" },
+                    400: { description: "Nenhum campo editável enviado" },
+                    401: { description: "Token não fornecido" },
+                    403: { description: "Token inválido ou expirado" },
+                    404: { description: "Usuário não encontrado" },
+                    500: { description: "Erro interno no servidor" }
+                }
+            },
+            delete: {
+                tags: ["Usuários"],
+                summary: "Remover usuário",
+                description: "Remove o usuário permanentemente do banco de dados",
+                security: [{ bearerAuth: [] }],
+                parameters: [
+                    {
+                        name: "id_usuario",
+                        in: "path",
+                        required: true,
+                        description: "Id do usuário a ser removido",
                         schema: { type: 'integer' },
                         example: 1
                     }
                 ],
                 responses: {
-                    200: {
-                        description: "Usuário desativado com sucesso",
-                        content: { "application/json": { example: "Usuário não encontrado" } }
-                    },
-                    500: {
-                        description: "Erro no Servidor"
-                    }
+                    200: { description: "Usuário removido com sucesso" },
+                    401: { description: "Token não fornecido" },
+                    403: { description: "Token inválido ou expirado" },
+                    500: { description: "Erro no Servidor" }
                 }
             }
         },
@@ -127,8 +165,25 @@ const swagger = {
                             }
                         }
                     },
-                    400: { description: "Email e senha são obrigatorios" },
-                    401: { description: "Credenciais inválidas" },
+                    400: { 
+                        description: "Campos em branco",
+                        content: {
+                            "application/json": {
+                                example: { message: "Email e senha são obrigatórios" }
+                            }
+                        }
+                    },
+                    401: { 
+                        description: "Credenciais inválidas",
+                        content: {
+                            "application/json": {
+                                examples: {
+                                    emailInexistente: { value: { message: "Email não encontrado" } },
+                                    senhaErrada: { value: { message: "Senha inválida" } }
+                                }
+                            }
+                        }
+                    },
                     500: {
                         description: "Erro interno no servidor"
                     }
@@ -157,6 +212,14 @@ const swagger = {
                         content: {
                             "application/json": {
                                 schema: { $ref: "#/components/schemas/Resposta_Chat" }
+                            }
+                        }
+                    },
+                    404: {
+                        description: "Usuário não encontrado (ID não existe no banco de dados)",
+                        content: {
+                            "application/json": {
+                                example: { error: "Usuário não encontrado. Crie um usuário válido antes de enviar mensagens ao chat." }
                             }
                         }
                     },
@@ -581,17 +644,26 @@ const swagger = {
                     message: { type: 'string', example: 'Login realizado com sucesso' },
                     token: {
                         type: 'string',
-                        description: 'Token JWT gerado',
-                        example: 'eyJhbGciOihjbiuihvfyuvh...'
+                        description: 'Token JWT — cole este valor no botão "Authorize" do Swagger (sem o prefixo Bearer)',
+                        example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
                     },
                     usuario: {
                         type: 'object',
                         properties: {
-                            id_usuario: { type: 'integer', example: 1 },
-                            email: { type: "string", example: "gustavo@email.com" },
-                            senha: { type: "string", example: "2026" }
+                            id: { type: 'integer', example: 1 },
+                            nome: { type: 'string', example: 'Fulano' },
+                            email: { type: "string", example: "fulano@email.com" }
                         }
                     }
+                }
+            },
+            Atualizar_Usuario: {
+                type: "object",
+                description: "Campos editáveis do usuário. Todos são opcionais — envie apenas o que deseja alterar.",
+                properties: {
+                    nome: { type: "string", example: "Fulano Silva" },
+                    email: { type: "string", example: "novo@email.com" },
+                    senha: { type: "string", example: "novaSenha123" }
                 }
             },
             Mensagem_Chat: {

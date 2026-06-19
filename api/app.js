@@ -89,7 +89,9 @@ app.get('/swagger', (req, res) => {
   <script>
     SwaggerUIBundle({
       spec: ${JSON.stringify(swagger)},
-      dom_id: '#swagger-ui'})
+      dom_id: '#swagger-ui',
+      persistAuthorization: true
+    })
   </script>
 </body></html>`);
 });

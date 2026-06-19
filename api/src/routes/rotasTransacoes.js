@@ -6,14 +6,27 @@ const router = Router();
 // Listar transações
 router.get('/transacoes', async (req, res) => {
     try {
-        const comando = `
+        const { id_usuario } = req.query;
+        let comando = `
             SELECT t.*, c.nome as categoria_nome 
             FROM transacoes t 
             LEFT JOIN subcategorias s ON t.id_subcategoria = s.id_subcategoria 
             LEFT JOIN categorias c ON s.id_categoria = c.id_categoria 
-            ORDER BY t.id_transacao DESC
         `;
-        const transacoes = await BD.query(comando);
+        let valores = [];
+
+        if (id_usuario) {
+            const checkUser = await BD.query('SELECT id_usuario FROM usuarios WHERE id_usuario = $1', [id_usuario]);
+            if (checkUser.rowCount === 0) {
+                return res.status(404).json({ error: 'Usuário não encontrado' });
+            }
+            comando += ` WHERE t.id_usuario = $1`;
+            valores.push(id_usuario);
+        }
+
+        comando += ` ORDER BY t.id_transacao DESC`;
+
+        const transacoes = await BD.query(comando, valores);
         res.status(200).json(transacoes.rows);
     } catch (error) {
         console.error(' ❌ ERRO AO LISTAR TRANSAÇÕES ❌ ', error.message);
@@ -29,7 +42,12 @@ router.get('/transacoes/:id_transacao', async (req, res) => {
         }
         const comando = `SELECT * FROM transacoes WHERE id_transacao = $1`;
         const transacoes = await BD.query(comando, [id_transacao]);
-        res.status(200).json(transacoes.rows);
+
+        if (transacoes.rowCount === 0) {
+            return res.status(404).json({ message: 'Transação não encontrada' });
+        }
+
+        res.status(200).json(transacoes.rows[0]);
     } catch (error) {
         console.error(' ❌ ERRO AO LISTAR TRANSAÇÕES ❌ ', error.message);
         return res.status(500).json({ error: '❌ ERRO AO LISTAR TRANSAÇÕES ❌' + error.message });

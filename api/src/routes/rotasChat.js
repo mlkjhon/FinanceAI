@@ -1,9 +1,10 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
+import { autenticar } from "../middlewares/autenticar.js";
 
 const router = Router();
 
-router.get('/chat/historico', async (req, res) => {
+router.get('/chat/historico', autenticar, async (req, res) => {
     const id_usuario = req.query.id_usuario || req.body.id_usuario;
 
     if (!id_usuario) {
@@ -11,6 +12,11 @@ router.get('/chat/historico', async (req, res) => {
     }
 
     try {
+        const checkUser = await BD.query('SELECT id_usuario FROM usuarios WHERE id_usuario = $1', [id_usuario]);
+        if (checkUser.rowCount === 0) {
+            return res.status(404).json({ error: 'Usuário não encontrado' });
+        }
+
         const comando = `SELECT id_chat, id_usuario, mensagem, resposta FROM chat WHERE id_usuario = $1 ORDER BY id_chat ASC`;
         const chat = await BD.query(comando, [id_usuario]);
         res.status(200).json(chat.rows);
@@ -20,7 +26,7 @@ router.get('/chat/historico', async (req, res) => {
     }
 });
 
-router.post('/chat', async (req, res) => {
+router.post('/chat', autenticar, async (req, res) => {
     const { id_usuario, mensagem } = req.body;
 
     if (!id_usuario || !mensagem) {
@@ -130,12 +136,15 @@ Regras obrigatórias:
         return res.status(200).json(inserido.rows[0]);
 
     } catch (error) {
+        if (error.code === '23503' || error.message.includes('foreign key')) {
+            return res.status(404).json({ error: 'Usuário não encontrado. Crie um usuário válido antes de enviar mensagens ao chat.' });
+        }
         console.error('Erro na IA Gemini / Cadastro Chat', error.message);
-        return res.status(500).json({ error: 'Erro ao gerar resposta da IA: ' + error.message });
+        return res.status(500).json({ error: 'Erro interno no servidor de Chat' });
     }
 });
 
-router.delete('/chat', async (req, res) => {
+router.delete('/chat', autenticar, async (req, res) => {
     const id_usuario = req.query.id_usuario || req.body.id_usuario;
     
     if (!id_usuario) {
@@ -143,6 +152,11 @@ router.delete('/chat', async (req, res) => {
     }
 
     try {
+        const checkUser = await BD.query('SELECT id_usuario FROM usuarios WHERE id_usuario = $1', [id_usuario]);
+        if (checkUser.rowCount === 0) {
+            return res.status(404).json({ message: 'Usuário não encontrado' });
+        }
+
         const comando = `DELETE FROM chat WHERE id_usuario = $1`;
         await BD.query(comando, [id_usuario]);
         return res.status(200).json({ message: 'Histórico do chat apagado com sucesso' });
@@ -152,12 +166,16 @@ router.delete('/chat', async (req, res) => {
     }
 });
 
-router.delete('/chat/:id_mensagem', async (req, res) => {
+router.delete('/chat/:id_mensagem', autenticar, async (req, res) => {
     const { id_mensagem } = req.params;
 
     try {
         const comando = `DELETE FROM chat WHERE id_chat = $1`;
-        await BD.query(comando, [id_mensagem]);
+        const resultado = await BD.query(comando, [id_mensagem]);
+        
+        if (resultado.rowCount === 0) {
+            return res.status(404).json({ message: 'Mensagem não encontrada' });
+        }
         return res.status(200).json({ message: 'Mensagem deletada com sucesso' });
     } catch (error) {
         console.error('Erro ao deletar mensagem do Chat', error.message);
