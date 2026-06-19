@@ -12,10 +12,14 @@ export function getUserData(): User | null {
   return data ? JSON.parse(data) : null;
 }
 
-export function setUserData(user: User, remember: boolean = false) {
+export function setUserData(user: User, token?: string, remember: boolean = false) {
   const storage = remember ? localStorage : sessionStorage;
   storage.setItem('finance_user', JSON.stringify(user));
-  storage.setItem('finance_token', user.id); // pseudo-token compatibility
+  if (token) {
+    storage.setItem('finance_token', token);
+  } else {
+    storage.setItem('finance_token', user.id); // pseudo-token compatibility
+  }
 }
 
 export function removeUserData() {
@@ -61,7 +65,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 // Auth
 export const authApi = {
   login: (email: string, password: string) =>
-    request<{ message: string; usuario: User }>('/login', {
+    request<{ message: string; token: string; usuario: User }>('/login', {
       method: 'POST',
       body: JSON.stringify({ email, senha: password }),
     }),

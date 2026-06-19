@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string, remember: boolean = false) => {
     const res = await authApi.login(email, password);
-    setUserData(res.usuario, remember);
+    setUserData(res.usuario, res.token, remember);
     setUser(res.usuario);
   }, []);
 
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await authApi.register({ nome, email, senha: password });
     // Após registrar, faz login automaticamente
     const res = await authApi.login(email, password);
-    setUserData(res.usuario);
+    setUserData(res.usuario, res.token);
     setUser(res.usuario);
   }, []);
 

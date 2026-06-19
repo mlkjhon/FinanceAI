@@ -1,9 +1,10 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
+import { autenticar } from "../middlewares/autenticar.js";
 
 const router = Router();
 
-router.get('/subcategorias', async (req, res) => {
+router.get('/subcategorias', autenticar, async (req, res) => {
     const { id_categoria } = req.query;
     try {
         let comando = `SELECT * FROM subcategorias ORDER BY id_subcategoria`;
@@ -19,7 +20,7 @@ router.get('/subcategorias', async (req, res) => {
     }
 });
 
-router.post('/subcategorias', async (req, res) => {
+router.post('/subcategorias', autenticar, async (req, res) => {
     const { id_categoria, nome } = req.body;
     if (!id_categoria || !nome) return res.status(400).json({ message: "id_categoria e nome são obrigatórios" });
     try {
@@ -31,7 +32,7 @@ router.post('/subcategorias', async (req, res) => {
     }
 });
 
-router.put('/subcategorias/:id_subcategoria', async (req, res) => {
+router.put('/subcategorias/:id_subcategoria', autenticar, async (req, res) => {
     const { id_subcategoria } = req.params;
     const { nome } = req.body; 
     if (!nome) return res.status(400).json({ message: 'O campo nome é obrigatório para atualizar a subcategoria' });
@@ -45,7 +46,7 @@ router.put('/subcategorias/:id_subcategoria', async (req, res) => {
     }
 });
 
-router.delete('/subcategorias/:id_subcategoria', async (req, res) => {
+router.delete('/subcategorias/:id_subcategoria', autenticar, async (req, res) => {
     const { id_subcategoria } = req.params;
     try {
         const comando = `DELETE FROM subcategorias WHERE id_subcategoria = $1`;

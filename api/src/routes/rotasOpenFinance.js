@@ -1,12 +1,13 @@
 import express from 'express';
 import { BD } from '../../db.js';
+import {autenticar} from '../middlewares/autenticar.js';
 
 const router = express.Router();
 
 const POLP_API_KEY = "wNeUIto7y7e5GsXfkqY9OLBsv3rOJyl0c7td42nA7xTtJdojwJEEbg5MEVrkdhdn";
 const POLP_BASE_URL = "https://api.polp.com.br";
 
-router.post('/link-token', async (req, res) => {
+router.post('/link-token', autenticar, async (req, res) => {
     const { id_usuario } = req.body;
     if (!id_usuario) return res.status(400).json({ error: 'id_usuario é obrigatório' });
 
@@ -31,10 +32,8 @@ router.post('/link-token', async (req, res) => {
     }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Rota segura: gera o Connect Token da Pluggy no servidor (nunca no browser)
-// ─────────────────────────────────────────────────────────────────────────────
-router.post('/pluggy/connect-token', async (req, res) => {
+
+router.post('/pluggy/connect-token', autenticar, async (req, res) => {
     try {
         const clientId = 'f8e57dd0-2c03-41b5-b2d8-6b63f2672751';
         const clientSecret = '54aac48c-1d05-4594-9ab9-eed8810c2e72';
@@ -79,7 +78,7 @@ router.post('/pluggy/connect-token', async (req, res) => {
     }
 });
 
-router.post('/conexoes', async (req, res) => {
+router.post('/conexoes', autenticar, async (req, res) => {
     const { id_usuario, public_token, instituicao, substituirTransacoes } = req.body;
 
     if (!id_usuario || !public_token) {
@@ -150,20 +149,17 @@ router.post('/conexoes', async (req, res) => {
             const txData = await txRes.json();
             let transacoes = txData.results || [];
             
-            // Gerador de transações super realistas para o Sandbox do Pluggy Bank
             if (transacoes.length === 0 && (instituicao === 'Pluggy Bank' || instituicao?.toLowerCase().includes('pluggy'))) {
                 console.log(`   ⚙️ Gerando transações realistas para demonstração (Pluggy Sandbox - Conta: ${acc.type})`);
                 const hoje = new Date();
                 const gerarData = (diasAtras) => {
                     const d = new Date(hoje);
                     d.setDate(d.getDate() - diasAtras);
-                    // Adicionar uma hora aleatória para ficar ainda mais real
                     d.setHours(Math.floor(Math.random() * 12) + 8, Math.floor(Math.random() * 60));
                     return d.toISOString();
                 };
 
                 if (acc.type === 'CREDIT') {
-                    // Transações típicas de Cartão de Crédito (Mastercard Black)
                     transacoes = [
                         { description: 'Uber *Trip', amount: -28.90, date: gerarData(0), category: 'Transporte', status: 'POSTED' },
                         { description: 'iFood *Restaurante', amount: -85.50, date: gerarData(1), category: 'Alimentação', status: 'POSTED' },
@@ -280,8 +276,7 @@ router.post('/conexoes', async (req, res) => {
     }
 });
 
-// Endpoint para criar um "Espaço Manual" (Área de trabalho em branco)
-router.post('/conexoes/manual', async (req, res) => {
+router.post('/conexoes/manual', autenticar, async (req, res) => {
     const { id_usuario, nome } = req.body;
     try {
         const item_id = 'manual_' + Date.now();
@@ -292,7 +287,6 @@ router.post('/conexoes/manual', async (req, res) => {
             [id_usuario, nome || 'Meu Espaço de Teste', item_id, access_token]
         );
         
-        // Criamos uma conta padrão dentro desse espaço para que transações manuais possam ser vinculadas a ela
         await BD.query(
             `INSERT INTO contas_cartoes (id_usuario, id_conexao, nome, tipo, ultimos_digitos, limite, saldo) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [id_usuario, novaConexao.rows[0].id, 'Carteira / Caixa', 'CONTA_CORRENTE', '0000', null, 0]
@@ -305,7 +299,7 @@ router.post('/conexoes/manual', async (req, res) => {
     }
 });
 
-router.delete('/conexoes/:id', async (req, res) => {
+router.delete('/conexoes/:id', autenticar, async (req, res) => {
     const { id } = req.params;
     try {
         await BD.query(`DELETE FROM conexoes_bancarias WHERE id = $1`, [id]);
@@ -326,7 +320,7 @@ router.get('/conexoes/:id_usuario', async (req, res) => {
     }
 });
 
-router.get('/ping', async (req, res) => {
+router.get('/ping', autenticar, async (req, res) => {
     try {
         const response = await fetch(`${POLP_BASE_URL}/v1/ping`, {
             headers: { 'Authorization': `Bearer ${POLP_API_KEY}` }

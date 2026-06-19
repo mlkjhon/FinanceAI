@@ -1,10 +1,11 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
+import { autenticar } from "../middlewares/autenticar.js";
 
 const router = Router();
 
 // Listar transações
-router.get('/transacoes', async (req, res) => {
+router.get('/transacoes', autenticar, async (req, res) => {
     try {
         const { id_usuario } = req.query;
         let comando = `
@@ -34,7 +35,7 @@ router.get('/transacoes', async (req, res) => {
     }
 });
 
-router.get('/transacoes/:id_transacao', async (req, res) => {
+router.get('/transacoes/:id_transacao', autenticar,  async (req, res) => {
     const { id_transacao } = req.params;
     try {
         if (!id_transacao) {
@@ -54,7 +55,7 @@ router.get('/transacoes/:id_transacao', async (req, res) => {
     }
 });
 
-router.post('/transacoes', async (req, res) => {
+router.post('/transacoes', autenticar, async (req, res) => {
     const { id_usuario, descricao, valor, tipo, id_subcategoria, data_registro } = req.body;
     try {
         // Se data_registro não for fornecida, o banco usa o valor default
@@ -69,7 +70,7 @@ router.post('/transacoes', async (req, res) => {
     }
 });
 
-router.put('/transacoes/:id_transacao', async (req, res) => {
+router.put('/transacoes/:id_transacao', autenticar, async (req, res) => {
     const { id_transacao } = req.params;
     const { descricao, valor, tipo, id_subcategoria, data_registro } = req.body;
     try {
@@ -92,7 +93,7 @@ router.put('/transacoes/:id_transacao', async (req, res) => {
     }
 });
 
-router.patch('/transacoes/:id_transacao', async (req, res) => {
+router.patch('/transacoes/:id_transacao', autenticar, async (req, res) => {
     const { id_transacao } = req.params;
     const { descricao, valor, tipo, id_subcategoria } = req.body;
     try {
@@ -116,7 +117,7 @@ router.patch('/transacoes/:id_transacao', async (req, res) => {
     }
 });
 
-router.delete('/transacoes/:id_transacao', async (req, res) => {
+router.delete('/transacoes/:id_transacao', autenticar, async (req, res) => {
     const { id_transacao } = req.params;
     try {
         const verificar = await BD.query(`SELECT id_transacao FROM transacoes WHERE id_transacao = $1`, [id_transacao]);

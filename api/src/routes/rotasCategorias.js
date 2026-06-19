@@ -1,9 +1,10 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
+import { autenticar } from "../middlewares/autenticar.js";
 
 const router = Router();
 
-router.get('/categorias', async (req, res) => {
+router.get('/categorias', autenticar, async (req, res) => {
     try {
         const comando = `SELECT * FROM categorias ORDER BY id_categoria`;
         const resultado = await BD.query(comando);
@@ -13,7 +14,7 @@ router.get('/categorias', async (req, res) => {
     }
 });
 
-router.post('/categorias', async (req, res) => {
+router.post('/categorias', autenticar, async (req, res) => {
     const { nome, tipo } = req.body;
     if (!nome || !tipo) return res.status(400).json({ message: "Nome e tipo são obrigatórios" });
     try {
@@ -33,7 +34,7 @@ router.post('/categorias', async (req, res) => {
     }
 });
 
-router.put('/categorias/:id_categoria', async (req, res) => {
+router.put('/categorias/:id_categoria', autenticar, async (req, res) => {
     const { id_categoria } = req.params;
     const { nome, tipo } = req.body;
     try {
@@ -61,7 +62,7 @@ router.put('/categorias/:id_categoria', async (req, res) => {
     }
 });
 
-router.delete('/categorias/:id_categoria', async (req, res) => {
+router.delete('/categorias/:id_categoria', autenticar, async (req, res) => {
     const { id_categoria } = req.params;
     try {
         const verificar = await BD.query(`SELECT id_categoria FROM categorias WHERE id_categoria = $1`, [id_categoria]);
