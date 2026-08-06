@@ -76,56 +76,59 @@ router.post('/investimentos', autenticar, async (req, res) => {
     }
 });
 
-// Adicionar transação (aporte, resgate, rendimento manual)
+// Adicionar transação (aporte ou resgate)
 router.post('/investimentos/:id/transacao', autenticar, async (req, res) => {
     const { id } = req.params;
     const id_usuario = req.usuario.id;
     const { tipo, valor, data_registro } = req.body; 
-    // tipo: 'aporte', 'resgate', 'rendimento'
+    // tipo: 'aporte', 'resgate'
     try {
+        if (!tipo || !valor) return res.status(400).json({ message: 'Tipo e valor são obrigatórios' });
+        if (!['aporte', 'resgate'].includes(tipo)) return res.status(400).json({ message: 'Tipo inválido. Use aporte ou resgate.' });
+        if (parseFloat(valor) <= 0) return res.status(400).json({ message: 'Valor deve ser maior que zero' });
+
         // Verificar se investimento pertence ao usuario
         const invQuery = await BD.query(`SELECT * FROM investimentos WHERE id_investimento = $1 AND id_usuario = $2`, [id, id_usuario]);
         if (invQuery.rowCount === 0) return res.status(404).json({ message: 'Investimento não encontrado' });
         const investimento = invQuery.rows[0];
 
-        await BD.query('BEGIN'); // Iniciar transacao SQL
+        await BD.query('BEGIN'); // Iniciar transaçao SQL
 
         // 1. Inserir na transacoes_investimentos
-        const colunas = data_registro ? 'id_investimento, tipo, valor, data_registro' : 'id_investimento, tipo, valor';
-        const vals = data_registro ? [id, tipo, valor, data_registro] : [id, tipo, valor];
-        const phs = data_registro ? '$1, $2, $3, $4' : '$1, $2, $3';
-        await BD.query(`INSERT INTO transacoes_investimentos (${colunas}) VALUES (${phs})`, vals);
+        if (data_registro) {
+            await BD.query(
+                `INSERT INTO transacoes_investimentos (id_investimento, tipo, valor, data_registro) VALUES ($1, $2, $3, $4)`,
+                [id, tipo, valor, data_registro]
+            );
+        } else {
+            await BD.query(
+                `INSERT INTO transacoes_investimentos (id_investimento, tipo, valor) VALUES ($1, $2, $3)`,
+                [id, tipo, valor]
+            );
+        }
 
-        // 2. Se for aporte ou resgate, afetar a tabela transacoes principal (conta corrente)
-        if (tipo === 'aporte' || tipo === 'resgate') {
-            // Pegar ID da categoria "Investimentos"
-            const catQuery = await BD.query(`SELECT id_categoria FROM categorias WHERE nome = 'Investimentos' LIMIT 1`);
-            let id_categoria = catQuery.rowCount > 0 ? catQuery.rows[0].id_categoria : null;
+        // 2. Registrar na conta principal (aporte = despesa, resgate = receita)
+        const tipoPrincipal = tipo === 'aporte' ? 'despesa' : 'receita';
+        const descPrincipal = `${tipo === 'aporte' ? 'Aporte' : 'Resgate'} em ${investimento.nome}`;
+        
+        // Buscar subcategoria de investimentos (sem criar, sem travar)
+        const subCatQuery = await BD.query(
+            `SELECT s.id_subcategoria FROM subcategorias s
+             JOIN categorias c ON s.id_categoria = c.id_categoria
+             WHERE LOWER(c.nome) = 'investimentos' LIMIT 1`
+        );
+        const id_subcategoria = subCatQuery.rowCount > 0 ? subCatQuery.rows[0].id_subcategoria : null;
 
-            if (!id_categoria) {
-                // Criar se não existir
-                const newCat = await BD.query(`INSERT INTO categorias (nome, tipo) VALUES ('Investimentos', 'despesa') RETURNING id_categoria`);
-                id_categoria = newCat.rows[0].id_categoria;
-            }
-
-            // Precisamos do id_subcategoria pra transacoes (se houver essa exigencia no BD)
-            let id_subcategoria = null;
-            const subCatQuery = await BD.query(`SELECT id_subcategoria FROM subcategorias WHERE id_categoria = $1 LIMIT 1`, [id_categoria]);
-            if (subCatQuery.rowCount > 0) {
-                id_subcategoria = subCatQuery.rows[0].id_subcategoria;
-            } else {
-                const newSub = await BD.query(`INSERT INTO subcategorias (nome, id_categoria) VALUES ('Transf. Investimento', $1) RETURNING id_subcategoria`, [id_categoria]);
-                id_subcategoria = newSub.rows[0].id_subcategoria;
-            }
-
-            const tipoPrincipal = tipo === 'aporte' ? 'despesa' : 'receita';
-            const descPrincipal = `${tipo === 'aporte' ? 'Aporte' : 'Resgate'} em ${investimento.nome}`;
-            
-            const colsPrincipal = data_registro ? 'id_usuario, descricao, valor, tipo, id_subcategoria, data_registro' : 'id_usuario, descricao, valor, tipo, id_subcategoria';
-            const valsPrincipal = data_registro ? [id_usuario, descPrincipal, valor, tipoPrincipal, id_subcategoria, data_registro] : [id_usuario, descPrincipal, valor, tipoPrincipal, id_subcategoria];
-            const phsPrincipal = data_registro ? '$1, $2, $3, $4, $5, $6' : '$1, $2, $3, $4, $5';
-            
-            await BD.query(`INSERT INTO transacoes (${colsPrincipal}) VALUES (${phsPrincipal})`, valsPrincipal);
+        if (data_registro) {
+            await BD.query(
+                `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria, data_registro) VALUES ($1, $2, $3, $4, $5, $6)`,
+                [id_usuario, descPrincipal, valor, tipoPrincipal, id_subcategoria, data_registro]
+            );
+        } else {
+            await BD.query(
+                `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria) VALUES ($1, $2, $3, $4, $5)`,
+                [id_usuario, descPrincipal, valor, tipoPrincipal, id_subcategoria]
+            );
         }
 
         await BD.query('COMMIT');
@@ -136,6 +139,7 @@ router.post('/investimentos/:id/transacao', autenticar, async (req, res) => {
         return res.status(500).json({ error: 'Erro ao registrar transação: ' + error.message });
     }
 });
+
 
 // Editar investimento (ex: mudar taxa)
 router.put('/investimentos/:id', autenticar, async (req, res) => {
