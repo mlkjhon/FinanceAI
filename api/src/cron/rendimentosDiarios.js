@@ -27,13 +27,16 @@ export const startCronJobs = () => {
             let processados = 0;
             for (const inv of investimentos) {
                 if (inv.saldo_atual > 0) {
-                    // Rendimento = (Saldo Atual * Taxa) / 100
-                    const valorRendimento = (parseFloat(inv.saldo_atual) * parseFloat(inv.taxa_rendimento)) / 100;
+                    // Taxa anual informada. Converter para taxa diária simples.
+                    // Para compostos seria Math.pow(1 + taxa/100, 1/365) - 1
+                    const taxaDiaria = parseFloat(inv.taxa_rendimento) / 365;
+                    // Rendimento = (Saldo Atual * Taxa Diaria) / 100
+                    const valorRendimento = (parseFloat(inv.saldo_atual) * taxaDiaria) / 100;
                     
                     if (valorRendimento > 0) {
                         await BD.query(
                             `INSERT INTO transacoes_investimentos (id_investimento, tipo, valor) VALUES ($1, 'rendimento', $2)`,
-                            [inv.id_investimento, valorRendimento.toFixed(2)]
+                            [inv.id_investimento, valorRendimento.toFixed(4)]
                         );
                         processados++;
                     }

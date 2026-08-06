@@ -22,7 +22,7 @@ function CustomTooltip({ active, payload, label }: any) {
     <div className="bg-white border border-gray-100 shadow-xl rounded-2xl p-4 min-w-[150px]">
       <p className="text-xs text-gray-400 mb-2 font-medium">{label}</p>
       <div className="flex items-center gap-2 text-sm">
-        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-finance-primary)]" />
         <span className="text-gray-600">Saldo</span>
         <span className="font-bold text-gray-900 ml-auto">{formatCurrency(payload[0].value)}</span>
       </div>
@@ -106,8 +106,8 @@ function InvestimentoDetailsPage() {
         {/* Saldo e Ações */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2">
-            <FinanceCard className="h-full flex flex-col justify-center bg-gradient-to-br from-indigo-500 to-purple-600 border-0 shadow-lg shadow-indigo-200">
-              <p className="text-indigo-100 text-sm font-medium mb-1">Saldo Atual</p>
+            <FinanceCard className="h-full flex flex-col justify-center gradient-hero border-0 shadow-lg shadow-[var(--color-finance-primary)]/20">
+              <p className="text-white/80 text-sm font-medium mb-1">Saldo Atual</p>
               <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
                 {isLoading ? 'R$ --,--' : formatCurrency(parseFloat(String(inv?.saldo_atual || 0)))}
               </h2>
@@ -126,7 +126,7 @@ function InvestimentoDetailsPage() {
                 </button>
                 <button 
                   onClick={() => openModal('rendimento')}
-                  className="bg-white/10 hover:bg-white/20 text-indigo-50 border border-white/20 px-5 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2 backdrop-blur-sm lg:ml-auto"
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-5 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2 backdrop-blur-sm lg:ml-auto"
                 >
                   <Plus size={18} /> Rendimento Manual
                 </button>
@@ -140,7 +140,7 @@ function InvestimentoDetailsPage() {
               <div className="space-y-4">
                 <div>
                   <p className="text-xs text-gray-400 mb-1">Taxa de Rendimento Automática</p>
-                  <p className="font-bold text-green-600 text-lg">+{inv?.taxa_rendimento}% <span className="text-sm font-medium text-gray-500">ao dia</span></p>
+                  <p className="font-bold text-green-600 text-lg">+{inv?.taxa_rendimento}% <span className="text-sm font-medium text-gray-500">ao ano</span></p>
                 </div>
                 <div className="pt-4 border-t border-gray-50">
                   <p className="text-xs text-gray-400 mb-1">Data de Criação</p>
@@ -164,8 +164,8 @@ function InvestimentoDetailsPage() {
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorSaldoInv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--color-finance-primary)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="var(--color-finance-primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
@@ -177,15 +177,15 @@ function InvestimentoDetailsPage() {
                   tickFormatter={(v) => formatCompactCurrency(v)}
                   width={60}
                 />
-                <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: '#6366F1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-finance-primary)', strokeWidth: 1, strokeDasharray: '4 4' }} />
                 <Area
                   type="monotone"
                   dataKey="saldo"
-                  stroke="#6366F1"
+                  stroke="var(--color-finance-primary)"
                   strokeWidth={3}
                   fillOpacity={1}
                   fill="url(#colorSaldoInv)"
-                  activeDot={{ r: 6, fill: '#6366F1', stroke: '#fff', strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: 'var(--color-finance-primary)', stroke: '#fff', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -214,7 +214,7 @@ function InvestimentoDetailsPage() {
                 <div key={t.id_transacao_inv} className="py-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center 
-                      ${t.tipo === 'aporte' ? 'bg-indigo-50 text-indigo-500' 
+                      ${t.tipo === 'aporte' ? 'bg-emerald-50 text-emerald-500' 
                         : t.tipo === 'resgate' ? 'bg-red-50 text-red-500' 
                         : 'bg-green-50 text-green-500'}`}
                     >
@@ -267,7 +267,7 @@ function InvestimentoDetailsPage() {
               
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 {tipoTransacao === 'aporte' && (
-                  <div className="p-3 bg-indigo-50 text-indigo-700 text-xs rounded-xl mb-4">
+                  <div className="p-3 bg-emerald-50 text-emerald-700 text-xs rounded-xl mb-4">
                     O valor do aporte será debitado do seu saldo principal no dashboard.
                   </div>
                 )}
@@ -286,7 +286,7 @@ function InvestimentoDetailsPage() {
                     value={valor}
                     onChange={e => setValor(e.target.value)}
                     placeholder="Ex: 500.00"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
                   />
                 </div>
 
@@ -302,7 +302,7 @@ function InvestimentoDetailsPage() {
                     type="submit"
                     disabled={transacaoMutation.isPending}
                     className={`flex-1 text-white font-medium rounded-xl transition-colors disabled:opacity-50 py-3 ${
-                      tipoTransacao === 'resgate' ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700'
+                      tipoTransacao === 'resgate' ? 'bg-red-500 hover:bg-red-600' : 'bg-[var(--color-finance-primary)] hover:opacity-90'
                     }`}
                   >
                     {transacaoMutation.isPending ? 'Salvando...' : 'Confirmar'}

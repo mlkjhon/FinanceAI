@@ -13,7 +13,7 @@ export const Route = createFileRoute('/investimentos/')({
 });
 
 const TIPOS_INVESTIMENTO = [
-  'CDB', 'LCI / LCA', 'Tesouro Direto', 'Ações', 'Fundos Imobiliários (FIIs)', 
+  'CDB', 'CDI', 'LCI / LCA', 'Tesouro Direto', 'Ações', 'Fundos Imobiliários (FIIs)', 
   'Criptomoedas', 'Previdência Privada', 'Fundos de Investimento', 'Poupança', 
   'BDRs', 'ETFs', 'Outro'
 ];
@@ -65,7 +65,7 @@ function InvestimentosPage() {
           </div>
           <button 
             onClick={() => setModalAberto(true)}
-            className="flex items-center gap-2 bg-[#6366F1] text-white px-5 py-2.5 rounded-xl font-medium shadow-sm shadow-indigo-200 hover:bg-[#4F46E5] hover:shadow-md transition-all active:scale-[0.98]"
+            className="flex items-center gap-2 bg-[var(--color-finance-primary)] text-white px-5 py-2.5 rounded-xl font-medium shadow-sm shadow-[var(--color-finance-primary)]/20 hover:opacity-90 transition-all active:scale-[0.98]"
           >
             <Plus size={18} />
             <span>Novo Investimento</span>
@@ -75,7 +75,7 @@ function InvestimentosPage() {
         {/* Resumo */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <FinanceCard className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500">
               <Wallet size={24} />
             </div>
             <div>
@@ -111,7 +111,7 @@ function InvestimentosPage() {
             </p>
             <button 
               onClick={() => setModalAberto(true)}
-              className="text-[#6366F1] font-medium hover:text-[#4F46E5] inline-flex items-center gap-2"
+              className="text-[var(--color-finance-primary)] font-medium hover:opacity-80 inline-flex items-center gap-2"
             >
               <Plus size={18} />
               Criar Investimento
@@ -136,7 +136,7 @@ function InvestimentosPage() {
                       <h3 className="font-bold text-gray-900 text-lg leading-tight">{inv.nome}</h3>
                       <p className="text-xs text-gray-400 font-medium">{inv.tipo}</p>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">
                       <ArrowRight size={16} />
                     </div>
                   </div>
@@ -148,7 +148,7 @@ function InvestimentosPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Rendimento</p>
-                      <p className="text-sm font-semibold text-green-600">+{parseFloat(String(inv.taxa_rendimento))}% a.d.</p>
+                      <p className="text-sm font-semibold text-green-600">+{parseFloat(String(inv.taxa_rendimento))}% a.a.</p>
                     </div>
                   </div>
                 </motion.div>
@@ -190,7 +190,7 @@ function InvestimentosPage() {
                     value={nome}
                     onChange={e => setNome(e.target.value)}
                     placeholder="Ex: Nubank CDB, Tesouro Selic..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
                   />
                 </div>
                 
@@ -199,7 +199,7 @@ function InvestimentosPage() {
                   <select
                     value={tipo}
                     onChange={e => setTipo(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
                   >
                     {TIPOS_INVESTIMENTO.map(t => (
                       <option key={t} value={t}>{t}</option>
@@ -208,7 +208,7 @@ function InvestimentosPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Taxa de Rendimento Diário (%)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Taxa de Rendimento Anual (%)</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -216,12 +216,12 @@ function InvestimentosPage() {
                       required
                       value={taxa}
                       onChange={e => setTaxa(e.target.value)}
-                      placeholder="Ex: 0.03"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      placeholder="Ex: 10.5"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">%</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1.5">Essa taxa será aplicada automaticamente sobre o saldo todo dia à meia-noite.</p>
+                  <p className="text-xs text-gray-400 mt-1.5">Essa taxa será calculada e aplicada proporcionalmente sobre o saldo todo dia à meia-noite.</p>
                 </div>
 
                 <div className="pt-4 flex gap-3">
@@ -235,7 +235,7 @@ function InvestimentosPage() {
                   <button
                     type="submit"
                     disabled={createMutation.isPending}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50 py-3"
+                    className="flex-1 bg-[var(--color-finance-primary)] hover:opacity-90 text-white font-medium rounded-xl transition-all disabled:opacity-50 py-3"
                   >
                     {createMutation.isPending ? 'Salvando...' : 'Adicionar'}
                   </button>
