@@ -15,7 +15,6 @@ import rotasOpenFinance from "./src/routes/rotasOpenFinance.js";
 import rotasInvestimentos from "./src/routes/rotasInvestimentos.js";
 
 import { BD, testarConexao } from "./db.js";
-import { startCronJobs } from "./src/cron/rendimentosDiarios.js";
 
 import swaggerUI from "swagger-ui-express";
 import swagger from './config/swagger.js';
@@ -80,13 +79,11 @@ app.use(rotasInsights);
 app.use(rotasOpenFinance);
 app.use(rotasInvestimentos);
 
-// Start Cron Jobs
-startCronJobs();
-
+// Start Cron Jobs apenas fora da Vercel (Vercel é serverless, não suporta cron persistente)
 app.get('/swagger', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html><head>
-  <title>API Ordens de Serviço</title>
+  <title>API Finance AI</title>
   <meta charset="utf-8"/>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
 </head><body>
@@ -102,7 +99,17 @@ app.get('/swagger', (req, res) => {
 </body></html>`);
 });
 
-const porta = 3000;
-app.listen(porta, () => {
-    console.log(`-> http://localhost:${porta} <-`);
-});
+// Cron Jobs apenas fora da Vercel (serverless nao suporta processos persistentes)
+if (!process.env.VERCEL) {
+    import('./src/cron/rendimentosDiarios.js').then(({ startCronJobs }) => {
+        startCronJobs();
+        console.log('⏰ [CRON] Cron jobs iniciados.');
+    }).catch(err => console.error('❌ [CRON] Falha ao iniciar cron jobs:', err.message));
+
+    const porta = 3000;
+    app.listen(porta, () => {
+        console.log(`-> http://localhost:${porta} <-`);
+    });
+}
+
+export default app;
