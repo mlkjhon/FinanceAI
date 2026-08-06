@@ -102,7 +102,7 @@ router.post('/investimentos/:id/transacao', autenticar, async (req, res) => {
         const id_transacao_inv = transInv.rows[0].id_transacao_inv;
 
         // 2. Registrar na conta principal como despesa (aporte) ou receita (resgate)
-        const tipoPrincipal = tipo === 'aporte' ? 'despesa' : 'receita';
+        const tipoPrincipal = tipo === 'aporte' ? 'S' : 'E';
         // Usar prefixo [INV:id_transacao_inv] na descricao para poder encontrar e deletar depois
         const descPrincipal = `[INV:${id_transacao_inv}] ${tipo === 'aporte' ? 'Aporte' : 'Resgate'} em ${investimento.nome}`;
 
