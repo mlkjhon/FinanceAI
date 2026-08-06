@@ -3,14 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from '../lib/api';
 import { FinanceCard, SkeletonCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, formatCompactCurrency } from '../lib/utils';
 import { ArrowLeft, TrendingUp, TrendingDown, Scale, CalendarDays } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend, LineChart, Line,
-  ReferenceLine,
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend, ReferenceLine,
 } from 'recharts';
 
 export const Route = createFileRoute('/entradas-saidas')({
@@ -21,165 +20,136 @@ export const Route = createFileRoute('/entradas-saidas')({
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-gray-100 shadow-xl rounded-2xl p-4 min-w-[160px]">
-      <p className="text-xs text-gray-400 mb-2 font-medium">{label}</p>
-      {payload.map((p: any) => (
-        <div key={p.dataKey} className="flex items-center gap-2 text-sm mt-1">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-          <span className="text-gray-600 capitalize">{p.name}</span>
-          <span className="font-bold text-gray-900 ml-auto">{formatCurrency(p.value)}</span>
-        </div>
-      ))}
+    <div className="bg-white border border-gray-100 shadow-xl rounded-2xl p-4 min-w-[180px]">
+      <p className="text-xs text-gray-400 mb-3 font-medium">{label}</p>
+      {payload.map((p: any) => {
+        const isSaida = p.dataKey === 'saidasNegativas';
+        const name = isSaida ? 'Saídas' : p.name;
+        const value = isSaida ? Math.abs(p.value) : p.value;
+        const prefix = p.dataKey === 'resultado' ? (value >= 0 ? '+' : '') : (isSaida ? '-' : '+');
+        return (
+          <div key={p.dataKey} className="flex items-center gap-2 text-sm mt-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+            <span className="text-gray-600 font-medium">{name}</span>
+            <span className={`font-bold ml-auto ${p.dataKey === 'resultado' ? (value >= 0 ? 'text-green-600' : 'text-red-500') : 'text-gray-900'}`}>
+              {prefix}{formatCurrency(value)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-/* ─── Gráfico de barras agrupadas ─────────────────────────────── */
-function BarChartGrouped({ data }: { data: { mes: string; entradas?: number; saidas?: number }[] }) {
+/* ─── Gráfico Divergente de Fluxo de Caixa ────────────────────── */
+function FluxoCaixaChart({ data }: { data: any[] }) {
   if (!data?.length) return <p className="text-sm text-gray-400 text-center pt-12">Nenhum dado disponível</p>;
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="28%">
+    <ResponsiveContainer width="100%" height={360}>
+      <ComposedChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} stackOffset="sign">
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-        <XAxis dataKey="mes" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={8} />
+        <XAxis dataKey="mes" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={10} />
         <YAxis
           axisLine={false} tickLine={false}
           tick={{ fontSize: 11, fill: '#9CA3AF' }}
-          tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
-          width={52}
+          tickFormatter={(v) => formatCompactCurrency(v)}
+          width={60}
         />
         <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
-        <Legend iconType="circle" iconSize={8}
-          formatter={(value) => <span className="text-xs text-gray-500 capitalize">{value}</span>}
-        />
-        <Bar dataKey="entradas" name="Entradas" fill="#10B981" radius={[6, 6, 0, 0]} />
-        <Bar dataKey="saidas" name="Saídas" fill="#F87171" radius={[6, 6, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-/* ─── Gráfico de linha – resultado líquido ────────────────────── */
-function ResultadoLineChart({ data }: { data: { mes: string; resultado: number }[] }) {
-  if (!data?.length) return <p className="text-sm text-gray-400 text-center pt-12">Nenhum dado disponível</p>;
-  return (
-    <ResponsiveContainer width="100%" height={240}>
-      <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-        <XAxis dataKey="mes" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={8} />
-        <YAxis
-          axisLine={false} tickLine={false}
-          tick={{ fontSize: 11, fill: '#9CA3AF' }}
-          tickFormatter={(v) => `R$${(v / 1000).toFixed(1)}k`}
-          width={56}
-        />
-        <Tooltip
-          content={({ active, payload, label }: any) => {
-            if (!active || !payload?.length) return null;
-            const val = payload[0].value;
-            return (
-              <div className="bg-white border border-gray-100 shadow-xl rounded-2xl p-4 min-w-[150px]">
-                <p className="text-xs text-gray-400 mb-2 font-medium">{label}</p>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className={`w-2.5 h-2.5 rounded-full ${val >= 0 ? 'bg-green-400' : 'bg-red-400'}`} />
-                  <span className="text-gray-600">Resultado</span>
-                  <span className={`font-bold ml-auto ${val >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {val >= 0 ? '+' : ''}{formatCurrency(val)}
-                  </span>
-                </div>
-              </div>
-            );
-          }}
-          cursor={{ stroke: '#6366F1', strokeWidth: 1, strokeDasharray: '4 4' }}
+        <Legend 
+          iconType="circle" 
+          iconSize={8} 
+          wrapperStyle={{ paddingBottom: '16px' }}
+          verticalAlign="top"
+          formatter={(value) => (
+            <span className="text-xs text-gray-500 mr-4 font-medium">{value === 'saidasNegativas' ? 'Saídas' : value}</span>
+          )}
         />
         <ReferenceLine y={0} stroke="#e5e7eb" strokeWidth={1.5} />
-        <Line
-          type="monotone"
-          dataKey="resultado"
-          stroke="#6366F1"
-          strokeWidth={3}
-          dot={{ r: 5, fill: '#6366F1', stroke: '#fff', strokeWidth: 2 }}
+        <Bar dataKey="entradas" name="Entradas" fill="#10B981" radius={[4, 4, 0, 0]} stackId="a" maxBarSize={50} />
+        <Bar dataKey="saidasNegativas" name="Saídas" fill="#F87171" radius={[0, 0, 4, 4]} stackId="a" maxBarSize={50} />
+        <Line 
+          type="monotone" 
+          dataKey="resultado" 
+          name="Resultado Líquido" 
+          stroke="#6366F1" 
+          strokeWidth={3} 
+          dot={{ r: 5, fill: '#6366F1', stroke: '#fff', strokeWidth: 2 }} 
           activeDot={{ r: 7, fill: '#6366F1', stroke: '#fff', strokeWidth: 2 }}
         />
-      </LineChart>
+      </ComposedChart>
     </ResponsiveContainer>
   );
 }
 
-/* ─── Card de mês ─────────────────────────────────────────────── */
-function MesCard({
-  item, i,
-}: {
-  item: { mes: string; entradas: number; saidas: number; resultado: number };
-  i: number;
-}) {
-  const positivo = item.resultado >= 0;
-  const taxaEconomia = item.entradas > 0 ? (item.resultado / item.entradas) * 100 : 0;
-
+/* ─── Tabela Mensal ─────────────────────────────────────────────── */
+function TabelaMensal({ dados }: { dados: any[] }) {
+  if (!dados?.length) return <p className="text-sm text-gray-500 text-center py-8">Nenhum dado registrado ainda.</p>;
+  
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: i * 0.07 }}
-      className="p-5 rounded-2xl bg-gray-50/60 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 transition-all"
-    >
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${positivo ? 'bg-green-50' : 'bg-red-50'}`}>
-            <CalendarDays size={16} className={positivo ? 'text-green-500' : 'text-red-400'} />
-          </div>
-          <span className="font-bold text-gray-800">{item.mes}</span>
-        </div>
-        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${positivo ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
-          {positivo ? '+' : ''}{formatCurrency(item.resultado)}
-        </span>
-      </div>
-
-      {/* Entradas */}
-      <div className="space-y-2 mb-3">
-        <div className="flex justify-between text-xs mb-0.5">
-          <span className="text-gray-500 flex items-center gap-1">
-            <TrendingUp size={11} className="text-green-500" /> Entradas
-          </span>
-          <span className="font-semibold text-green-600">+{formatCurrency(item.entradas)}</span>
-        </div>
-        <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
-          <motion.div
-            className="h-full rounded-full bg-green-400"
-            initial={{ width: 0 }}
-            animate={{ width: `100%` }}
-            transition={{ duration: 0.6, delay: i * 0.07 + 0.1 }}
-          />
-        </div>
-      </div>
-
-      {/* Saídas */}
-      <div className="space-y-2 mb-4">
-        <div className="flex justify-between text-xs mb-0.5">
-          <span className="text-gray-500 flex items-center gap-1">
-            <TrendingDown size={11} className="text-red-400" /> Saídas
-          </span>
-          <span className="font-semibold text-red-500">-{formatCurrency(item.saidas)}</span>
-        </div>
-        <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
-          <motion.div
-            className="h-full rounded-full bg-red-400"
-            initial={{ width: 0 }}
-            animate={{ width: item.entradas > 0 ? `${Math.min((item.saidas / item.entradas) * 100, 100)}%` : '0%' }}
-            transition={{ duration: 0.6, delay: i * 0.07 + 0.2 }}
-          />
-        </div>
-      </div>
-
-      {/* Taxa de economia */}
-      <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-        <span className="text-gray-400">Taxa de economia</span>
-        <span className={`font-bold ${taxaEconomia >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-          {taxaEconomia.toFixed(1)}%
-        </span>
-      </div>
-    </motion.div>
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse min-w-[600px]">
+        <thead>
+          <tr className="border-b border-gray-100">
+            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Mês</th>
+            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Entradas</th>
+            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Saídas</th>
+            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Economia</th>
+            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right pr-2">Resultado</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {dados.map((item, i) => {
+            const positivo = item.resultado >= 0;
+            const taxa = item.entradas > 0 ? (item.resultado / item.entradas) * 100 : 0;
+            return (
+              <motion.tr 
+                key={item.mes}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.05 }}
+                className="hover:bg-gray-50/50 transition-colors group"
+              >
+                <td className="py-4 whitespace-nowrap">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${positivo ? 'bg-green-50 group-hover:bg-green-100' : 'bg-red-50 group-hover:bg-red-100'}`}>
+                      <CalendarDays size={15} className={positivo ? 'text-green-500' : 'text-red-400'} />
+                    </div>
+                    <span className="font-semibold text-gray-800 text-sm">{item.mes}</span>
+                  </div>
+                </td>
+                <td className="py-4 text-right text-sm font-semibold text-green-600">
+                  +{formatCurrency(item.entradas)}
+                </td>
+                <td className="py-4 text-right text-sm font-semibold text-red-500">
+                  -{formatCurrency(item.saidas)}
+                </td>
+                <td className="py-4 text-right text-sm">
+                   <div className="flex items-center justify-end gap-3">
+                     <span className={`font-semibold ${taxa >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                       {taxa >= 0 ? '+' : ''}{taxa.toFixed(1)}%
+                     </span>
+                     <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden flex justify-start">
+                       <motion.div 
+                          className={`h-full rounded-full ${taxa >= 0 ? 'bg-green-400' : 'bg-red-400'}`} 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(Math.abs(taxa), 100)}%` }}
+                          transition={{ duration: 0.6, delay: i * 0.05 + 0.2 }}
+                       />
+                     </div>
+                   </div>
+                </td>
+                <td className="py-4 text-right pr-2">
+                  <span className={`inline-flex justify-center min-w-[90px] text-xs font-semibold px-2.5 py-1.5 rounded-full ${positivo ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                    {positivo ? '+' : ''}{formatCurrency(item.resultado)}
+                  </span>
+                </td>
+              </motion.tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -197,6 +167,7 @@ function EntradasSaidasPage() {
     mes: e.mes,
     entradas: e.entradas ?? 0,
     saidas: e.saidas ?? 0,
+    saidasNegativas: -(e.saidas ?? 0),
     resultado: (e.entradas ?? 0) - (e.saidas ?? 0),
   }));
 
@@ -251,8 +222,8 @@ function EntradasSaidasPage() {
             <ArrowLeft size={20} className="text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Entradas vs Saídas</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Análise comparativa de receitas e despesas por mês.</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Análise de Fluxo</h1>
+            <p className="text-gray-500 text-sm mt-0.5">Visão detalhada e comparativa entre receitas e despesas.</p>
           </div>
         </div>
 
@@ -307,47 +278,34 @@ function EntradasSaidasPage() {
                 />
               </div>
               <span className={`text-xl font-bold whitespace-nowrap ${taxaMediaEconomia >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                {taxaMediaEconomia.toFixed(1)}%
+                {taxaMediaEconomia >= 0 ? '+' : ''}{taxaMediaEconomia.toFixed(1)}%
               </span>
             </div>
           </motion.div>
         )}
 
-        {/* Gráficos */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-6">
-          <FinanceCard>
-            <h2 className="font-semibold text-gray-900 mb-1">Entradas vs Saídas</h2>
-            <p className="text-xs text-gray-400 mb-4">Comparativo mensal de receitas e despesas</p>
-            {isLoading
-              ? <SkeletonCard lines={1} className="border-0 shadow-none h-[280px]" />
-              : <BarChartGrouped data={meses} />
-            }
-          </FinanceCard>
+        {/* Gráfico Principal */}
+        <FinanceCard className="mb-6">
+          <div className="mb-6">
+            <h2 className="font-semibold text-gray-900 mb-1">Fluxo de Caixa Mensal</h2>
+            <p className="text-xs text-gray-400">Entradas e saídas convergindo para o resultado líquido</p>
+          </div>
+          {isLoading
+            ? <SkeletonCard lines={1} className="border-0 shadow-none h-[340px]" />
+            : <FluxoCaixaChart data={meses} />
+          }
+        </FinanceCard>
 
-          <FinanceCard>
-            <h2 className="font-semibold text-gray-900 mb-1">Resultado Líquido</h2>
-            <p className="text-xs text-gray-400 mb-4">Entradas menos saídas a cada mês</p>
-            {isLoading
-              ? <SkeletonCard lines={1} className="border-0 shadow-none h-[240px]" />
-              : <ResultadoLineChart data={meses} />
-            }
-          </FinanceCard>
-        </div>
-
-        {/* Detalhamento por mês */}
+        {/* Detalhamento por mês em Tabela */}
         <FinanceCard>
-          <h2 className="font-semibold text-gray-900 mb-1">Detalhamento por Mês</h2>
-          <p className="text-xs text-gray-400 mb-5">Entradas, saídas, resultado e taxa de economia mensal</p>
+          <div className="mb-4">
+            <h2 className="font-semibold text-gray-900 mb-1">Histórico Detalhado</h2>
+            <p className="text-xs text-gray-400">Tabela de desempenho financeiro mês a mês</p>
+          </div>
           {isLoading ? (
             <SkeletonCard lines={4} className="border-0 shadow-none" />
-          ) : meses.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-8">Nenhum dado registrado ainda.</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {meses.map((item, i) => (
-                <MesCard key={item.mes} item={item} i={i} />
-              ))}
-            </div>
+            <TabelaMensal dados={meses} />
           )}
         </FinanceCard>
 

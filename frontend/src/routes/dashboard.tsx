@@ -315,7 +315,7 @@ function DashboardContent() {
             </div>
             <Link 
               to="/entradas-saidas" 
-              className="text-xs font-medium text-[#6366F1] hover:text-[#4F46E5] flex items-center gap-1 transition-colors"
+              className="text-sm text-[var(--color-finance-primary)] font-medium hover:underline flex items-center gap-1"
             >
               Ver detalhes
               <ArrowUpRight size={14} />

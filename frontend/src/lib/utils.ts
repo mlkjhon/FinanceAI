@@ -35,3 +35,33 @@ export function getInitials(name: string) {
     .join('')
     .toUpperCase();
 }
+
+export function formatCompactCurrency(value: number, withPrefix = true) {
+  if (value === 0) return withPrefix ? 'R$0' : '0';
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  const prefix = withPrefix ? 'R$' : '';
+
+  if (abs < 1000) {
+    return `${sign}${prefix}${abs.toFixed(0)}`;
+  }
+
+  const units = [
+    { threshold: 1e15, symbol: 'Q' },
+    { threshold: 1e12, symbol: 'T' },
+    { threshold: 1e9,  symbol: 'B' },
+    { threshold: 1e6,  symbol: 'M' },
+    { threshold: 1e3,  symbol: 'k' },
+  ];
+
+  for (const { threshold, symbol } of units) {
+    if (abs >= threshold) {
+      const val = abs / threshold;
+      const formatted = val % 1 === 0 || val >= 100 ? val.toFixed(0) : val.toFixed(1);
+      return `${sign}${prefix}${formatted}${symbol}`;
+    }
+  }
+
+  return `${sign}${prefix}${abs.toFixed(0)}`;
+}
+

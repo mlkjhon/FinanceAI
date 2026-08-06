@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from '../lib/api';
 import { FinanceCard, SkeletonCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, formatCompactCurrency } from '../lib/utils';
 import { ArrowLeft, TrendingUp, TrendingDown, Wallet, BarChart2 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
@@ -54,8 +54,8 @@ function SaldoAreaChart({ data }: { data: { mes: string; saldo: number }[] }) {
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 11, fill: '#9CA3AF' }}
-          tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
-          width={52}
+          tickFormatter={(v) => formatCompactCurrency(v)}
+          width={60}
         />
         <Tooltip content={<CustomTooltipSaldo />} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} />
         <Area
@@ -86,8 +86,8 @@ function EntradasSaidasChart({ data }: { data: { mes: string; entradas?: number;
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 11, fill: '#9CA3AF' }}
-          tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
-          width={52}
+          tickFormatter={(v) => formatCompactCurrency(v)}
+          width={60}
         />
         <Tooltip content={<CustomTooltipSaldo />} cursor={{ fill: '#f9fafb' }} />
         <Legend
