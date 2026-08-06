@@ -313,6 +313,13 @@ function DashboardContent() {
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-400 inline-block" /> Entradas</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-300 inline-block" /> Saídas</span>
             </div>
+            <Link 
+              to="/entradas-saidas" 
+              className="text-xs font-medium text-[#6366F1] hover:text-[#4F46E5] flex items-center gap-1 transition-colors"
+            >
+              Ver detalhes
+              <ArrowUpRight size={14} />
+            </Link>
           </div>
         </div>
         {summaryLoading
