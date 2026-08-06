@@ -499,5 +499,13 @@ export const investimentosApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  delete: (id: string | number) =>
+    request<{ message: string }>(`/investimentos/${id}`, {
+      method: 'DELETE',
+    }),
+  deleteTransaction: (id: string | number, transacaoId: string | number) =>
+    request<{ message: string }>(`/investimentos/${id}/transacao/${transacaoId}`, {
+      method: 'DELETE',
+    }),
 };
 

@@ -32,24 +32,17 @@ router.get('/investimentos/:id', autenticar, async (req, res) => {
     const { id } = req.params;
     const id_usuario = req.usuario.id;
     try {
-        // Obter investimento
         const invQuery = await BD.query(`SELECT * FROM investimentos WHERE id_investimento = $1 AND id_usuario = $2`, [id, id_usuario]);
-        if (invQuery.rowCount === 0) {
-            return res.status(404).json({ message: 'Investimento não encontrado' });
-        }
+        if (invQuery.rowCount === 0) return res.status(404).json({ message: 'Investimento não encontrado' });
         const investimento = invQuery.rows[0];
 
-        // Obter transacoes do investimento
         const transQuery = await BD.query(`SELECT * FROM transacoes_investimentos WHERE id_investimento = $1 ORDER BY data_registro ASC`, [id]);
         
         let saldoAcumulado = 0;
         const historico = transQuery.rows.map(t => {
             if (t.tipo === 'resgate') saldoAcumulado -= parseFloat(t.valor);
             else saldoAcumulado += parseFloat(t.valor);
-            return {
-                ...t,
-                saldoAposTransacao: saldoAcumulado
-            };
+            return { ...t, saldoAposTransacao: saldoAcumulado };
         });
 
         investimento.saldo_atual = saldoAcumulado;
@@ -80,38 +73,38 @@ router.post('/investimentos', autenticar, async (req, res) => {
 router.post('/investimentos/:id/transacao', autenticar, async (req, res) => {
     const { id } = req.params;
     const id_usuario = req.usuario.id;
-    const { tipo, valor, data_registro } = req.body; 
-    // tipo: 'aporte', 'resgate'
+    const { tipo, valor, data_registro } = req.body;
     try {
         if (!tipo || !valor) return res.status(400).json({ message: 'Tipo e valor são obrigatórios' });
         if (!['aporte', 'resgate'].includes(tipo)) return res.status(400).json({ message: 'Tipo inválido. Use aporte ou resgate.' });
         if (parseFloat(valor) <= 0) return res.status(400).json({ message: 'Valor deve ser maior que zero' });
 
-        // Verificar se investimento pertence ao usuario
         const invQuery = await BD.query(`SELECT * FROM investimentos WHERE id_investimento = $1 AND id_usuario = $2`, [id, id_usuario]);
         if (invQuery.rowCount === 0) return res.status(404).json({ message: 'Investimento não encontrado' });
         const investimento = invQuery.rows[0];
 
-        await BD.query('BEGIN'); // Iniciar transaçao SQL
+        await BD.query('BEGIN');
 
-        // 1. Inserir na transacoes_investimentos
+        // 1. Inserir na transacoes_investimentos e obter o id gerado
+        let transInv;
         if (data_registro) {
-            await BD.query(
-                `INSERT INTO transacoes_investimentos (id_investimento, tipo, valor, data_registro) VALUES ($1, $2, $3, $4)`,
+            transInv = await BD.query(
+                `INSERT INTO transacoes_investimentos (id_investimento, tipo, valor, data_registro) VALUES ($1, $2, $3, $4) RETURNING id_transacao_inv`,
                 [id, tipo, valor, data_registro]
             );
         } else {
-            await BD.query(
-                `INSERT INTO transacoes_investimentos (id_investimento, tipo, valor) VALUES ($1, $2, $3)`,
+            transInv = await BD.query(
+                `INSERT INTO transacoes_investimentos (id_investimento, tipo, valor) VALUES ($1, $2, $3) RETURNING id_transacao_inv`,
                 [id, tipo, valor]
             );
         }
+        const id_transacao_inv = transInv.rows[0].id_transacao_inv;
 
-        // 2. Registrar na conta principal (aporte = despesa, resgate = receita)
+        // 2. Registrar na conta principal como despesa (aporte) ou receita (resgate)
         const tipoPrincipal = tipo === 'aporte' ? 'despesa' : 'receita';
-        const descPrincipal = `${tipo === 'aporte' ? 'Aporte' : 'Resgate'} em ${investimento.nome}`;
-        
-        // Buscar subcategoria de investimentos (sem criar, sem travar)
+        // Usar prefixo [INV:id_transacao_inv] na descricao para poder encontrar e deletar depois
+        const descPrincipal = `[INV:${id_transacao_inv}] ${tipo === 'aporte' ? 'Aporte' : 'Resgate'} em ${investimento.nome}`;
+
         const subCatQuery = await BD.query(
             `SELECT s.id_subcategoria FROM subcategorias s
              JOIN categorias c ON s.id_categoria = c.id_categoria
@@ -140,8 +133,40 @@ router.post('/investimentos/:id/transacao', autenticar, async (req, res) => {
     }
 });
 
+// Deletar uma transação do investimento (e a respectiva transação da conta principal, se houver)
+router.delete('/investimentos/:id/transacao/:transacaoId', autenticar, async (req, res) => {
+    const { id, transacaoId } = req.params;
+    const id_usuario = req.usuario.id;
+    try {
+        // Verificar se o investimento pertence ao usuário
+        const invQuery = await BD.query(`SELECT id_investimento FROM investimentos WHERE id_investimento = $1 AND id_usuario = $2`, [id, id_usuario]);
+        if (invQuery.rowCount === 0) return res.status(403).json({ message: 'Não autorizado' });
 
-// Editar investimento (ex: mudar taxa)
+        // Buscar a transação do investimento
+        const transQuery = await BD.query(`SELECT * FROM transacoes_investimentos WHERE id_transacao_inv = $1 AND id_investimento = $2`, [transacaoId, id]);
+        if (transQuery.rowCount === 0) return res.status(404).json({ message: 'Transação não encontrada' });
+
+        await BD.query('BEGIN');
+
+        // Deletar da transacoes_investimentos
+        await BD.query(`DELETE FROM transacoes_investimentos WHERE id_transacao_inv = $1`, [transacaoId]);
+
+        // Tentar deletar a transação vinculada na conta principal (marcada com [INV:id])
+        await BD.query(
+            `DELETE FROM transacoes WHERE id_usuario = $1 AND descricao LIKE $2`,
+            [id_usuario, `[INV:${transacaoId}]%`]
+        );
+
+        await BD.query('COMMIT');
+        res.status(200).json({ message: 'Transação excluída com sucesso' });
+    } catch (error) {
+        await BD.query('ROLLBACK');
+        console.error('❌ ERRO AO DELETAR TRANSACAO ❌', error.message);
+        return res.status(500).json({ error: 'Erro ao excluir transação: ' + error.message });
+    }
+});
+
+// Editar investimento (nome, tipo, taxa)
 router.put('/investimentos/:id', autenticar, async (req, res) => {
     const { id } = req.params;
     const id_usuario = req.usuario.id;
@@ -155,6 +180,35 @@ router.put('/investimentos/:id', autenticar, async (req, res) => {
         res.status(200).json({ message: 'Investimento atualizado com sucesso', investimento: result.rows[0] });
     } catch (error) {
         return res.status(500).json({ error: 'Erro ao atualizar investimento: ' + error.message });
+    }
+});
+
+// Deletar investimento (e todas as suas transações)
+router.delete('/investimentos/:id', autenticar, async (req, res) => {
+    const { id } = req.params;
+    const id_usuario = req.usuario.id;
+    try {
+        const invQuery = await BD.query(`SELECT id_investimento FROM investimentos WHERE id_investimento = $1 AND id_usuario = $2`, [id, id_usuario]);
+        if (invQuery.rowCount === 0) return res.status(404).json({ message: 'Investimento não encontrado' });
+
+        await BD.query('BEGIN');
+
+        // Deletar todas as transações vinculadas na conta principal que tenham o prefixo [INV:
+        await BD.query(
+            `DELETE FROM transacoes WHERE id_usuario = $1 AND descricao ~ '\\[INV:\\d+\\]'`,
+            [id_usuario]
+        );
+        // Deletar transações do investimento
+        await BD.query(`DELETE FROM transacoes_investimentos WHERE id_investimento = $1`, [id]);
+        // Deletar o investimento
+        await BD.query(`DELETE FROM investimentos WHERE id_investimento = $1`, [id]);
+
+        await BD.query('COMMIT');
+        res.status(200).json({ message: 'Investimento excluído com sucesso' });
+    } catch (error) {
+        await BD.query('ROLLBACK');
+        console.error('❌ ERRO AO DELETAR INVESTIMENTO ❌', error.message);
+        return res.status(500).json({ error: 'Erro ao excluir investimento: ' + error.message });
     }
 });
 
