@@ -271,8 +271,13 @@ function DashboardContent() {
         {/* Evolução do saldo */}
         <div className="lg:col-span-2">
           <FinanceCard className="h-full">
-            <h2 className="font-semibold text-gray-900 mb-4">Evolução do Saldo</h2>
-            <div className="h-48 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-900">Evolução do Saldo</h2>
+              <a href="/evolucao-saldo" className="text-sm text-[var(--color-finance-primary)] font-medium hover:underline flex items-center gap-1">
+                Ver detalhes <ArrowUpRight size={16} />
+              </a>
+            </div>
+            <div className="h-48">
               {summaryLoading
                 ? <SkeletonCard lines={1} className="h-full border-0 shadow-none" />
                 : <LineChart data={summary?.evolucao_saldo || []} />

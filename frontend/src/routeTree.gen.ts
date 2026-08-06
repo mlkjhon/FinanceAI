@@ -9,61 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TransactionsRouteImport } from './routes/transactions'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as InsightsRouteImport } from './routes/insights'
-import { Route as GoalsRouteImport } from './routes/goals'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as CategoriasRouteImport } from './routes/categorias'
-import { Route as BudgetsRouteImport } from './routes/budgets'
-import { Route as BancosRouteImport } from './routes/bancos'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as R404RouteImport } from './routes/404'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as R404RouteImport } from './routes/404'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BancosRouteImport } from './routes/bancos'
+import { Route as BudgetsRouteImport } from './routes/budgets'
+import { Route as CategoriasRouteImport } from './routes/categorias'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as EvolucaoSaldoRouteImport } from './routes/evolucao-saldo'
+import { Route as GoalsRouteImport } from './routes/goals'
+import { Route as InsightsRouteImport } from './routes/insights'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as TransactionsRouteImport } from './routes/transactions'
 
-const TransactionsRoute = TransactionsRouteImport.update({
-  id: '/transactions',
-  path: '/transactions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InsightsRoute = InsightsRouteImport.update({
-  id: '/insights',
-  path: '/insights',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GoalsRoute = GoalsRouteImport.update({
-  id: '/goals',
-  path: '/goals',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CategoriasRoute = CategoriasRouteImport.update({
-  id: '/categorias',
-  path: '/categorias',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BudgetsRoute = BudgetsRouteImport.update({
-  id: '/budgets',
-  path: '/budgets',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BancosRoute = BancosRouteImport.update({
-  id: '/bancos',
-  path: '/bancos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const R404Route = R404RouteImport.update({
@@ -71,9 +32,54 @@ const R404Route = R404RouteImport.update({
   path: '/404',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BancosRoute = BancosRouteImport.update({
+  id: '/bancos',
+  path: '/bancos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BudgetsRoute = BudgetsRouteImport.update({
+  id: '/budgets',
+  path: '/budgets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoriasRoute = CategoriasRouteImport.update({
+  id: '/categorias',
+  path: '/categorias',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EvolucaoSaldoRoute = EvolucaoSaldoRouteImport.update({
+  id: '/evolucao-saldo',
+  path: '/evolucao-saldo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GoalsRoute = GoalsRouteImport.update({
+  id: '/goals',
+  path: '/goals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InsightsRoute = InsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransactionsRoute = TransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/budgets': typeof BudgetsRoute
   '/categorias': typeof CategoriasRoute
   '/dashboard': typeof DashboardRoute
+  '/evolucao-saldo': typeof EvolucaoSaldoRoute
   '/goals': typeof GoalsRoute
   '/insights': typeof InsightsRoute
   '/profile': typeof ProfileRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/budgets': typeof BudgetsRoute
   '/categorias': typeof CategoriasRoute
   '/dashboard': typeof DashboardRoute
+  '/evolucao-saldo': typeof EvolucaoSaldoRoute
   '/goals': typeof GoalsRoute
   '/insights': typeof InsightsRoute
   '/profile': typeof ProfileRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/budgets': typeof BudgetsRoute
   '/categorias': typeof CategoriasRoute
   '/dashboard': typeof DashboardRoute
+  '/evolucao-saldo': typeof EvolucaoSaldoRoute
   '/goals': typeof GoalsRoute
   '/insights': typeof InsightsRoute
   '/profile': typeof ProfileRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/budgets'
     | '/categorias'
     | '/dashboard'
+    | '/evolucao-saldo'
     | '/goals'
     | '/insights'
     | '/profile'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/budgets'
     | '/categorias'
     | '/dashboard'
+    | '/evolucao-saldo'
     | '/goals'
     | '/insights'
     | '/profile'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/budgets'
     | '/categorias'
     | '/dashboard'
+    | '/evolucao-saldo'
     | '/goals'
     | '/insights'
     | '/profile'
@@ -167,6 +179,7 @@ export interface RootRouteChildren {
   BudgetsRoute: typeof BudgetsRoute
   CategoriasRoute: typeof CategoriasRoute
   DashboardRoute: typeof DashboardRoute
+  EvolucaoSaldoRoute: typeof EvolucaoSaldoRoute
   GoalsRoute: typeof GoalsRoute
   InsightsRoute: typeof InsightsRoute
   ProfileRoute: typeof ProfileRoute
@@ -175,67 +188,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/transactions': {
-      id: '/transactions'
-      path: '/transactions'
-      fullPath: '/transactions'
-      preLoaderRoute: typeof TransactionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/insights': {
-      id: '/insights'
-      path: '/insights'
-      fullPath: '/insights'
-      preLoaderRoute: typeof InsightsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/goals': {
-      id: '/goals'
-      path: '/goals'
-      fullPath: '/goals'
-      preLoaderRoute: typeof GoalsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/categorias': {
-      id: '/categorias'
-      path: '/categorias'
-      fullPath: '/categorias'
-      preLoaderRoute: typeof CategoriasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/budgets': {
-      id: '/budgets'
-      path: '/budgets'
-      fullPath: '/budgets'
-      preLoaderRoute: typeof BudgetsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bancos': {
-      id: '/bancos'
-      path: '/bancos'
-      fullPath: '/bancos'
-      preLoaderRoute: typeof BancosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/404': {
@@ -245,11 +202,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof R404RouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bancos': {
+      id: '/bancos'
+      path: '/bancos'
+      fullPath: '/bancos'
+      preLoaderRoute: typeof BancosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/budgets': {
+      id: '/budgets'
+      path: '/budgets'
+      fullPath: '/budgets'
+      preLoaderRoute: typeof BudgetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/categorias': {
+      id: '/categorias'
+      path: '/categorias'
+      fullPath: '/categorias'
+      preLoaderRoute: typeof CategoriasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/evolucao-saldo': {
+      id: '/evolucao-saldo'
+      path: '/evolucao-saldo'
+      fullPath: '/evolucao-saldo'
+      preLoaderRoute: typeof EvolucaoSaldoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/goals': {
+      id: '/goals'
+      path: '/goals'
+      fullPath: '/goals'
+      preLoaderRoute: typeof GoalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/insights': {
+      id: '/insights'
+      path: '/insights'
+      fullPath: '/insights'
+      preLoaderRoute: typeof InsightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transactions': {
+      id: '/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof TransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -263,6 +283,7 @@ const rootRouteChildren: RootRouteChildren = {
   BudgetsRoute: BudgetsRoute,
   CategoriasRoute: CategoriasRoute,
   DashboardRoute: DashboardRoute,
+  EvolucaoSaldoRoute: EvolucaoSaldoRoute,
   GoalsRoute: GoalsRoute,
   InsightsRoute: InsightsRoute,
   ProfileRoute: ProfileRoute,
