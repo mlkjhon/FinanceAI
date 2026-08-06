@@ -58,10 +58,11 @@ router.get('/investimentos/:id', autenticar, async (req, res) => {
 // Criar novo investimento
 router.post('/investimentos', autenticar, async (req, res) => {
     const id_usuario = req.usuario.id;
-    const { nome, tipo, taxa_rendimento } = req.body;
+    const { nome, tipo, taxa_rendimento, indexador } = req.body;
+    const index = indexador || 'PREFIXADO';
     try {
-        const comando = `INSERT INTO investimentos (id_usuario, nome, tipo, taxa_rendimento) VALUES ($1, $2, $3, $4) RETURNING *`;
-        const result = await BD.query(comando, [id_usuario, nome, tipo, taxa_rendimento]);
+        const comando = `INSERT INTO investimentos (id_usuario, nome, tipo, taxa_rendimento, indexador) VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+        const result = await BD.query(comando, [id_usuario, nome, tipo, taxa_rendimento, index]);
         res.status(201).json({ message: 'Investimento criado com sucesso', investimento: result.rows[0] });
     } catch (error) {
         console.error('❌ ERRO AO CRIAR INVESTIMENTO ❌', error.message);
@@ -170,11 +171,12 @@ router.delete('/investimentos/:id/transacao/:transacaoId', autenticar, async (re
 router.put('/investimentos/:id', autenticar, async (req, res) => {
     const { id } = req.params;
     const id_usuario = req.usuario.id;
-    const { nome, tipo, taxa_rendimento } = req.body;
+    const { nome, tipo, taxa_rendimento, indexador } = req.body;
+    const index = indexador || 'PREFIXADO';
     try {
         const result = await BD.query(
-            `UPDATE investimentos SET nome=$1, tipo=$2, taxa_rendimento=$3 WHERE id_investimento=$4 AND id_usuario=$5 RETURNING *`,
-            [nome, tipo, taxa_rendimento, id, id_usuario]
+            `UPDATE investimentos SET nome=$1, tipo=$2, taxa_rendimento=$3, indexador=$4 WHERE id_investimento=$5 AND id_usuario=$6 RETURNING *`,
+            [nome, tipo, taxa_rendimento, index, id, id_usuario]
         );
         if (result.rowCount === 0) return res.status(404).json({ message: 'Investimento não encontrado' });
         res.status(200).json({ message: 'Investimento atualizado com sucesso', investimento: result.rows[0] });

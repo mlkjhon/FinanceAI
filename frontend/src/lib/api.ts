@@ -455,6 +455,7 @@ export interface Investment {
   nome: string;
   tipo: string;
   taxa_rendimento: number | string;
+  indexador?: string;
   saldo_atual: number | string;
   data_criacao: string;
   historico?: InvestmentTransaction[];
@@ -473,6 +474,7 @@ export interface CreateInvestment {
   nome: string;
   tipo: string;
   taxa_rendimento: number;
+  indexador: string;
 }
 
 export interface CreateInvestmentTransaction {

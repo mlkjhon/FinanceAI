@@ -18,12 +18,15 @@ const TIPOS_INVESTIMENTO = [
   'BDRs', 'ETFs', 'Outro'
 ];
 
+const INDEXADORES = ['PREFIXADO', 'CDI', 'SELIC', 'IPCA'];
+
 function InvestimentosPage() {
   const queryClient = useQueryClient();
   const [modalAberto, setModalAberto] = useState(false);
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState(TIPOS_INVESTIMENTO[0]);
   const [taxa, setTaxa] = useState('');
+  const [indexador, setIndexador] = useState(INDEXADORES[0]);
 
   const { data: investimentos, isLoading } = useQuery({
     queryKey: ['investimentos'],
@@ -46,7 +49,8 @@ function InvestimentosPage() {
     createMutation.mutate({
       nome,
       tipo,
-      taxa_rendimento: parseFloat(taxa || '0')
+      taxa_rendimento: parseFloat(taxa || '0'),
+      indexador
     });
   };
 
@@ -208,7 +212,22 @@ function InvestimentosPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Taxa de Rendimento Anual (%)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Indexador</label>
+                  <select
+                    value={indexador}
+                    onChange={e => setIndexador(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
+                  >
+                    {INDEXADORES.map(idx => (
+                      <option key={idx} value={idx}>{idx}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    {indexador === 'PREFIXADO' ? 'Taxa Anual (%)' : `Porcentagem do ${indexador} (%)`}
+                  </label>
                   <div className="relative">
                     <input
                       type="number"
@@ -216,7 +235,7 @@ function InvestimentosPage() {
                       required
                       value={taxa}
                       onChange={e => setTaxa(e.target.value)}
-                      placeholder="Ex: 10.5"
+                      placeholder={indexador === 'PREFIXADO' ? "Ex: 10.5" : "Ex: 120"}
                       className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">%</span>

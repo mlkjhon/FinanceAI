@@ -113,8 +113,21 @@ router.patch('/transacoes/:id_transacao', autenticar, async (req, res) => {
 router.delete('/transacoes/:id_transacao', autenticar, async (req, res) => {
     const { id_transacao } = req.params;
     try {
-        const verificar = await BD.query(`SELECT id_transacao FROM transacoes WHERE id_transacao = $1`, [id_transacao]);
+        const verificar = await BD.query(`SELECT id_transacao, descricao FROM transacoes WHERE id_transacao = $1`, [id_transacao]);
         if (verificar.rowCount === 0) return res.status(404).json({ message: 'Transação não encontrada' });
+
+        const transacao = verificar.rows[0];
+        
+        // Verifica se é uma transação gerada pelo módulo de investimentos
+        if (transacao.descricao && transacao.descricao.includes('[INV:')) {
+            const match = transacao.descricao.match(/\[INV:(\d+)\]/);
+            if (match && match[1]) {
+                const id_transacao_inv = match[1];
+                // Remove a transação de investimento (e a transação na conta principal será removida se não for apagada aqui)
+                // Mas, como já estamos apagando a principal aqui, vamos apagar a do investimento também.
+                await BD.query(`DELETE FROM transacoes_investimentos WHERE id_transacao_inv = $1`, [id_transacao_inv]);
+            }
+        }
 
         const comando = `DELETE FROM transacoes WHERE id_transacao = $1`;
         await BD.query(comando, [id_transacao]);

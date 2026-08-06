@@ -40,11 +40,24 @@ function InvestimentoDetailsPage() {
 
   // Edit State
   const [modalEditAberto, setModalEditAberto] = useState(false);
-  const [editForm, setEditForm] = useState({ nome: '', tipo: '', taxa_rendimento: '' });
+  const [editForm, setEditForm] = useState({ nome: '', tipo: '', taxa_rendimento: '', indexador: 'PREFIXADO' });
 
   const { data: inv, isLoading } = useQuery({
     queryKey: ['investimentos', id],
     queryFn: () => investimentosApi.get(id),
+  });
+
+  const { data: taxasApi } = useQuery({
+    queryKey: ['taxasBrasilAPI'],
+    queryFn: async () => {
+      try {
+        const res = await fetch('https://brasilapi.com.br/api/taxas/v1');
+        return res.json();
+      } catch (e) {
+        return [{ nome: 'cdi', valor: 10.5 }, { nome: 'selic', valor: 10.5 }, { nome: 'ipca', valor: 4.5 }];
+      }
+    },
+    staleTime: 1000 * 60 * 60 * 24 // 24h
   });
 
   const transacaoMutation = useMutation({
@@ -103,7 +116,8 @@ function InvestimentoDetailsPage() {
       setEditForm({
         nome: inv.nome,
         tipo: inv.tipo,
-        taxa_rendimento: String(inv.taxa_rendimento)
+        taxa_rendimento: String(inv.taxa_rendimento),
+        indexador: inv.indexador || 'PREFIXADO'
       });
       setModalEditAberto(true);
     }
@@ -114,7 +128,8 @@ function InvestimentoDetailsPage() {
     updateInvMutation.mutate({
       nome: editForm.nome,
       tipo: editForm.tipo,
-      taxa_rendimento: parseFloat(editForm.taxa_rendimento)
+      taxa_rendimento: parseFloat(editForm.taxa_rendimento),
+      indexador: editForm.indexador
     });
   };
 
@@ -130,7 +145,21 @@ function InvestimentoDetailsPage() {
 
   const historicoInvertido = [...(inv?.historico || [])].reverse();
 
-  const rendimentoPrevisto = inv ? (parseFloat(String(inv.saldo_atual)) * (parseFloat(String(inv.taxa_rendimento)) / 100)) / 365 : 0;
+  const getTaxaAnual = (invData: any) => {
+    let taxa = parseFloat(String(invData.taxa_rendimento));
+    const idx = (invData.indexador || 'PREFIXADO').toUpperCase();
+    if (idx === 'PREFIXADO') return taxa;
+    if (!taxasApi) return 0;
+
+    const getT = (n: string) => taxasApi.find((t:any) => t.nome.toLowerCase() === n.toLowerCase())?.valor || 0;
+    
+    if (idx === 'CDI') return (taxa / 100) * (getT('cdi') || 10.5);
+    if (idx === 'SELIC') return (taxa / 100) * (getT('selic') || 10.5);
+    if (idx === 'IPCA') return (getT('ipca') || 4.5) + taxa;
+    return taxa;
+  };
+
+  const rendimentoPrevisto = inv ? (parseFloat(String(inv.saldo_atual)) * (getTaxaAnual(inv) / 100)) / 365 : 0;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] font-sans text-gray-900 pb-20">
@@ -209,7 +238,12 @@ function InvestimentoDetailsPage() {
               <div className="space-y-4">
                 <div>
                   <p className="text-xs text-gray-400 mb-1">Taxa de Rendimento Automática</p>
-                  <p className="font-bold text-green-600 text-lg">+{inv?.taxa_rendimento}% <span className="text-sm font-medium text-gray-500">ao ano</span></p>
+                  <p className="font-bold text-green-600 text-lg">
+                    +{inv?.taxa_rendimento}% 
+                    <span className="text-sm font-medium text-gray-500">
+                      {(!inv?.indexador || inv?.indexador === 'PREFIXADO') ? ' ao ano' : ` do ${inv?.indexador}`}
+                    </span>
+                  </p>
                 </div>
                 <div className="pt-4 border-t border-gray-50">
                   <p className="text-xs text-gray-400 mb-1">Rendimento Previsto (Amanhã)</p>
@@ -444,10 +478,24 @@ function InvestimentoDetailsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Taxa de Rendimento (% ao ano)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Indexador</label>
+                  <select
+                    value={editForm.indexador}
+                    onChange={e => setEditForm({...editForm, indexador: e.target.value})}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
+                  >
+                    {['PREFIXADO', 'CDI', 'SELIC', 'IPCA'].map(idx => (
+                      <option key={idx} value={idx}>{idx}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    {editForm.indexador === 'PREFIXADO' ? 'Taxa de Rendimento (% ao ano)' : `Porcentagem do ${editForm.indexador} (%)`}
+                  </label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="0.0001"
                     required
                     value={editForm.taxa_rendimento}
                     onChange={e => setEditForm({...editForm, taxa_rendimento: e.target.value})}
