@@ -18,7 +18,11 @@ const TIPOS_INVESTIMENTO = [
   'BDRs', 'ETFs', 'Outro'
 ];
 
-const INDEXADORES = ['PREFIXADO', 'CDI', 'SELIC', 'IPCA', 'IGPM', 'INPC', 'TR', 'POUPANCA', 'IBOVESPA'];
+const INDEXADORES = [
+  'PREFIXADO', 'CDI', 'SELIC', 'IPCA', 'IGPM', 'INPC', 
+  'TR', 'POUPANCA', 'IBOVESPA', 'TLP', 'TJLP', 'TBF', 
+  'PTAX', 'IMA-B', 'IRF-M', 'IDA'
+];
 
 function InvestimentosPage() {
   const queryClient = useQueryClient();

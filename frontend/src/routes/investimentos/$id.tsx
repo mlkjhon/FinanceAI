@@ -164,6 +164,8 @@ function InvestimentoDetailsPage() {
     if (idx === 'INPC') return getVal('inpc') + taxa;
     if (idx === 'IBOVESPA') return (taxa / 100) * getVal('ibovespa');
     if (idx === 'TR') return getVal('tr') + taxa;
+    if (['TLP', 'TJLP', 'TBF'].includes(idx)) return 6.0 + taxa;
+    if (['PTAX', 'IMA-B', 'IRF-M', 'IDA'].includes(idx)) return 5.0 + taxa;
     if (idx === 'POUPANCA' || idx === 'POUPANÇA') {
         const selic = getVal('selic');
         const rendimentoBase = selic > 8.5 ? 6.17 : (selic * 0.70);
@@ -497,7 +499,11 @@ function InvestimentoDetailsPage() {
                     onChange={e => setEditForm({...editForm, indexador: e.target.value})}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
                   >
-                    {['PREFIXADO', 'CDI', 'SELIC', 'IPCA', 'IGPM', 'INPC', 'TR', 'POUPANCA', 'IBOVESPA'].map(idx => (
+                    {[
+                      'PREFIXADO', 'CDI', 'SELIC', 'IPCA', 'IGPM', 'INPC', 
+                      'TR', 'POUPANCA', 'IBOVESPA', 'TLP', 'TJLP', 'TBF', 
+                      'PTAX', 'IMA-B', 'IRF-M', 'IDA'
+                    ].map(idx => (
                       <option key={idx} value={idx}>{idx}</option>
                     ))}
                   </select>

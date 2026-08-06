@@ -9,7 +9,12 @@ export const startCronJobs = () => {
         console.log('⏰ [CRON] Iniciando processamento de rendimentos diários...');
         try {
             // Buscar taxas atuais da BrasilAPI
-            let taxasAtuais = { cdi: 10.5, selic: 10.5, ipca: 4.5, igpm: 4.0, inpc: 4.5, tr: 1.5, ibovespa: 10.0 }; // Fallbacks
+            let taxasAtuais = { 
+                cdi: 10.5, selic: 10.5, ipca: 4.5, igpm: 4.0, inpc: 4.5, tr: 1.5, 
+                ibovespa: 10.0, ifix: 8.0, sp500: 10.0, nasdaq: 12.0, dowjones: 9.0,
+                bitcoin: 50.0, ethereum: 40.0, dolar: 3.0, euro: 2.0, libor: 5.0,
+                sofr: 5.0, euribor: 3.5, tlp: 6.0, tjlp: 6.5, tbf: 10.0
+            }; // Fallbacks
             try {
                 const response = await fetch('https://brasilapi.com.br/api/taxas/v1');
                 const taxas = await response.json();
@@ -52,7 +57,8 @@ export const startCronJobs = () => {
                 if (inv.saldo_atual > 0) {
                     let taxaAnual = parseFloat(inv.taxa_rendimento); // Ex: 120 (para 120% CDI) ou 10 (para 10% Prefixado)
                     const indexador = (inv.indexador || 'PREFIXADO').toUpperCase();
-
+                    
+                    const getVal = (n) => taxasAtuais[n] || taxasAtuais[n.replace(/ /g, '')] || 5.0; // 5.0 fallback for unknown
                     // Calcula a taxa anual efetiva com base no indexador
                     if (indexador === 'CDI') {
                         taxaAnual = (taxaAnual / 100) * taxasAtuais.cdi; 
@@ -68,6 +74,10 @@ export const startCronJobs = () => {
                         taxaAnual = (taxaAnual / 100) * taxasAtuais.ibovespa;
                     } else if (indexador === 'TR') {
                         taxaAnual = taxasAtuais.tr + taxaAnual;
+                    } else if (['TLP', 'TJLP', 'TBF'].includes(indexador)) {
+                        taxaAnual = 6.0 + taxaAnual; // Fallback generico
+                    } else if (['PTAX', 'IMA-B', 'IRF-M', 'IDA'].includes(indexador)) {
+                        taxaAnual = 5.0 + taxaAnual; // Fallback generico
                     } else if (indexador === 'POUPANCA' || indexador === 'POUPANÇA') {
                         // Regra da Poupança: se Selic > 8.5%, rende 6.17% (0.5% a.m.) + TR. Senão, 70% da Selic + TR
                         const rendimentoBase = taxasAtuais.selic > 8.5 ? 6.17 : (taxasAtuais.selic * 0.70);
