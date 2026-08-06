@@ -12,6 +12,7 @@ const navLinks = [
   { href: '/budgets', label: 'Orçamentos' },
   { href: '/goals', label: 'Metas' },
   { href: '/bancos', label: 'Bancos' },
+  { href: '/investimentos', label: 'Investimentos' },
   { href: '/insights', label: 'Insights IA' },
 ];
 

@@ -12,8 +12,10 @@ import rotasMetas from "./src/routes/rotasMetas.js";
 import rotasOrcamentos from "./src/routes/rotasOrcamentos.js";
 import rotasInsights from "./src/routes/rotasInsights.js";
 import rotasOpenFinance from "./src/routes/rotasOpenFinance.js";
+import rotasInvestimentos from "./src/routes/rotasInvestimentos.js";
 
 import { BD, testarConexao } from "./db.js";
+import { startCronJobs } from "./src/cron/rendimentosDiarios.js";
 
 import swaggerUI from "swagger-ui-express";
 import swagger from './config/swagger.js';
@@ -76,6 +78,10 @@ app.use(rotasMetas);
 app.use(rotasOrcamentos);
 app.use(rotasInsights);
 app.use(rotasOpenFinance);
+app.use(rotasInvestimentos);
+
+// Start Cron Jobs
+startCronJobs();
 
 app.get('/swagger', (req, res) => {
     res.send(`<!DOCTYPE html>

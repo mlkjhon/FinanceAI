@@ -447,3 +447,57 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+
+// Investimentos
+export interface Investment {
+  id_investimento: number;
+  id_usuario: number;
+  nome: string;
+  tipo: string;
+  taxa_rendimento: number | string;
+  saldo_atual: number | string;
+  data_criacao: string;
+  historico?: InvestmentTransaction[];
+}
+
+export interface InvestmentTransaction {
+  id_transacao_inv: number;
+  id_investimento: number;
+  tipo: 'aporte' | 'resgate' | 'rendimento';
+  valor: number | string;
+  data_registro: string;
+  saldoAposTransacao?: number;
+}
+
+export interface CreateInvestment {
+  nome: string;
+  tipo: string;
+  taxa_rendimento: number;
+}
+
+export interface CreateInvestmentTransaction {
+  tipo: 'aporte' | 'resgate' | 'rendimento';
+  valor: number;
+  data_registro?: string;
+}
+
+export const investimentosApi = {
+  list: () => request<Investment[]>('/investimentos'),
+  get: (id: string | number) => request<Investment>(`/investimentos/${id}`),
+  create: (data: CreateInvestment) =>
+    request<{ message: string; investimento: Investment }>('/investimentos', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  addTransaction: (id: string | number, data: CreateInvestmentTransaction) =>
+    request<{ message: string }>(`/investimentos/${id}/transacao`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id: string | number, data: CreateInvestment) =>
+    request<{ message: string; investimento: Investment }>(`/investimentos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+};
+
