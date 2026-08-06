@@ -153,9 +153,22 @@ function InvestimentoDetailsPage() {
 
     const getT = (n: string) => taxasApi.find((t:any) => t.nome.toLowerCase() === n.toLowerCase())?.valor || 0;
     
-    if (idx === 'CDI') return (taxa / 100) * (getT('cdi') || 10.5);
-    if (idx === 'SELIC') return (taxa / 100) * (getT('selic') || 10.5);
-    if (idx === 'IPCA') return (getT('ipca') || 4.5) + taxa;
+    // Default fallback approximations for frontend display if API fails
+    const defaultTaxas: any = { cdi: 10.5, selic: 10.5, ipca: 4.5, igpm: 4.0, inpc: 4.5, tr: 1.5, ibovespa: 10.0 };
+    const getVal = (n: string) => getT(n) || defaultTaxas[n] || 0;
+
+    if (idx === 'CDI') return (taxa / 100) * getVal('cdi');
+    if (idx === 'SELIC') return (taxa / 100) * getVal('selic');
+    if (idx === 'IPCA') return getVal('ipca') + taxa;
+    if (idx === 'IGPM') return getVal('igpm') + taxa;
+    if (idx === 'INPC') return getVal('inpc') + taxa;
+    if (idx === 'IBOVESPA') return (taxa / 100) * getVal('ibovespa');
+    if (idx === 'TR') return getVal('tr') + taxa;
+    if (idx === 'POUPANCA' || idx === 'POUPANÇA') {
+        const selic = getVal('selic');
+        const rendimentoBase = selic > 8.5 ? 6.17 : (selic * 0.70);
+        return (taxa / 100) * (rendimentoBase + getVal('tr'));
+    }
     return taxa;
   };
 
@@ -484,7 +497,7 @@ function InvestimentoDetailsPage() {
                     onChange={e => setEditForm({...editForm, indexador: e.target.value})}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
                   >
-                    {['PREFIXADO', 'CDI', 'SELIC', 'IPCA'].map(idx => (
+                    {['PREFIXADO', 'CDI', 'SELIC', 'IPCA', 'IGPM', 'INPC', 'TR', 'POUPANCA', 'IBOVESPA'].map(idx => (
                       <option key={idx} value={idx}>{idx}</option>
                     ))}
                   </select>

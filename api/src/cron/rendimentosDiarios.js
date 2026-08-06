@@ -9,7 +9,7 @@ export const startCronJobs = () => {
         console.log('⏰ [CRON] Iniciando processamento de rendimentos diários...');
         try {
             // Buscar taxas atuais da BrasilAPI
-            let taxasAtuais = { cdi: 10.5, selic: 10.5, ipca: 4.5 }; // Valores default de fallback
+            let taxasAtuais = { cdi: 10.5, selic: 10.5, ipca: 4.5, igpm: 4.0, inpc: 4.5, tr: 1.5, ibovespa: 10.0 }; // Fallbacks
             try {
                 const response = await fetch('https://brasilapi.com.br/api/taxas/v1');
                 const taxas = await response.json();
@@ -55,12 +55,25 @@ export const startCronJobs = () => {
 
                     // Calcula a taxa anual efetiva com base no indexador
                     if (indexador === 'CDI') {
-                        taxaAnual = (taxaAnual / 100) * taxasAtuais.cdi; // 120% de 10.5 = 12.6
+                        taxaAnual = (taxaAnual / 100) * taxasAtuais.cdi; 
                     } else if (indexador === 'SELIC') {
                         taxaAnual = (taxaAnual / 100) * taxasAtuais.selic;
                     } else if (indexador === 'IPCA') {
-                        taxaAnual = taxasAtuais.ipca + taxaAnual; // IPCA + 6% = 4.5 + 6 = 10.5
-                    } // PREFIXADO mantem a taxa inserida
+                        taxaAnual = taxasAtuais.ipca + taxaAnual; 
+                    } else if (indexador === 'IGPM') {
+                        taxaAnual = taxasAtuais.igpm + taxaAnual;
+                    } else if (indexador === 'INPC') {
+                        taxaAnual = taxasAtuais.inpc + taxaAnual;
+                    } else if (indexador === 'IBOVESPA') {
+                        taxaAnual = (taxaAnual / 100) * taxasAtuais.ibovespa;
+                    } else if (indexador === 'TR') {
+                        taxaAnual = taxasAtuais.tr + taxaAnual;
+                    } else if (indexador === 'POUPANCA' || indexador === 'POUPANÇA') {
+                        // Regra da Poupança: se Selic > 8.5%, rende 6.17% (0.5% a.m.) + TR. Senão, 70% da Selic + TR
+                        const rendimentoBase = taxasAtuais.selic > 8.5 ? 6.17 : (taxasAtuais.selic * 0.70);
+                        taxaAnual = (taxaAnual / 100) * (rendimentoBase + taxasAtuais.tr);
+                    }
+                    // PREFIXADO mantem a taxa inserida
 
                     // Converter taxa anual para diária (simples)
                     const taxaDiaria = taxaAnual / 365;
