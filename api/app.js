@@ -21,6 +21,14 @@ import swagger from './config/swagger.js';
 import cors from 'cors';
 
 const app = express();
+
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    credentials: true
+}));
+
 app.use(express.json());
 
 app.get('/', async (req, res) => {
@@ -63,8 +71,6 @@ app.get('/test-gemini', async (req, res) => {
         res.status(500).json({ erro: error.message });
     }
 });
-
-app.use(cors());
 
 //Utilizando Rotas
 app.use(rotasUsuarios);

@@ -29,7 +29,7 @@ export function OpenFinanceWidget({ onEvent, onClose }: OpenFinanceWidgetProps) 
   useEffect(() => {
     async function fetchToken() {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+        const API_URL = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
         const res = await fetch(`${API_URL}/pluggy/connect-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }

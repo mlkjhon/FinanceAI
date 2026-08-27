@@ -12,7 +12,7 @@ const swagger = {
         //     description: 'Servidor Localhost'
         // },
         {
-            url: 'https://api-iota-livid-42.vercel.app/',
+            url: 'https://api-lyart-kappa.vercel.app/',
             description: 'Servidor de Produção'
         }
     ],

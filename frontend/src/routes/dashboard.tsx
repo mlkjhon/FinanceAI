@@ -201,7 +201,7 @@ function DashboardContent() {
       try {
         const user = getUserData();
         if (!user) return;
-        const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+        const API_URL = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
         const res = await fetch(`${API_URL}/conexoes/${user.id}`);
         if (res.ok) {
           const data = await res.json();

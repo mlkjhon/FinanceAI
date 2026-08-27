@@ -1,4 +1,4 @@
-const API_BASE = 'https://api-iota-livid-42.vercel.app';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

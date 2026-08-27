@@ -33,7 +33,7 @@ export default function BancosPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['openfinance', user?.id],
     queryFn: async () => {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
       const res = await fetch(`${API_URL}/conexoes/${user?.id}`);
       if (!res.ok) throw new Error('Erro ao buscar dados');
       return res.json() as Promise<{ conexoes: any[]; contas: any[] }>;
@@ -56,7 +56,7 @@ export default function BancosPage() {
 
     try {
       setIsSyncing(true);
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
       
       const res = await fetch(`${API_URL}/conexoes`, {
         method: 'POST',
@@ -274,7 +274,7 @@ export default function BancosPage() {
                   onClick={async () => {
                     try {
                       setIsDeleting(true);
-                      const API_URL = import.meta.env.VITE_API_URL || 'https://api-iota-livid-42.vercel.app';
+                      const API_URL = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
                       await fetch(`${API_URL}/conexoes/${deleteConfirm.id}`, { method: 'DELETE' });
                       queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
                       setDeleteConfirm(null);

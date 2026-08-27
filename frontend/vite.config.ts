@@ -19,7 +19,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://api-iota-livid-42.vercel.app',
+        target: 'https://api-lyart-kappa.vercel.app',
         changeOrigin: true,
       },
     },
