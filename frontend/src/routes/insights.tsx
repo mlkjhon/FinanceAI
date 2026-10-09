@@ -356,7 +356,7 @@ function InsightsPage() {
           </>
         )}
       </main>
-      <CommandBar estado={estado} resposta={resposta} erro={erroComando} onEnviar={(t) => comando(t)} />
+      <CommandBar estado={estado} resposta={resposta} erro={erroComando} onEnviar={(t) => comando(t)} blocos={blocos} />
     </div>
   );
 }
