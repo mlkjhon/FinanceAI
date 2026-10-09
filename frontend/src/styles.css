@@ -488,6 +488,133 @@
 .stagger > :nth-child(5) { animation-delay: 200ms; }
 .stagger > :nth-child(n + 6) { animation-delay: 250ms; }
 
+/* ---------- Transações ---------- */
+
+/*
+ * Painel lateral (Base UI Dialog). Frequência: ocasional. Propósito: continuidade
+ * espacial, entra e sai pela mesma borda. Entrada 400ms com a curva de drawer,
+ * saída 200ms (o sistema respondendo é sempre mais rápido). No celular vira sheet de baixo.
+ */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: color-mix(in oklab, var(--color-ink) 28%, transparent);
+  transition: opacity 400ms var(--ease-drawer);
+}
+.sheet-backdrop[data-starting-style],
+.sheet-backdrop[data-ending-style] { opacity: 0; }
+.sheet-backdrop[data-ending-style] { transition-duration: 200ms; }
+
+.sheet {
+  position: fixed;
+  z-index: var(--z-drawer);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  outline: none;
+  transition: transform 400ms var(--ease-drawer);
+  /* celular: sheet de baixo */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 92dvh;
+  border-radius: 20px 20px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -12px 40px -12px color-mix(in oklab, var(--color-accent) 25%, transparent);
+}
+.sheet[data-starting-style],
+.sheet[data-ending-style] { transform: translateY(100%); }
+.sheet[data-ending-style] { transition-duration: 200ms; }
+
+@media (min-width: 768px) {
+  .sheet {
+    left: auto;
+    top: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: min(440px, calc(100vw - 1.5rem));
+    max-height: none;
+    border-radius: 20px;
+    padding-bottom: 0;
+    box-shadow: -12px 0 40px -12px color-mix(in oklab, var(--color-accent) 25%, transparent);
+  }
+  .sheet[data-starting-style],
+  .sheet[data-ending-style] { transform: translateX(calc(100% + 0.75rem)); }
+}
+
+/* Campo do valor: o número é o protagonista do formulário */
+.amount-input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 2.75rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+.amount-input::placeholder { color: color-mix(in oklab, var(--color-ink) 25%, transparent); }
+.amount-input::-webkit-outer-spin-button,
+.amount-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.amount-input { -moz-appearance: textfield; }
+
+/*
+ * Segurar para excluir. Propósito: feedback de uma ação destrutiva sem modal.
+ * Pressionar: 2s linear (é progresso, progresso não tem easing).
+ * Soltar: volta em 200ms ease-out.
+ */
+.hold-btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.hold-btn[data-holding] { transform: scale(0.97); }
+.hold-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in oklab, var(--color-finance-error) 16%, transparent);
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 200ms var(--ease-out);
+}
+.hold-btn[data-holding] .hold-fill {
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 2s linear;
+}
+
+/*
+ * Linha recém-salva: o fundo acende e apaga. Frequência: uma vez por lançamento.
+ * Propósito: indicação de estado (mostra onde a transação foi parar na lista).
+ * Só cor, então vale também com reduced motion.
+ */
+.row-new { animation: row-new 1600ms var(--ease-out) both; }
+@keyframes row-new {
+  from { background-color: color-mix(in oklab, var(--color-accent) 12%, transparent); }
+  to { background-color: transparent; }
+}
+
+/* Linha do livro-caixa: hover sutil só com mouse (dezenas de vezes por dia = quase imperceptível) */
+.ledger-row {
+  transition: background-color 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ledger-row:hover { background-color: color-mix(in oklab, var(--color-accent) 4%, transparent); }
+}
+.ledger-row:active { background-color: color-mix(in oklab, var(--color-accent) 6%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet { transition: opacity 200ms ease; }
+  .sheet[data-starting-style],
+  .sheet[data-ending-style] { transform: none; opacity: 0; }
+  .hold-btn[data-holding] { transform: none; }
+}
+
 /* Seta que avança no hover de um card clicável: diz "isso abre algo" */
 .arrow-nudge {
   display: inline-flex;

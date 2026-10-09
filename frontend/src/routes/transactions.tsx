@@ -1,15 +1,17 @@
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { Dialog } from '@base-ui/react/dialog';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { txSchema, type TxForm } from '../lib/schemas/transaction';
-import { Plus, Search, Trash2, Edit2, X, Loader2, ChevronLeft, ChevronRight, TrendingUp } from '../components/icons';
+import { Plus, Search, X, Loader2, Trash2 } from '../components/icons';
 import { transactionsApi, categoriesApi, subcategoriasApi, type Transaction, type CreateTransaction } from '../lib/api';
 import { Navbar } from '../components/Navbar';
-import { SkeletonCard, Badge } from '../components/ui';
-import { formatCurrency, formatDate, cn } from '../lib/utils';
+import { AnimatedCounter } from '../components/ui';
+import { formatCurrency, cn } from '../lib/utils';
+import { spring } from '../lib/motion-tokens';
 
 export const Route = createFileRoute('/transactions')({
   beforeLoad: () => {
@@ -18,19 +20,136 @@ export const Route = createFileRoute('/transactions')({
   component: TransactionsPage,
 });
 
+const PAGE_SIZE = 30;
+type Filtro = 'todas' | 'receita' | 'despesa';
 
-function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => void }) {
+// ---------- Datas ----------
+
+// 'YYYY-MM-DD' da transação, sem passar por Date (evita trocar de dia por fuso)
+const diaDe = (tx: Transaction) => (tx.data || tx.created_at || '').slice(0, 10);
+
+const hojeISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const somarDias = (iso: string, n: number) => {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+const rotuloDoDia = (iso: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return 'Sem data';
+  const hoje = hojeISO();
+  if (iso === hoje) return 'Hoje';
+  if (iso === somarDias(hoje, -1)) return 'Ontem';
+  const d = new Date(`${iso}T12:00:00`);
+  const mesmoAno = iso.slice(0, 4) === hoje.slice(0, 4);
+  return d.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short', year: mesmoAno ? undefined : 'numeric' })
+    .replace(/\./g, '')
+    .replace(/^(\w)/, (c) => c.toUpperCase());
+};
+
+const sinal = (tx: Transaction) => (tx.tipo === 'receita' ? tx.valor : -tx.valor);
+
+// ---------- Controle segmentado ----------
+
+/*
+ * Indicador desliza entre as opções. Frequência: dezenas por dia, então é rápido
+ * (spring.snappy, ~250ms, sem bounce) e some com reduced motion.
+ */
+function Segmented<T extends string>({ id, value, options, onChange, label }: {
+  id: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string;
+}) {
+  const reduce = useReducedMotion();
+  return (
+    <div role="group" aria-label={label} className="inline-flex self-start rounded-full bg-[var(--color-ink)]/[0.05] p-1">
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+
+            aria-pressed={active}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              'relative px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-150',
+              active ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink-soft)]'
+            )}
+          >
+            {active && (
+              <motion.span
+                layoutId={reduce ? undefined : id}
+                transition={spring.snappy}
+                className="absolute inset-0 -z-10 rounded-full bg-white shadow-sm"
+              />
+            )}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------- Segurar para excluir ----------
+
+function HoldToDelete({ onConfirm, pending }: { onConfirm: () => void; pending: boolean }) {
+  const [holding, setHolding] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const start = () => {
+    if (pending) return;
+    setHolding(true);
+    timer.current = setTimeout(() => { setHolding(false); onConfirm(); }, 2000);
+  };
+  const cancel = () => { clearTimeout(timer.current); setHolding(false); };
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  return (
+    <button
+      type="button"
+      className="hold-btn w-full rounded-full border border-[var(--color-finance-error)]/30 py-3 text-sm font-semibold text-loss"
+      data-holding={holding ? '' : undefined}
+      onPointerDown={start}
+      onPointerUp={cancel}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); start(); } }}
+      onKeyUp={(e) => { if (e.key === 'Enter' || e.key === ' ') cancel(); }}
+      onContextMenu={(e) => e.preventDefault()}
+      aria-label="Segure para excluir esta transação"
+    >
+      <span className="hold-fill" aria-hidden />
+      <span className="inline-flex items-center gap-2">
+        {pending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+        {pending ? 'Excluindo' : holding ? 'Continue segurando' : 'Segure para excluir'}
+      </span>
+    </button>
+  );
+}
+
+// ---------- Painel de criar / editar ----------
+
+const fieldCls =
+  'field w-full px-4 py-3 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm text-[var(--color-ink)]';
+
+function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose: () => void; onSaved: () => void }) {
   const qc = useQueryClient();
   const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue } = useForm<TxForm>({
     resolver: zodResolver(txSchema),
-    defaultValues: tx ? {
-      descricao: tx.descricao,
-      valor: tx.valor,
-      tipo: tx.tipo,
-      id_categoria: tx.id_categoria || '',
-      id_subcategoria: tx.id_subcategoria || '',
-      data: tx.data?.split('T')[0],
-    } : { tipo: 'despesa' },
+    defaultValues: tx
+      ? {
+          descricao: tx.descricao,
+          valor: tx.valor,
+          tipo: tx.tipo,
+          id_categoria: tx.id_categoria || '',
+          id_subcategoria: tx.id_subcategoria || '',
+          data: diaDe(tx),
+        }
+      : { tipo: 'despesa', data: hojeISO() },
   });
 
   const tipo = watch('tipo');
@@ -43,37 +162,33 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
     enabled: !!id_categoria,
   } as any);
 
-  // Auto-seleciona a subcategoria padrão quando a categoria é escolhida
+  // Seleciona a primeira subcategoria quando a categoria muda (mantém a da edição)
   useEffect(() => {
     const list = subcats as Array<{ id: string }> | undefined;
-    if (list && list.length > 0) {
-      setValue('id_subcategoria', list[0].id);
-    }
+    if (!list?.length) return;
+    if (tx?.id_subcategoria && list.some((s) => s.id === tx.id_subcategoria) && watch('id_subcategoria')) return;
+    setValue('id_subcategoria', list[0].id);
   }, [subcats]);
 
   const filteredCats = cats?.filter((c) => c.tipo === tipo) ?? [];
 
-  // Quando o tipo muda, limpa a categoria e subcategoria
   const handleTipoChange = (t: 'receita' | 'despesa') => {
     setValue('tipo', t);
     setValue('id_categoria', '');
     setValue('id_subcategoria', '');
   };
 
-  // Quando a categoria muda, limpa a subcategoria (o useEffect acima vai auto-selecionar)
-  const handleCatChange = (catId: string) => {
-    setValue('id_categoria', catId);
-    setValue('id_subcategoria', '');
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['transactions'] });
+    qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
   };
-
-  const createMut = useMutation({
-    mutationFn: transactionsApi.create,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['transactions'] }); qc.invalidateQueries({ queryKey: ['dashboard-summary'] }); onClose(); },
-  });
+  const createMut = useMutation({ mutationFn: transactionsApi.create, onSuccess: () => { invalidate(); onSaved(); } });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<CreateTransaction> }) => transactionsApi.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['transactions'] }); qc.invalidateQueries({ queryKey: ['dashboard-summary'] }); onClose(); },
+    onSuccess: () => { invalidate(); onSaved(); },
   });
+  const deleteMut = useMutation({ mutationFn: transactionsApi.delete, onSuccess: () => { invalidate(); onClose(); } });
+  const saveError = createMut.error || updateMut.error || deleteMut.error;
 
   const onSubmit = async (data: TxForm) => {
     const payload: CreateTransaction = {
@@ -89,278 +204,366 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="font-brand font-bold text-lg text-gray-900">
-            {tx ? 'Editar Transação' : 'Nova transação'}
-          </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <X size={18} />
-          </button>
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col min-h-0 h-full">
+      <header className="flex items-center justify-between px-6 pt-5 pb-2">
+        <Dialog.Title className="font-brand font-bold text-lg text-[var(--color-ink)]">
+          {tx ? 'Editar transação' : 'Nova transação'}
+        </Dialog.Title>
+        <Dialog.Close className="pressable p-2 -mr-2 rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)]" aria-label="Fechar">
+          <X size={18} />
+        </Dialog.Close>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
+        <Segmented
+          id="tx-sheet-tipo"
+          label="Tipo da transação"
+          value={tipo}
+          onChange={handleTipoChange}
+          options={[{ value: 'despesa', label: 'Saída' }, { value: 'receita', label: 'Entrada' }]}
+        />
+
+        <div>
+          <label htmlFor="tx-valor" className="metric-label">Valor</label>
+          <div className="mt-1 flex items-baseline gap-2 border-b border-[var(--color-line)] pb-2 focus-within:border-[var(--color-accent)] transition-colors duration-150">
+            <span className={cn('font-brand text-2xl font-bold whitespace-nowrap shrink-0', tipo === 'receita' ? 'text-gain' : 'text-[var(--color-ink-muted)]')}>
+              {tipo === 'receita' ? '+R$' : '-R$'}
+            </span>
+            <input
+              id="tx-valor"
+              {...register('valor')}
+              type="number"
+              step="0.01"
+              inputMode="decimal"
+              placeholder="0,00"
+              autoFocus={!tx}
+              aria-invalid={!!errors.valor}
+              className="amount-input"
+            />
+          </div>
+          {errors.valor && <p className="mt-1.5 text-xs text-loss">{errors.valor.message}</p>}
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Tipo toggle */}
-          <div className="flex rounded-xl bg-gray-100 p-1">
-            {(['despesa', 'receita'] as const).map((t) => (
-              <label key={t} className="flex-1">
-                <input type="radio" value={t} {...register('tipo')} className="sr-only"
-                  onChange={() => handleTipoChange(t)} />
-                <span className={cn(
-                  'block text-center py-2 rounded-lg text-sm font-semibold cursor-pointer transition-[color,background-color,border-color,box-shadow,opacity]',
-                  tipo === t
-                    ? t === 'receita' ? 'bg-[var(--color-finance-success)] text-white' : 'bg-[var(--color-finance-error)] text-white'
-                    : 'text-gray-500 hover:text-gray-700'
-                )}>
-                  {t === 'receita' ? '+ Receita' : '- Despesa'}
+        <div className="space-y-2">
+          <label htmlFor="tx-desc" className="text-sm font-medium text-[var(--color-ink-soft)]">Descrição</label>
+          <input id="tx-desc" {...register('descricao')} placeholder="Ex.: mercado da semana" aria-invalid={!!errors.descricao} className={fieldCls} />
+          {errors.descricao && <p className="text-xs text-loss">{errors.descricao.message}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="tx-data" className="text-sm font-medium text-[var(--color-ink-soft)]">Data</label>
+          <input id="tx-data" {...register('data')} type="date" className={fieldCls} />
+        </div>
+
+        {filteredCats.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="tx-cat" className="text-sm font-medium text-[var(--color-ink-soft)]">Categoria</label>
+              <select
+                id="tx-cat"
+                {...register('id_categoria')}
+                onChange={(e) => { setValue('id_categoria', e.target.value); setValue('id_subcategoria', ''); }}
+                className={fieldCls}
+              >
+                <option value="">Sem categoria</option>
+                {filteredCats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="tx-sub" className="text-sm font-medium text-[var(--color-ink-soft)]">Subcategoria</label>
+              <select id="tx-sub" {...register('id_subcategoria')} disabled={!id_categoria} className={cn(fieldCls, 'disabled:opacity-50')}>
+                <option value="">Nenhuma</option>
+                {(subcats as any[] | undefined)?.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {saveError && (
+          <p role="alert" className="text-sm text-loss">
+            Não deu para salvar agora. Confira a conexão e tente de novo.
+          </p>
+        )}
+      </div>
+
+      <footer className="px-6 py-5 border-t border-[var(--color-line)] space-y-3">
+        <button type="submit" disabled={isSubmitting} className="btn-primary w-full py-3.5 text-sm">
+          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+          {tx ? 'Salvar alterações' : 'Registrar'}
+        </button>
+        {tx && <HoldToDelete pending={deleteMut.isPending} onConfirm={() => deleteMut.mutate(tx.id)} />}
+      </footer>
+    </form>
+  );
+}
+
+// ---------- Livro-caixa ----------
+
+function LedgerRow({ tx, isNew, onOpen }: { tx: Transaction; isNew: boolean; onOpen: () => void }) {
+  const income = tx.tipo === 'receita';
+  const inicial = (tx.categoria_nome || tx.descricao || '?').trim().charAt(0).toUpperCase();
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={cn('ledger-row w-full flex items-center gap-4 px-4 sm:px-5 py-3.5 text-left', isNew && 'row-new')}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            'w-9 h-9 shrink-0 rounded-[10px] flex items-center justify-center text-sm font-semibold font-brand',
+            income ? 'bg-gain-soft text-gain' : 'bg-[var(--color-ink)]/[0.05] text-[var(--color-ink-soft)]'
+          )}
+        >
+          {inicial}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-[var(--color-ink)] truncate" title={tx.descricao}>{tx.descricao}</span>
+          <span className="block text-xs mt-0.5 truncate text-[var(--color-ink-muted)]">
+            {tx.categoria_nome || 'Sem categoria'}
+          </span>
+        </span>
+        <span data-num className={cn('shrink-0 text-sm font-semibold', income ? 'text-gain' : 'text-[var(--color-ink)]')}>
+          {income ? '+' : '-'}{formatCurrency(tx.valor)}
+        </span>
+      </button>
+    </li>
+  );
+}
+
+function LedgerSkeleton() {
+  return (
+    <div className="space-y-8" role="status" aria-label="Carregando transações">
+      {[3, 2].map((n, g) => (
+        <div key={g}>
+          <span className="media-frame block h-3 w-24 rounded-full mb-3" data-loading="" />
+          <div className="finance-card divide-y divide-[var(--color-line)]">
+            {Array.from({ length: n }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4">
+                <span className="media-frame block w-9 h-9 rounded-[10px]" data-loading="" />
+                <span className="flex-1 space-y-2">
+                  <span className="media-frame block h-3 w-1/2 rounded-full" data-loading="" />
+                  <span className="media-frame block h-2.5 w-1/4 rounded-full" data-loading="" />
                 </span>
-              </label>
+                <span className="media-frame block h-3 w-20 rounded-full" data-loading="" />
+              </div>
             ))}
           </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700">Descrição</label>
-            <input {...register('descricao')} placeholder="Ex: Almoço no restaurante" className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-finance-primary)]/20" />
-            {errors.descricao && <p className="text-xs text-[var(--color-finance-error)]">{errors.descricao.message}</p>}
-          </div>
+function MonthSummary({ all }: { all: Transaction[] }) {
+  const mes = hojeISO().slice(0, 7);
+  const doMes = all.filter((t) => diaDe(t).startsWith(mes));
+  const entrou = doMes.filter((t) => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
+  const saiu = doMes.filter((t) => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
+  const resultado = entrou - saiu;
+  const nomeMes = new Date().toLocaleDateString('pt-BR', { month: 'long' });
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Valor (R$)</label>
-              <input {...register('valor')} type="number" step="0.01" placeholder="0,00" className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-finance-primary)]/20" />
-              {errors.valor && <p className="text-xs text-[var(--color-finance-error)]">{errors.valor.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Data</label>
-              <input {...register('data')} type="date" className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-finance-primary)]/20" />
-            </div>
-          </div>
-
-          {/* Categoria - auto-seleciona subcategoria ao escolher */}
-          {filteredCats.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">Categoria</label>
-                <select {...register('id_categoria')} onChange={(e) => handleCatChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:border-[var(--color-accent)]">
-                  <option value="">Selecione uma categoria</option>
-                  {filteredCats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
-              </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">Subcategoria</label>
-                  <select {...register('id_subcategoria')}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:border-[var(--color-accent)]">
-                    <option value="">Selecione...</option>
-                    {(subcats as any[] | undefined)?.map((s) => (
-                      <option key={s.id} value={s.id}>{s.nome}</option>
-                    ))}
-                  </select>
-                </div>
-
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 disabled:opacity-70 mt-2"
-          >
-            {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-            {tx ? 'Salvar alterações' : 'Registrar transação'}
-          </button>
-        </form>
-      </motion.div>
+  return (
+    <div className="border-y border-[var(--color-line)] py-4">
+    <p className="text-xs text-[var(--color-ink-muted)] mb-3 first-letter:uppercase">{nomeMes} até agora</p>
+    <dl className="grid grid-cols-3 divide-x divide-[var(--color-line)]">
+      <div className="pr-4">
+        <dt className="metric-label">Entrou</dt>
+        <dd><AnimatedCounter value={entrou} isCurrency className="mt-1 block text-lg sm:text-2xl text-gain" /></dd>
+      </div>
+      <div className="px-4">
+        <dt className="metric-label">Saiu</dt>
+        <dd><AnimatedCounter value={saiu} isCurrency className="mt-1 block text-lg sm:text-2xl text-[var(--color-ink)]" /></dd>
+      </div>
+      <div className="pl-4">
+        <dt className="metric-label">Resultado</dt>
+        <dd className={cn('mt-1 font-brand font-bold tracking-tight text-lg sm:text-2xl', resultado < 0 ? 'text-loss' : 'text-[var(--color-ink)]')} data-num>
+          {resultado < 0 ? '-' : resultado > 0 ? '+' : ''}{formatCurrency(Math.abs(resultado))}
+        </dd>
+      </div>
+    </dl>
     </div>
   );
 }
 
 function TransactionsContent() {
-  const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const [filtro, setFiltro] = useState<Filtro>('todas');
   const [search, setSearch] = useState('');
-  const [tipo, setTipo] = useState('');
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editTx, setEditTx] = useState<Transaction | undefined>();
-  const [showModal, setShowModal] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const knownIds = useRef<Set<string> | null>(null);
+  const expectNew = useRef(false);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['transactions', { page: String(page), busca: search, tipo }],
-    queryFn: () => transactionsApi.list({ page: String(page), limit: '10', busca: search || undefined, tipo: tipo || undefined }),
+  // A API já devolve tudo; filtro, busca e agrupamento são feitos aqui
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['transactions', 'all'],
+    queryFn: () => transactionsApi.list({ limit: '100000' }),
   });
+  const all = data?.data ?? [];
 
-  const deleteMut = useMutation({
-    mutationFn: transactionsApi.delete,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['transactions'] });
-      qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      setDeleteId(null);
-    },
-  });
+  // Destaca a linha que apareceu depois de salvar uma transação nova
+  useEffect(() => {
+    if (!data) return;
+    const ids = new Set(all.map((t) => t.id));
+    if (knownIds.current && expectNew.current) {
+      const fresh = all.filter((t) => !knownIds.current!.has(t.id)).map((t) => t.id);
+      if (fresh.length) {
+        setNewIds(new Set(fresh));
+        expectNew.current = false;
+        const t = setTimeout(() => setNewIds(new Set()), 1700);
+        knownIds.current = ids;
+        return () => clearTimeout(t);
+      }
+    }
+    knownIds.current = ids;
+  }, [data]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return all
+      .filter((t) => filtro === 'todas' || t.tipo === filtro)
+      .filter((t) => !q || t.descricao.toLowerCase().includes(q) || (t.categoria_nome || '').toLowerCase().includes(q))
+      .sort((a, b) => diaDe(b).localeCompare(diaDe(a)) || Number(b.id) - Number(a.id));
+  }, [all, filtro, search]);
+
+  const groups = useMemo(() => {
+    const out: { dia: string; items: Transaction[]; total: number }[] = [];
+    for (const tx of filtered.slice(0, visible)) {
+      const dia = diaDe(tx);
+      const last = out[out.length - 1];
+      if (last && last.dia === dia) { last.items.push(tx); last.total += sinal(tx); }
+      else out.push({ dia, items: [tx], total: sinal(tx) });
+    }
+    return out;
+  }, [filtered, visible]);
+
+  const openNew = () => { setEditTx(undefined); setSheetOpen(true); };
+  const openEdit = (tx: Transaction) => { setEditTx(tx); setSheetOpen(true); };
+
+  const count = filtered.length;
 
   return (
-    <div className="stagger space-y-6 pb-16">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-brand text-2xl font-bold text-gray-900">Transações</h1>
-          <p className="text-sm text-gray-500">Gerencie suas receitas e despesas</p>
-        </div>
-        <button
-          onClick={() => { setEditTx(undefined); setShowModal(true); }}
-          className="btn-primary flex items-center gap-2 px-4 py-2.5 text-sm"
-        >
-          <Plus size={16} /> Nova transação
-        </button>
-      </div>
+    <div className="pb-16">
+      <div className="stagger space-y-6">
+        <header className="flex items-end justify-between gap-4">
+          <h1 className="font-brand text-3xl font-bold tracking-tight text-[var(--color-ink)]">Transações</h1>
+          <button onClick={openNew} className="btn-primary px-5 py-2.5 text-sm">
+            <Plus size={16} />
+            <span className="hidden sm:inline">Nova transação</span>
+            <span className="sm:hidden">Nova</span>
+          </button>
+        </header>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar transações..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:border-[var(--color-accent)]"
-          />
-        </div>
-        <select
-          value={tipo}
-          onChange={(e) => { setTipo(e.target.value); setPage(1); }}
-          className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:border-[var(--color-accent)]"
-        >
-          <option value="">Todos os tipos</option>
-          <option value="receita">Receitas</option>
-          <option value="despesa">Despesas</option>
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className="finance-card overflow-hidden">
         {isLoading ? (
-          <SkeletonCard lines={5} className="border-0 shadow-none" />
-        ) : data?.data.length ? (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50">
-                    <th className="px-5 py-3">Descrição</th>
-                    <th className="px-5 py-3">Tipo</th>
-                    <th className="px-5 py-3">Categoria</th>
-                    <th className="px-5 py-3">Data</th>
-                    <th className="px-5 py-3 text-right">Valor</th>
-                    <th className="px-5 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.data.map((tx, i) => (
-                    <motion.tr
-                      key={tx.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.03 }}
-                      className="border-t border-gray-50 hover:bg-gray-50/50"
-                    >
-                      <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{tx.descricao}</td>
-                      <td className="px-5 py-3.5">
-                        <Badge
-                          label={tx.tipo === 'receita' ? 'Receita' : 'Despesa'}
-                          variant={tx.tipo === 'receita' ? 'success' : 'error'}
-                        />
-                      </td>
-                      <td className="px-5 py-3.5 text-sm text-gray-500">{tx.categoria_nome || 'Sem categoria'}</td>
-                      <td className="px-5 py-3.5 text-sm text-gray-500">{formatDate(tx.data)}</td>
-                      <td className={`px-5 py-3.5 text-right font-brand font-semibold text-sm ${tx.tipo === 'receita' ? 'text-[var(--color-finance-success)]' : 'text-[var(--color-finance-error)]'}`}>
-                        {tx.tipo === 'despesa' ? '-' : '+'}{formatCurrency(tx.valor)}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => { setEditTx(tx); setShowModal(true); }} className="p-1.5 rounded-lg hover:bg-[var(--color-finance-primary)]/10 text-gray-400 hover:text-[var(--color-accent)] transition-colors">
-                            <Edit2 size={14} />
-                          </button>
-                          <button onClick={() => setDeleteId(tx.id)} className="p-1.5 rounded-lg hover:bg-[var(--color-finance-error)]/10 text-gray-400 hover:text-[var(--color-finance-error)] transition-colors">
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {/* Pagination */}
-            {data.totalPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-50">
-                <p className="text-xs text-gray-500">
-                  {((page - 1) * 10) + 1}-{Math.min(page * 10, data.total)} de {data.total}
-                </p>
-                <div className="flex gap-2">
-                  <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="p-1.5 rounded-lg bg-gray-100 disabled:opacity-40">
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button disabled={page === data.totalPages} onClick={() => setPage((p) => p + 1)} className="p-1.5 rounded-lg bg-gray-100 disabled:opacity-40">
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-16">
-            <TrendingUp size={40} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 text-sm">Nenhuma transação encontrada</p>
-            <button onClick={() => setShowModal(true)} className="mt-4 text-[var(--color-accent)] text-sm font-medium hover:underline">
-              Adicionar primeira transação
-            </button>
+          <div className="grid grid-cols-3 gap-4 border-y border-[var(--color-line)] py-4">
+            {[0, 1, 2].map((i) => <span key={i} className="media-frame block h-10 rounded-lg" data-loading="" />)}
           </div>
+        ) : (
+          <MonthSummary all={all} />
         )}
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <Segmented
+            id="tx-filter"
+            label="Filtrar por tipo"
+            value={filtro}
+            onChange={(v) => { setFiltro(v); setVisible(PAGE_SIZE); }}
+            options={[{ value: 'todas', label: 'Todas' }, { value: 'receita', label: 'Entradas' }, { value: 'despesa', label: 'Saídas' }]}
+          />
+          <div className="relative sm:w-72">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)] pointer-events-none" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setVisible(PAGE_SIZE); }}
+              placeholder="Buscar por descrição ou categoria"
+              aria-label="Buscar transações"
+              className="field w-full pl-10 pr-4 py-2.5 rounded-full border border-[var(--color-line)] bg-white text-sm"
+            />
+          </div>
+        </div>
+
+        <section aria-live="polite">
+          {isLoading ? (
+            <LedgerSkeleton />
+          ) : isError ? (
+            <div className="finance-card px-6 py-10 max-w-xl">
+              <p className="font-semibold text-[var(--color-ink)]">Não foi possível carregar suas transações.</p>
+              <p className="text-sm text-[var(--color-ink-muted)] mt-1">Verifique a conexão e recarregue a página.</p>
+            </div>
+          ) : all.length === 0 ? (
+            <div className="finance-card px-6 py-12 flex flex-col items-start gap-3 max-w-xl">
+              <h2 className="text-lg font-semibold text-[var(--color-ink)]">Seu livro-caixa está vazio</h2>
+              <p className="text-sm text-[var(--color-ink-muted)] max-w-[44ch]">
+                Registre o que entra e o que sai. Os gráficos do painel e as dicas da IA começam a funcionar a partir daí.
+              </p>
+              <button onClick={openNew} className="btn-primary px-5 py-2.5 text-sm mt-2">
+                <Plus size={16} /> Registrar a primeira
+              </button>
+            </div>
+          ) : count === 0 ? (
+            <div className="py-10">
+              <p className="text-[var(--color-ink)] font-medium">
+                Nada encontrado{search ? <> para <q>{search}</q></> : ''}.
+              </p>
+              <button
+                onClick={() => { setSearch(''); setFiltro('todas'); }}
+                className="link-line mt-2 text-sm font-medium text-[var(--color-accent)]"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-[var(--color-ink-muted)] mb-4" data-num>
+                {count === 1 ? '1 transação' : `${count.toLocaleString('pt-BR')} transações`}
+              </p>
+              <div className="space-y-7">
+                {groups.map((g) => (
+                  <section key={g.dia} aria-label={rotuloDoDia(g.dia)}>
+                    <div className="sticky top-16 z-[1] -mx-1 px-1 py-2 flex items-baseline justify-between app-surface">
+                      <h2 className="text-sm font-semibold text-[var(--color-ink)]">{rotuloDoDia(g.dia)}</h2>
+                      <span data-num className={cn('text-xs font-medium', g.total >= 0 ? 'text-gain' : 'text-[var(--color-ink-muted)]')}>
+                        {g.total >= 0 ? '+' : '-'}{formatCurrency(Math.abs(g.total))}
+                      </span>
+                    </div>
+                    <ul className="finance-card overflow-hidden divide-y divide-[var(--color-line)]">
+                      {g.items.map((tx) => (
+                        <LedgerRow key={tx.id} tx={tx} isNew={newIds.has(tx.id)} onOpen={() => openEdit(tx)} />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+              {visible < count && (
+                <button
+                  onClick={() => setVisible((v) => v + PAGE_SIZE)}
+                  className="pressable mt-8 mx-auto block rounded-full border border-[var(--color-line)] bg-white px-5 py-2.5 text-sm font-medium text-[var(--color-ink-soft)]"
+                >
+                  Mostrar mais {Math.min(PAGE_SIZE, count - visible)}
+                </button>
+              )}
+            </>
+          )}
+        </section>
       </div>
 
-      {/* Delete confirmation */}
-      <AnimatePresence>
-        {deleteId && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-[var(--color-finance-error)]/10 flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={24} className="text-[var(--color-finance-error)]" />
-              </div>
-              <h3 className="font-brand font-bold text-lg text-gray-900 mb-2">Excluir transação?</h3>
-              <p className="text-sm text-gray-500 mb-6">Essa ação não pode ser desfeita.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setDeleteId(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => deleteMut.mutate(deleteId)}
-                  disabled={deleteMut.isPending}
-                  className="flex-1 py-2.5 rounded-xl bg-[var(--color-finance-error)] text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                >
-                  {deleteMut.isPending && <Loader2 size={14} className="animate-spin" />}
-                  Excluir
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showModal && <TransactionModal tx={editTx} onClose={() => { setShowModal(false); setEditTx(undefined); }} />}
-      </AnimatePresence>
+      <Dialog.Root open={sheetOpen} onOpenChange={setSheetOpen}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="sheet-backdrop" />
+          <Dialog.Popup className="sheet">
+            <TransactionSheet
+              key={editTx?.id ?? 'new'}
+              tx={editTx}
+              onClose={() => setSheetOpen(false)}
+              onSaved={() => { if (!editTx) expectNew.current = true; setSheetOpen(false); }}
+            />
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }
@@ -369,11 +572,11 @@ function TransactionsPage() {
   return (
     <div className="min-h-[100dvh] app-surface">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Suspense fallback={<SkeletonCard lines={5} />}>
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        <Suspense fallback={<LedgerSkeleton />}>
           <TransactionsContent />
         </Suspense>
-      </div>
+      </main>
     </div>
   );
 }
