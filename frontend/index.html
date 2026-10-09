@@ -2,12 +2,44 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FinanceAI</title>
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <title>FinanceAI: controle suas finanças com inteligência</title>
+    <meta name="description" content="Organize gastos, metas, orçamentos e investimentos em um só lugar. A IA do FinanceAI lê seus lançamentos e aponta onde dá para economizar." />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:site_name" content="FinanceAI" />
+    <meta property="og:title" content="FinanceAI: controle suas finanças com inteligência" />
+    <meta property="og:description" content="Gastos, metas, orçamentos e investimentos em um só lugar, com uma IA que aponta onde economizar." />
+    <meta property="og:image" content="/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Fontes (Fontshare, ITF Free Font License). Repositório público: arquivos não versionados.
+         Carregadas sem bloquear a renderização; os fallbacks com métricas ajustadas (styles.css) evitam CLS na troca. -->
+    <link rel="preconnect" href="https://api.fontshare.com" />
+    <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+    <link rel="preload" as="style" href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,700,800&display=swap" />
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,700,800&display=swap" media="print" onload="this.media='all'" />
+    <link rel="preload" as="style" href="https://api.fontshare.com/v2/css?f[]=switzer@400,401,500,600&display=swap" />
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@400,401,500,600&display=swap" media="print" onload="this.media='all'" />
+
+    <!-- Mídia do hero (candidata a LCP) -->
+    <link rel="preload" as="image" type="image/webp" href="/images/hero-640.webp" imagesrcset="/images/hero-640.webp 640w, /images/hero-1120.webp 1120w" imagesizes="(min-width: 1024px) 40vw, 100vw" fetchpriority="high" />
+
+    <noscript>
+      <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,700,800&display=swap" />
+      <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@400,401,500,600&display=swap" />
+      <style>[data-reveal]{opacity:1!important;transform:none!important;clip-path:none!important}</style>
+    </noscript>
   </head>
   <body>
     <div id="root"></div>

@@ -1,10 +1,13 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, animate, motion, useMotionValue, useTransform } from 'motion/react';
+import { Icon } from './icons';
 
 interface SplashScreenProps {
   type?: 'initial' | 'transition' | 'ai';
   message?: string;
 }
+
+const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const financialMessages = [
   'Cuide hoje do seu amanhã financeiro.',
@@ -15,7 +18,8 @@ const financialMessages = [
 
 export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
   const [currentMessage, setCurrentMessage] = React.useState(0);
-  const [displayValue, setDisplayValue] = React.useState(0);
+  const amount = useMotionValue(0);
+  const amountText = useTransform(amount, (v) => brl.format(v));
 
   React.useEffect(() => {
     if (type !== 'initial') return;
@@ -27,22 +31,13 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
 
   React.useEffect(() => {
     if (type !== 'initial') return;
-    let start = 0;
-    const end = 99999.99;
-    const duration = 1500;
-    const step = end / (duration / 16);
-    const raf = () => {
-      start += step;
-      if (start >= end) { setDisplayValue(end); return; }
-      setDisplayValue(start);
-      requestAnimationFrame(raf);
-    };
-    requestAnimationFrame(raf);
-  }, [type]);
+    const controls = animate(amount, 99999.99, { duration: 1.5, ease: [0.23, 1, 0.32, 1] });
+    return () => controls.stop();
+  }, [type, amount]);
 
   if (type === 'ai') {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-black">
+      <div className="fixed inset-0 z-[var(--z-splash)] flex flex-col items-center justify-center bg-white">
         <NeuralWave />
         <motion.p
           key={message}
@@ -59,7 +54,7 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
 
   if (type === 'transition') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-black">
+      <div className="fixed inset-0 z-[var(--z-splash)] flex items-center justify-center bg-white">
         <div className="w-full max-w-sm px-6 space-y-4">
           {[1, 2, 3].map((i) => (
             <motion.div
@@ -82,7 +77,7 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.5 }}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-black overflow-hidden"
+      className="fixed inset-0 z-[var(--z-splash)] flex flex-col items-center justify-center bg-white overflow-hidden"
     >
       {/* Floating particles */}
       <ParticleGraph />
@@ -90,18 +85,15 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
       <div className="relative z-10 flex flex-col items-center gap-6">
         {/* Logo */}
         <motion.div
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+          initial={{ transform: 'scale(0.9)', opacity: 0 }}
+          animate={{ transform: 'scale(1)', opacity: 1 }}
           transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
           className="flex items-center gap-3"
         >
           <div className="w-12 h-12 rounded-2xl gradient-hero flex items-center justify-center shadow-lg shadow-[var(--color-finance-primary)]/30">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-              <polyline points="16 7 22 7 22 13"/>
-            </svg>
+            <Icon name="trend-up" size={28} className="text-white" />
           </div>
-          <span className="text-3xl font-brand font-bold text-gray-900 dark:text-white tracking-tight">Finance<span className="text-[var(--color-finance-accent)]">AI</span></span>
+          <span className="text-3xl font-brand font-bold text-gray-900 tracking-tight">Finance<span className="text-[var(--color-finance-accent)]">AI</span></span>
         </motion.div>
 
         {/* Animated counter */}
@@ -111,7 +103,7 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
           transition={{ delay: 0.6 }}
           className="text-2xl font-brand font-semibold text-[var(--color-finance-secondary)] tabular-nums"
         >
-          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayValue)}
+          {amountText}
         </motion.div>
 
         {/* Rotating message */}
@@ -121,7 +113,7 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.5 }}
-          className="text-gray-500 dark:text-gray-400 text-sm text-center max-w-xs"
+          className="text-gray-500 text-sm text-center max-w-xs"
         >
           {financialMessages[currentMessage]}
         </motion.p>
@@ -143,36 +135,19 @@ export function SplashScreen({ type = 'initial', message }: SplashScreenProps) {
 }
 
 function ParticleGraph() {
-  const points = [
-    { x: 10, y: 80 }, { x: 20, y: 65 }, { x: 32, y: 70 },
-    { x: 45, y: 48 }, { x: 58, y: 55 }, { x: 70, y: 35 },
-    { x: 82, y: 28 }, { x: 92, y: 20 },
-  ];
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-
+  const bars = [22, 38, 30, 52, 45, 66, 72, 84];
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <svg className="absolute inset-0 w-full h-full opacity-10" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <motion.path
-          d={pathD}
-          fill="none"
-          stroke="var(--color-finance-accent)"
-          strokeWidth="0.5"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 2, ease: 'easeInOut', repeat: Infinity, repeatType: 'loop', repeatDelay: 1 }}
+    <div className="absolute inset-x-0 bottom-0 flex h-1/2 items-end justify-center gap-[3vw] px-[8vw] opacity-10 pointer-events-none">
+      {bars.map((h, i) => (
+        <motion.div
+          key={i}
+          className="w-[4vw] max-w-10 rounded-t-lg bg-[var(--color-finance-secondary)] origin-bottom"
+          style={{ height: h + '%' }}
+          initial={{ transform: 'scaleY(0.2)' }}
+          animate={{ transform: 'scaleY(1)' }}
+          transition={{ duration: 0.9, delay: i * 0.06, ease: [0.23, 1, 0.32, 1] }}
         />
-        {points.map((p, i) => (
-          <motion.circle
-            key={i}
-            cx={p.x} cy={p.y} r="0.8"
-            fill="var(--color-finance-secondary)"
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: [0, 1, 0], scale: [0, 1, 0] }}
-            transition={{ duration: 2, delay: i * 0.2, repeat: Infinity, repeatDelay: 1 }}
-          />
-        ))}
-      </svg>
+      ))}
     </div>
   );
 }
@@ -185,7 +160,7 @@ function NeuralWave() {
           key={i}
           className="absolute inset-0 rounded-full border-2 border-[var(--color-finance-accent)]/40"
           animate={{ scale: [1, 2, 1], opacity: [0.6, 0, 0.6] }}
-          transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.8, ease: 'easeInOut' }}
+          transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.8, ease: [0.77, 0, 0.175, 1] }}
         />
       ))}
       <div className="absolute inset-0 flex items-center justify-center">
@@ -194,12 +169,14 @@ function NeuralWave() {
           animate={{ rotate: [0, 360] }}
           transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round">
-            <path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10A10 10 0 0 1 2 12 10 10 0 0 1 12 2z"/>
-            <path d="m8 12 3 3 6-6"/>
-          </svg>
+          <Icon name="check" size={20} className="text-white" />
         </motion.div>
       </div>
     </div>
   );
+}
+
+/* Overlay com saída animada; carregado sob demanda pelo __root (fora da landing). */
+export function SplashOverlay({ show }: { show: boolean }) {
+  return <AnimatePresence>{show && <SplashScreen key="splash" type="initial" />}</AnimatePresence>;
 }

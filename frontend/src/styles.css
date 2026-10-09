@@ -1,47 +1,242 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:is(.never-dark));
+/*
+ * Tema único: claro. O projeto nunca teve dark mode ativo (a variante estava
+ * presa a .never-dark), então as classes dark: foram removidas e o tema é
+ * travado em claro (taste §4.11, R1).
+ */
+
+/* ---------- Fontes ---------- */
+
+/* Ícones: subset woff2 da Phosphor regular (npm run icons). Nada de SVG. */
+@font-face {
+  font-family: "Phosphor";
+  src: url("./assets/fonts/phosphor-subset.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+/* Fallbacks com métricas da Arial ajustadas (calculadas com fontkit) para CLS zero na troca. */
+@font-face {
+  font-family: "Cabinet Fallback";
+  src: local("Arial");
+  size-adjust: 97.27%;
+  ascent-override: 89.44%;
+  descent-override: 28.79%;
+  line-gap-override: 9.25%;
+}
+@font-face {
+  font-family: "Switzer Fallback";
+  src: local("Arial");
+  size-adjust: 101.28%;
+  ascent-override: 96.76%;
+  descent-override: 24.68%;
+  line-gap-override: 8.89%;
+}
 
 @theme {
-  --font-brand: "Space Grotesk", sans-serif;
-  --font-body: "DM Sans", sans-serif;
+  --font-brand: "Cabinet Grotesk", "Cabinet Fallback", sans-serif;
+  --font-body: "Switzer", "Switzer Fallback", sans-serif;
+  --font-sans: "Switzer", "Switzer Fallback", sans-serif;
 
-  /* Alterando as cores para aplicar o verde e o branco pedidos */
-  --color-finance-primary: #10B981;          /* Verde principal */
-  --color-finance-secondary: #059669;         /* Verde mais escuro */
-  --color-finance-accent: #34D399;            /* Verde mais claro */
-
+  /* Paleta original, intocada (R1) */
+  --color-finance-primary: #10B981;
+  --color-finance-secondary: #059669;
+  --color-finance-accent: #34D399;
   --color-finance-primary-hover: #047857;
-  
-  --color-finance-bg-light: #ffffff; /* Fundo totalmente branco */
-  --color-finance-bg-dark: #111827; /* Fundo escuro para Dark Mode */
-  
+  --color-finance-bg-light: #ffffff;
+  --color-finance-bg-dark: #111827;
   --color-finance-card-light: #ffffff;
-  --color-finance-card-dark: #1F2937; /* Card escuro para Dark Mode */
+  --color-finance-card-dark: #1F2937;
+  --color-finance-error: #EF4444;
+  --color-finance-success: #10B981;
 
-  --color-finance-error: #EF4444;             /* Vermelho (para despesas, erros) */
-  --color-finance-success: #10B981;          /* Verde (para entradas, sucessos) */
+  /* Papéis semânticos, todos apontando para cores já existentes */
+  --color-bg: #ffffff;
+  --color-ink: #111827; /* gray-900 = finance-bg-dark */
+  --color-ink-soft: #4b5563; /* gray-600 */
+  --color-ink-muted: #6b7280; /* gray-500 */
+  --color-line: #e5e7eb; /* gray-200 */
+  --color-surface: #f9fafb; /* gray-50 */
+  --color-accent: #047857; /* accent único da página (texto e CTAs, 5,48:1 com branco) */
+  --color-brand: #10B981;
 
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
+
+  /* Shape lock da landing: botões pill, cards 16px, inputs 10px */
+  --radius-card: 1rem;
+  --radius-input: 0.625rem;
+
+  /* Sombras tingidas com o verde (nunca preto puro) */
+  --shadow-sm: 0 1px 2px 0 color-mix(in oklab, #047857 10%, transparent);
+  --shadow: 0 1px 3px 0 color-mix(in oklab, #047857 12%, transparent), 0 1px 2px -1px color-mix(in oklab, #047857 12%, transparent);
+  --shadow-md: 0 4px 6px -1px color-mix(in oklab, #047857 12%, transparent), 0 2px 4px -2px color-mix(in oklab, #047857 10%, transparent);
+  --shadow-lg: 0 10px 15px -3px color-mix(in oklab, #047857 12%, transparent), 0 4px 6px -4px color-mix(in oklab, #047857 8%, transparent);
+  --shadow-xl: 0 20px 25px -5px color-mix(in oklab, #047857 12%, transparent), 0 8px 10px -6px color-mix(in oklab, #047857 8%, transparent);
+  --shadow-2xl: 0 25px 50px -12px color-mix(in oklab, #047857 22%, transparent);
+
+  /* Escala tipográfica fluida (prompt §7.4, ajustada à Cabinet Grotesk) */
+  --text-display-xl: clamp(3rem, 1.8rem + 5.2vw, 6.5rem);
+  --text-display-xl--line-height: 0.95;
+  --text-display-xl--letter-spacing: -0.045em;
+  --text-display-xl--font-weight: 700;
+  --text-display: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 700;
+  --text-h2: clamp(2rem, 1.4rem + 2.4vw, 3.25rem);
+  --text-h2--line-height: 1.05;
+  --text-h2--letter-spacing: -0.03em;
+  --text-h2--font-weight: 700;
+  --text-h3: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
+  --text-h3--line-height: 1.15;
+  --text-h3--letter-spacing: -0.015em;
+  --text-h3--font-weight: 500;
+  --text-lead: clamp(1.125rem, 1.05rem + 0.35vw, 1.3125rem);
+  --text-lead--line-height: 1.5;
+  --text-lead--letter-spacing: -0.005em;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.6;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.5;
+  --text-small--letter-spacing: 0.005em;
+  --text-micro: 0.75rem;
+  --text-micro--line-height: 1.4;
+  --text-micro--letter-spacing: 0.02em;
+}
+
+/* ---------- Tokens de motion e camadas ---------- */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 160ms;
+  --dur-hover: 200ms;
+  --dur-tooltip: 125ms;
+
+  /*
+   * Escala de z-index (taste §6.F). Nada de z-50 aleatório na landing.
+   * main 1 | footer revelado 0 | header 40 | barra de progresso 41 |
+   * tooltip 50 | overlay mobile 60 | drawer 70 | splash 80
+   */
+  --z-footer: 0;
+  --z-main: 1;
+  --z-header: 40;
+  --z-progress: 41;
+  --z-tooltip: 50;
+  --z-overlay: 60;
+  --z-drawer: 70;
+  --z-splash: 80;
+
+  font-synthesis: none;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  -webkit-text-size-adjust: 100%;
 }
 
 @layer base {
-  body {
-    font-family: var(--font-body);
-    @apply bg-[var(--color-finance-bg-light)] text-gray-900 dark:bg-[var(--color-finance-bg-dark)] dark:text-gray-100 transition-colors duration-200;
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scrollbar-gutter: stable;
+    color-scheme: light;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  body {
+    font-family: var(--font-body);
+    background: var(--color-bg);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-brand {
     font-family: var(--font-brand);
+    /* ss01: "a" e "g" de um andar da Cabinet Grotesk, a assinatura da marca */
+    font-feature-settings: "ss01" 1, "kern" 1;
+  }
+
+  h1, h2, h3 { text-wrap: balance; overflow-wrap: break-word; }
+  p, li, blockquote, figcaption { text-wrap: pretty; }
+  blockquote { hanging-punctuation: first last; }
+  [data-num], .price, .stat { font-variant-numeric: tabular-nums lining-nums; }
+  .acronym { font-feature-settings: "case" 1; letter-spacing: 0.04em; }
+
+  /* mobile-native §4: inputs com 16px evitam zoom no iOS */
+  input, textarea, select { font-size: max(16px, 1em); }
+
+  /* mobile-native §5 e §8: toque imediato, rótulos de controle não selecionáveis */
+  button, a, [role="button"] { touch-action: manipulation; }
+  button, [role="button"], [role="tab"] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
   }
 }
 
-@layer utilities {
+/* Ganho e perda: o accent e o vermelho da paleta, nada de green-500 / red-400 soltos.
+   @utility (e nao classe comum) para aceitar variantes como hover: */
+@utility text-gain { color: var(--color-accent); }
+@utility text-loss { color: color-mix(in oklab, var(--color-finance-error) 85%, #000); }
+@utility bg-gain-soft { background-color: color-mix(in oklab, var(--color-accent) 8%, transparent); }
+@utility bg-loss-soft { background-color: color-mix(in oklab, var(--color-finance-error) 8%, transparent); }
+
+/* Em components (e não utilities) para que bg-*, border-* etc. passados junto vençam */
+@layer components {
+  /*
+   * Card do app: hairline e nenhuma sombra. Elevação só existe quando comunica
+   * hierarquia (modais e drawer); card que "flutua" no hover era ruído.
+   */
   .finance-card {
-    @apply bg-white border border-gray-100 rounded-xl shadow-sm backdrop-blur-md transition-all duration-300;
+    background: var(--color-bg);
+    border: 1px solid color-mix(in oklab, var(--color-line) 80%, transparent);
+    border-radius: var(--radius-card);
+    transition: border-color var(--dur-hover) ease;
   }
-  
+  @media (hover: hover) and (pointer: fine) {
+    .finance-card[data-clickable]:hover {
+      border-color: color-mix(in oklab, var(--color-accent) 35%, var(--color-line));
+    }
+  }
+
+}
+
+@layer utilities {
+  /* Fundo das telas do app: superfície levemente tingida de verde, não cinza azulado genérico */
+  .app-surface {
+    background: color-mix(in oklab, var(--color-finance-accent) 4%, var(--color-surface));
+  }
+
+  /* Botão primário: verde sólido do accent, pill, com press feedback */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    background: var(--color-accent);
+    color: #fff;
+    font-weight: 600;
+    transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-hover) ease;
+  }
+  .btn-primary:active { transform: scale(0.97); }
+  .btn-primary:disabled { opacity: 0.6; }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-primary:hover { background: color-mix(in oklab, var(--color-accent) 88%, #000); }
+  }
+
+
+  /* Rótulo de métrica: pequeno, sem caixa alta */
+  .metric-label {
+    font-size: var(--text-small);
+    color: var(--color-ink-muted);
+  }
+
   .glass {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(10px);
@@ -49,7 +244,289 @@
     border: 1px solid rgba(255, 255, 255, 0.18);
   }
 
+  /* Gradiente com dois matizes já existentes: mais profundo que o verde-verde antigo */
   .gradient-hero {
-    background: linear-gradient(135deg, var(--color-finance-primary) 0%, var(--color-finance-accent) 100%);
+    background: linear-gradient(135deg, var(--color-finance-primary-hover) 0%, var(--color-finance-primary) 100%);
   }
+
+  .ph-icon {
+    font-family: "Phosphor" !important;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1;
+    display: inline-block;
+    speak: never;
+    text-transform: none;
+    letter-spacing: 0;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .measure { max-width: 65ch; }
+  .on-dark { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+}
+
+/* ---------- Primitivas de motion em CSS ---------- */
+
+/* M10: press feedback universal */
+.pressable {
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.pressable:active {
+  transform: scale(0.97);
+}
+
+/* M09: rolling label no CTA primário */
+.roll {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+.roll > span {
+  display: block;
+  transition: transform 220ms var(--ease-out);
+}
+.roll > span + span {
+  position: absolute;
+  inset: 0;
+  transform: translateY(100%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .cta:hover .roll > span:first-child { transform: translateY(-100%); }
+  .cta:hover .roll > span + span { transform: translateY(0); }
+}
+.cta:focus-visible .roll > span:first-child { transform: translateY(-100%); }
+.cta:focus-visible .roll > span + span { transform: translateY(0); }
+
+/* M28: sublinhado sensível à direção */
+.link-line {
+  position: relative;
+  text-decoration: none;
+}
+.link-line::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.15em;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform var(--dur-hover) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .link-line:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+.link-line:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* M12: marquee (track duplicado uma vez, roda só com .is-running) */
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 40s linear infinite;
+  animation-play-state: paused;
+}
+.marquee-track.is-running {
+  animation-play-state: running;
+}
+@media (hover: hover) and (pointer: fine) {
+  .marquee:hover .marquee-track { animation-play-state: paused; }
+}
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+
+/* M31: shimmer enquanto a imagem carrega */
+.media-frame {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--color-finance-accent) 12%, var(--color-surface));
+}
+.media-frame[data-loading]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--color-finance-accent) 22%, transparent) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: shimmer 1.4s linear infinite;
+  pointer-events: none;
+}
+@keyframes shimmer {
+  to { transform: translateX(100%); }
+}
+
+/* Spinner CSS (substitui SVG) */
+.spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: spin 600ms linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* M26: ícone "mais" que vira "fechar", feito com duas barras */
+.plus-x {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.plus-x::before,
+.plus-x::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform 220ms var(--ease-out);
+}
+.plus-x::after { transform: rotate(90deg); }
+[aria-expanded="true"] .plus-x::before { transform: rotate(45deg); }
+[aria-expanded="true"] .plus-x::after { transform: rotate(135deg); }
+
+/* M27: anel de foco do formulário via box-shadow */
+.field {
+  transition: box-shadow 150ms var(--ease-out), border-color 150ms var(--ease-out);
+}
+.field:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent) 18%, transparent);
+}
+.field[aria-invalid="true"] {
+  border-color: var(--color-finance-error);
+}
+
+/* M25: tooltip com origem no gatilho (Base UI) */
+.tip {
+  transform-origin: var(--transform-origin);
+  transition: transform var(--dur-tooltip) var(--ease-out), opacity var(--dur-tooltip) var(--ease-out);
+}
+.tip[data-starting-style],
+.tip[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.tip[data-instant] {
+  transition-duration: 0ms;
+}
+
+/* ---------- Preferências do usuário ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+  .media-frame[data-loading]::after { animation: none; }
+  .roll > span,
+  .link-line::after,
+  .plus-x::before,
+  .plus-x::after { transition-duration: 0ms; }
+  .pressable:active { transform: none; }
+  .spinner { animation-duration: 1.2s; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .material,
+  .glass {
+    background: var(--color-bg) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .material { border-bottom: 1px solid var(--color-ink); }
+  .finance-card { border-color: var(--color-ink-muted); }
+}
+
+/*
+ * Entrada em cascata dos blocos de uma tela do app. Frequência: uma vez por
+ * navegação (ocasional). Propósito: evitar que a tela "pisque" inteira de uma vez.
+ * Só transform + opacity, 50ms entre itens, ease-out forte. O índice vem de
+ * style={{ '--i': n }}.
+ */
+.rise {
+  animation: rise 420ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Mesmo efeito aplicado aos filhos diretos de um container (telas sem índice manual) */
+.stagger > :not(.fixed) {
+  animation: rise 420ms var(--ease-out) both;
+}
+.stagger > :nth-child(2) { animation-delay: 50ms; }
+.stagger > :nth-child(3) { animation-delay: 100ms; }
+.stagger > :nth-child(4) { animation-delay: 150ms; }
+.stagger > :nth-child(5) { animation-delay: 200ms; }
+.stagger > :nth-child(n + 6) { animation-delay: 250ms; }
+
+/* Seta que avança no hover de um card clicável: diz "isso abre algo" */
+.arrow-nudge {
+  display: inline-flex;
+  transition: transform var(--dur-hover) var(--ease-out), color var(--dur-hover) ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .group:hover .arrow-nudge { transform: translateX(3px); }
+}
+
+/* Barras de gráfico crescendo da base (scaleY, nunca height) */
+.bar-grow {
+  transform-origin: bottom;
+  animation: bar-grow 600ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+@keyframes bar-grow {
+  from { transform: scaleY(0.04); }
+}
+
+/* Barra de progresso preenchendo (scaleX, nunca width) */
+.fill-grow {
+  transform-origin: left;
+  transition: transform 700ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .stagger > :not(.fixed) { animation: route-fade 200ms ease both; animation-delay: 0ms; }
+  .bar-grow { animation: none; }
+  .fill-grow { transition-duration: 0ms; }
+}
+
+/* Entrada das telas do app (antes era um motion.div no __root) */
+.route-fade {
+  animation: route-fade 300ms var(--ease-out) both;
+}
+@keyframes route-fade {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-fade { animation-duration: 150ms; }
 }

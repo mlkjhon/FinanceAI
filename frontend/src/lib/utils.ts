@@ -69,3 +69,13 @@ export function formatCompactCurrency(value: number, withPrefix = true) {
   return `${sign}${prefix}${abs.toFixed(0)}`;
 }
 
+
+// "110% do CDI", "IPCA + 6,2% a.a.", "12% a.a." conforme o indexador
+export function descreverTaxa(inv: { taxa_rendimento: number | string; indexador?: string }) {
+  const taxa = parseFloat(String(inv.taxa_rendimento)).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  const idx = (inv.indexador || "PREFIXADO").toUpperCase();
+  if (idx === "PREFIXADO") return `${taxa}% a.a.`;
+  if (idx === "POUPANCA" || idx === "POUPANÇA") return `${taxa}% da poupança`;
+  if (["CDI", "SELIC", "IBOVESPA"].includes(idx)) return `${taxa}% do ${idx}`;
+  return `${idx} + ${taxa}% a.a.`;
+}

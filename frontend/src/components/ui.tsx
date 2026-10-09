@@ -1,62 +1,42 @@
 import React from 'react';
-import { motion, useInView, useMotionValue, useSpring } from 'framer-motion';
+import { motion, animate, useInView, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
 import { cn, formatCurrency } from '../lib/utils';
+import { ease } from '../lib/motion-tokens';
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 },
-};
-
-// StatCard – cards de resumo do dashboard
+// StatCard: métrica com rótulo e número. Sem chip de ícone colorido e sem "flutuar" no hover.
 interface StatCardProps {
   title: string;
   value: number;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   trend?: number;
   isCurrency?: boolean;
   color?: 'primary' | 'secondary' | 'accent' | 'success' | 'error';
   delay?: number;
 }
 
-export function StatCard({ title, value, icon, trend, isCurrency = true, color = 'primary', delay = 0 }: StatCardProps) {
-  const colorMap = {
-    primary: 'var(--color-finance-primary)',
-    secondary: 'var(--color-finance-secondary)',
-    accent: 'var(--color-finance-accent)',
-    success: 'var(--color-finance-success)',
-    error: 'var(--color-finance-error)',
-  };
-  const c = colorMap[color];
-
+export function StatCard({ title, value, trend, isCurrency = true, color = 'primary', delay = 0 }: StatCardProps) {
   return (
-    <motion.div
-      variants={cardVariants}
-      initial="hidden"
-      animate="visible"
-      transition={{ delay, duration: 0.4 }}
-      whileHover={{ y: -3, boxShadow: `0 12px 32px -4px ${c}33` }}
-      className="finance-card p-5 cursor-default"
-    >
-      <div className="flex items-start justify-between mb-3">
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ background: `${c}18`, color: c }}
-        >
-          {icon}
-        </div>
-      </div>
-      <AnimatedCounter value={value} isCurrency={isCurrency} color={c} />
+    <div className="finance-card rise p-5" style={{ '--i': Math.round(delay * 10) } as React.CSSProperties}>
+      <p className="metric-label">{title}</p>
+      <AnimatedCounter
+        value={value}
+        isCurrency={isCurrency}
+        className={cn('mt-2 block text-2xl', color === 'error' ? 'text-loss' : 'text-[var(--color-ink)]')}
+      />
       {trend !== undefined && (
-        <p className={cn('text-xs mt-1', trend >= 0 ? 'text-[var(--color-finance-success)]' : 'text-[var(--color-finance-error)]')}>
-          {trend >= 0 ? '↑' : '↓'} {Math.abs(trend).toFixed(1)}% este mês
+        <p className={cn('text-xs mt-1 tabular-nums', trend >= 0 ? 'text-gain' : 'text-loss')}>
+          {trend >= 0 ? '+' : '-'}{Math.abs(trend).toFixed(1)}% este mês
         </p>
       )}
-    </motion.div>
+    </div>
   );
 }
 
-// AnimatedCounter
+/*
+ * AnimatedCounter: o número sobe até o valor quando entra na tela.
+ * Frequência: uma vez por carregamento. O texto vem de um motion value,
+ * então o React não re-renderiza a cada frame. Reduced motion mostra o valor final.
+ */
 interface AnimatedCounterProps {
   value: number;
   isCurrency?: boolean;
@@ -67,60 +47,63 @@ interface AnimatedCounterProps {
 export function AnimatedCounter({ value, isCurrency = false, color, className }: AnimatedCounterProps) {
   const ref = React.useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true });
-  const motionValue = useMotionValue(0);
-  const springValue = useSpring(motionValue, { duration: 800, stiffness: 80, damping: 20 });
-  const [display, setDisplay] = React.useState('0');
+  const reduce = useReducedMotion();
+  const mv = useMotionValue(reduce ? value : 0);
+  const text = useTransform(mv, (v) => (isCurrency ? formatCurrency(v) : Math.round(v).toLocaleString('pt-BR')));
 
   React.useEffect(() => {
-    if (inView) motionValue.set(value);
-  }, [inView, value, motionValue]);
-
-  React.useEffect(() => {
-    return springValue.on('change', (v) => {
-      setDisplay(isCurrency ? formatCurrency(v) : v.toFixed(0));
-    });
-  }, [springValue, isCurrency]);
+    if (!inView) return;
+    if (reduce) {
+      mv.set(value);
+      return;
+    }
+    const controls = animate(mv, value, { duration: 0.9, ease: ease.out });
+    return () => controls.stop();
+  }, [inView, reduce, value, mv]);
 
   return (
-    <span
+    <motion.span
       ref={ref}
-      className={cn('text-2xl font-brand font-bold tabular-nums', className)}
-      style={color ? { color } : {}}
+      data-num
+      className={cn('font-brand font-bold tracking-tight', className)}
+      style={color ? { color } : undefined}
     >
-      {display}
-    </span>
+      {text}
+    </motion.span>
   );
 }
 
-// FinanceCard – card genérico com glassmorphism
+// FinanceCard: superfície com hairline. Só reage ao hover quando é clicável.
 interface FinanceCardProps {
   children: React.ReactNode;
   className?: string;
   glass?: boolean;
   gradient?: boolean;
   onClick?: () => void;
+  index?: number;
 }
 
-export function FinanceCard({ children, className, glass, gradient, onClick }: FinanceCardProps) {
+export function FinanceCard({ children, className, glass, gradient, onClick, index }: FinanceCardProps) {
   return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
+    <div
       onClick={onClick}
+      data-clickable={onClick ? '' : undefined}
+      style={index !== undefined ? ({ '--i': index } as React.CSSProperties) : undefined}
       className={cn(
         'finance-card p-5',
+        index !== undefined && 'rise',
         glass && 'glass',
-        gradient && 'gradient-hero text-white',
-        onClick && 'cursor-pointer',
+        gradient && 'gradient-hero text-white border-0',
+        onClick && 'cursor-pointer pressable',
         className
       )}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
-// SkeletonCard – shimmer dourado
+// SkeletonCard: linhas com o shimmer CSS da landing (roda fora da main thread)
 interface SkeletonProps {
   lines?: number;
   className?: string;
@@ -128,21 +111,20 @@ interface SkeletonProps {
 
 export function SkeletonCard({ lines = 3, className }: SkeletonProps) {
   return (
-    <div className={cn('finance-card p-5 space-y-3', className)}>
+    <div className={cn('finance-card p-5 space-y-3', className)} role="status" aria-label="Carregando">
       {Array.from({ length: lines }).map((_, i) => (
-        <motion.div
+        <span
           key={i}
-          className="h-3 rounded-full bg-gradient-to-r from-[var(--color-finance-secondary)]/10 via-[var(--color-finance-secondary)]/40 to-[var(--color-finance-secondary)]/10 bg-[length:200%_100%]"
+          data-loading=""
+          className="media-frame block h-3 rounded-full"
           style={{ width: `${100 - i * 20}%` }}
-          animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
-          transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.15 }}
         />
       ))}
     </div>
   );
 }
 
-// ProgressBar
+// ProgressBar: preenche com scaleX (GPU), não com width
 interface ProgressBarProps {
   value: number;
   max: number;
@@ -152,16 +134,23 @@ interface ProgressBarProps {
 }
 
 export function ProgressBar({ value, max, label, showValue = true, colorOverride }: ProgressBarProps) {
-  const pct = Math.min((value / max) * 100, 100);
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   const isWarning = pct >= 75 && pct < 90;
   const isDanger = pct >= 90;
-  const color = colorOverride || (isDanger ? 'var(--color-finance-error)' : isWarning ? 'var(--color-finance-secondary)' : 'var(--color-finance-primary)');
+  const color = colorOverride || (isDanger ? 'var(--color-finance-error)' : isWarning ? '#B45309' : 'var(--color-accent)');
+
+  // Começa vazia e preenche no primeiro frame, para a transição CSS rodar
+  const [shown, setShown] = React.useState(0);
+  React.useEffect(() => {
+    const id = requestAnimationFrame(() => setShown(pct));
+    return () => cancelAnimationFrame(id);
+  }, [pct]);
 
   return (
     <div className="space-y-1.5">
       {(label || showValue) && (
         <div className="flex justify-between text-sm">
-          {label && <span className="text-gray-600 dark:text-gray-400">{label}</span>}
+          {label && <span className="text-[var(--color-ink-soft)]">{label}</span>}
           {showValue && (
             <span className="font-medium tabular-nums" style={{ color }}>
               {pct.toFixed(0)}%
@@ -169,20 +158,23 @@ export function ProgressBar({ value, max, label, showValue = true, colorOverride
           )}
         </div>
       )}
-      <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-        <motion.div
-          className="h-full rounded-full"
-          style={{ backgroundColor: color }}
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
+      <div
+        className="h-1.5 rounded-full bg-[var(--color-line)] overflow-hidden"
+        role="progressbar"
+        aria-valuenow={Math.round(pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div
+          className="fill-grow h-full w-full rounded-full"
+          style={{ backgroundColor: color, transform: `scaleX(${shown / 100})` }}
         />
       </div>
     </div>
   );
 }
 
-// Badge
+// Badge: rótulo quadrado-arredondado (não pill), cores da paleta
 interface BadgeProps {
   label: string;
   variant?: 'success' | 'error' | 'warning' | 'info' | 'default';
@@ -190,14 +182,14 @@ interface BadgeProps {
 
 export function Badge({ label, variant = 'default' }: BadgeProps) {
   const vars = {
-    success: 'bg-[var(--color-finance-success)]/10 text-[var(--color-finance-success)]',
-    error: 'bg-[var(--color-finance-error)]/10 text-[var(--color-finance-error)]',
-    warning: 'bg-[var(--color-finance-secondary)]/20 text-[oklch(0.55_0.08_85)]',
-    info: 'bg-[var(--color-finance-accent)]/10 text-[var(--color-finance-accent)]',
-    default: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
+    success: 'bg-[var(--color-accent)]/10 text-gain',
+    error: 'bg-[var(--color-finance-error)]/10 text-loss',
+    warning: 'bg-amber-500/10 text-amber-800',
+    info: 'bg-[var(--color-accent)]/10 text-gain',
+    default: 'bg-[var(--color-surface)] text-[var(--color-ink-soft)]',
   };
   return (
-    <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold', vars[variant])}>
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium', vars[variant])}>
       {label}
     </span>
   );

@@ -6,7 +6,14 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [
-    TanStackRouterVite(),
+    TanStackRouterVite({
+      autoCodeSplitting: true,
+      codeSplittingOptions: {
+        // A landing é a rota de entrada: fica no bundle principal para não criar
+        // uma cascata JS -> chunk da rota antes do LCP. As telas do app seguem divididas.
+        splitBehavior: ({ routeId }) => (routeId === '/' ? [] : undefined),
+      },
+    }),
     tailwindcss(),
     react(),
   ],

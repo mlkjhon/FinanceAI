@@ -4,9 +4,9 @@ import { dashboardApi } from '../lib/api';
 import { FinanceCard, SkeletonCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
 import { formatCurrency, formatCompactCurrency } from '../lib/utils';
-import { ArrowLeft, TrendingUp, TrendingDown, Wallet, BarChart2 } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown, Wallet, BarChart2 } from '../components/icons';
 import { Link } from '@tanstack/react-router';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -33,7 +33,7 @@ function CustomTooltipSaldo({ active, payload, label }: any) {
   );
 }
 
-/* ─── Gráfico de área – evolução do saldo ─────────────────────── */
+/* ─── Gráfico de área: evolução do saldo ─────────────────────── */
 function SaldoAreaChart({ data }: { data: { mes: string; saldo: number }[] }) {
   if (!data?.length) return <p className="text-sm text-gray-400 text-center pt-12">Nenhum dado disponível</p>;
 
@@ -73,7 +73,7 @@ function SaldoAreaChart({ data }: { data: { mes: string; saldo: number }[] }) {
   );
 }
 
-/* ─── Gráfico de barras – entradas vs saídas ──────────────────── */
+/* ─── Gráfico de barras: entradas vs saídas ──────────────────── */
 function EntradasSaidasChart({ data }: { data: { mes: string; entradas?: number; saidas?: number }[] }) {
   if (!data?.length) return <p className="text-sm text-gray-400 text-center pt-12">Nenhum dado disponível</p>;
 
@@ -124,7 +124,7 @@ function MesRow({
       initial={{ opacity: 0, x: -12 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.35, delay: i * 0.06 }}
-      className="p-4 rounded-2xl bg-gray-50/60 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 transition-all"
+      className="p-4 rounded-2xl bg-gray-50/60 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 transition-[color,background-color,border-color,box-shadow,opacity]"
     >
       {/* Linha superior */}
       <div className="flex items-center justify-between mb-3">
@@ -152,15 +152,15 @@ function MesRow({
       <div className="grid grid-cols-3 gap-2 text-xs">
         <div>
           <p className="text-gray-400 mb-0.5">Entradas</p>
-          <p className="font-semibold text-green-600">+{formatCurrency(entradas)}</p>
+          <p className="font-semibold text-gain">+{formatCurrency(entradas)}</p>
         </div>
         <div>
           <p className="text-gray-400 mb-0.5">Saídas</p>
-          <p className="font-semibold text-red-500">-{formatCurrency(saidas)}</p>
+          <p className="font-semibold text-loss">-{formatCurrency(saidas)}</p>
         </div>
         <div>
           <p className="text-gray-400 mb-0.5">Resultado</p>
-          <p className={`font-semibold ${resultado >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+          <p className={`font-semibold ${resultado >= 0 ? 'text-gain' : 'text-loss'}`}>
             {resultado >= 0 ? '+' : ''}{formatCurrency(resultado)}
           </p>
         </div>
@@ -210,7 +210,7 @@ function EvolucaoSaldoPage() {
       bg: '#6366F115',
     },
     {
-      label: 'Saldo Atual',
+      label: 'Saldo atual',
       value: formatCurrency(summary?.saldo_total ?? 0),
       icon: <Wallet size={18} />,
       color: '#F59E0B',
@@ -219,9 +219,9 @@ function EvolucaoSaldoPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] font-sans text-gray-900 pb-20">
+    <div className="min-h-[100dvh] app-surface font-sans text-gray-900 pb-20">
       <Navbar />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <div className="stagger max-w-6xl mx-auto px-4 sm:px-6 py-8">
 
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -232,7 +232,7 @@ function EvolucaoSaldoPage() {
             <ArrowLeft size={20} className="text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Evolução do Saldo</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Evolução do saldo</h1>
             <p className="text-gray-500 text-sm mt-0.5">Análise completa da evolução financeira ao longo dos meses.</p>
           </div>
         </div>
@@ -267,7 +267,7 @@ function EvolucaoSaldoPage() {
         {/* Gráficos */}
         <div className="grid lg:grid-cols-2 gap-6 mb-6">
           <FinanceCard>
-            <h2 className="font-semibold text-gray-900 mb-1">Evolução do Saldo</h2>
+            <h2 className="font-semibold text-gray-900 mb-1">Evolução do saldo</h2>
             <p className="text-xs text-gray-400 mb-4">Patrimônio acumulado mês a mês</p>
             {isLoading
               ? <SkeletonCard lines={1} className="border-0 shadow-none h-[260px]" />
@@ -276,7 +276,7 @@ function EvolucaoSaldoPage() {
           </FinanceCard>
 
           <FinanceCard>
-            <h2 className="font-semibold text-gray-900 mb-1">Entradas vs Saídas</h2>
+            <h2 className="font-semibold text-gray-900 mb-1">Entradas e saídas</h2>
             <p className="text-xs text-gray-400 mb-4">Comparativo mensal de fluxo de caixa</p>
             {isLoading
               ? <SkeletonCard lines={1} className="border-0 shadow-none h-[260px]" />
@@ -287,7 +287,7 @@ function EvolucaoSaldoPage() {
 
         {/* Detalhamento por mês */}
         <FinanceCard>
-          <h2 className="font-semibold text-gray-900 mb-1">Detalhamento por Mês</h2>
+          <h2 className="font-semibold text-gray-900 mb-1">Detalhamento por mês</h2>
           <p className="text-xs text-gray-400 mb-5">Entradas, saídas e resultado líquido mês a mês</p>
           {isLoading ? (
             <SkeletonCard lines={4} className="border-0 shadow-none" />

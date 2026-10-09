@@ -1,12 +1,13 @@
 import React, { Suspense } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Plus, Calendar, PiggyBank, X, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Target, Plus, Calendar, PiggyBank, X, Check } from '../components/icons';
 import { goalsApi } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { FinanceCard, SkeletonCard } from '../components/ui';
 import { formatCurrency, formatDate } from '../lib/utils';
+import { ProgressRing } from '../components/ConicChart';
 
 export const Route = createFileRoute('/goals')({
   beforeLoad: () => {
@@ -18,33 +19,11 @@ export const Route = createFileRoute('/goals')({
 // Componente do progresso circular (anel verde)
 function CircularProgress({ value, max }: { value: number; max: number }) {
   const pct = Math.min(max > 0 ? (value / max) * 100 : 0, 100);
-  const r = 40;
-  const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
 
   return (
-    <div className="relative w-24 h-24 mx-auto">
-      <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-        {/* Círculo de fundo (cinza claro) */}
-        <circle cx="50" cy="50" r={r} fill="none" stroke="#E5E7EB" strokeWidth="8" />
-        {/* Círculo de progresso (verde) */}
-        <motion.circle
-          cx="50" cy="50" r={r}
-          fill="none"
-          stroke="#10B981"
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${circ}`}
-          initial={{ strokeDasharray: '0 251' }}
-          animate={{ strokeDasharray: `${dash} ${circ}` }}
-          transition={{ duration: 1, ease: 'easeOut' }}
-        />
-      </svg>
-      {/* Percentual no centro */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="font-bold text-sm text-green-600">{pct.toFixed(0)}%</span>
-      </div>
-    </div>
+    <ProgressRing pct={pct} className="w-24 h-24 mx-auto">
+      <span className="font-bold text-sm text-gain">{pct.toFixed(0)}%</span>
+    </ProgressRing>
   );
 }
 
@@ -80,8 +59,8 @@ function ModalDeposito({
         {/* Cabeçalho do modal */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-green-100 flex items-center justify-center">
-              <PiggyBank size={16} className="text-green-600" />
+            <div className="w-8 h-8 rounded-xl bg-gain-soft flex items-center justify-center">
+              <PiggyBank size={16} className="text-gain" />
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 text-sm">Adicionar à meta</h3>
@@ -113,7 +92,7 @@ function ModalDeposito({
               onChange={(e) => setValor(e.target.value)}
               placeholder="Ex: 150,00"
               autoFocus
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100 transition-all"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/15 transition-[color,background-color,border-color,box-shadow,opacity]"
             />
             <p className="text-xs text-gray-400">⚠️ Esse valor será descontado automaticamente do seu saldo total.</p>
           </div>
@@ -128,7 +107,7 @@ function ModalDeposito({
             <button
               type="submit"
               disabled={isLoading || !valor || parseFloat(valor) <= 0}
-              className="flex-1 py-2.5 rounded-xl bg-green-500 text-white text-sm font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 py-2.5 rounded-xl bg-[var(--color-accent)] text-white text-sm font-semibold hover:bg-[#065f46] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <span className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
@@ -194,16 +173,16 @@ function GoalsContent() {
   };
 
   return (
-    <div className="space-y-6 pb-16">
+    <div className="stagger space-y-6 pb-16">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-bold text-2xl text-gray-900">Metas Financeiras</h1>
+          <h1 className="font-bold text-2xl text-gray-900">Metas financeiras</h1>
           <p className="text-sm text-gray-500">Defina e acompanhe seus objetivos</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-500 text-white text-sm font-semibold hover:bg-green-600 transition-colors shadow"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--color-accent)] text-white text-sm font-semibold hover:bg-[#065f46] transition-colors shadow"
         >
           <Plus size={16} /> Nova meta
         </button>
@@ -227,7 +206,7 @@ function GoalsContent() {
                   value={form[key as keyof typeof form]}
                   onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
                   placeholder={placeholder}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/15"
                 />
               </div>
             ))}
@@ -238,12 +217,12 @@ function GoalsContent() {
                 value={form.descricao}
                 onChange={(e) => setForm((prev) => ({ ...prev, descricao: e.target.value }))}
                 placeholder="Adicione detalhes sobre sua meta"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/15"
               />
             </div>
             <div className="sm:col-span-2 flex gap-3">
               <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold">Cancelar</button>
-              <button type="submit" disabled={createMut.isPending || !form.nome || !form.valor_meta} className="flex-1 py-2.5 rounded-xl bg-green-500 text-white text-sm font-semibold hover:bg-green-600 disabled:opacity-50 transition-colors">
+              <button type="submit" disabled={createMut.isPending || !form.nome || !form.valor_meta} className="flex-1 py-2.5 rounded-xl bg-[var(--color-accent)] text-white text-sm font-semibold hover:bg-[#065f46] disabled:opacity-50 transition-colors">
                 Criar meta
               </button>
             </div>
@@ -272,7 +251,7 @@ function GoalsContent() {
                   <p className="font-semibold text-gray-900">{g.nome}</p>
                   {g.descricao && <p className="text-xs text-gray-400 mt-0.5">{g.descricao}</p>}
                 </div>
-                <Target size={18} className="text-green-500 shrink-0" />
+                <Target size={18} className="text-gain shrink-0" />
               </div>
 
               {/* Progresso circular */}
@@ -283,7 +262,7 @@ function GoalsContent() {
                 <p className="text-sm font-bold text-gray-900">
                   {formatCurrency(g.valor_atual)} <span className="text-gray-400 font-normal text-xs">de</span> {formatCurrency(g.valor_meta)}
                 </p>
-                <p className="text-xs text-green-500">
+                <p className="text-xs text-gain">
                   Falta: {formatCurrency(Math.max(g.valor_meta - g.valor_atual, 0))}
                 </p>
               </div>
@@ -301,14 +280,14 @@ function GoalsContent() {
                 {/* Botão: adicionar dinheiro à meta */}
                 <button
                   onClick={() => setMetaDeposito({ id: g.id, nome: g.nome, valor_meta: g.valor_atual, valor_atual: g.valor_atual })}
-                  className="flex-1 py-2 rounded-xl bg-green-50 text-green-600 text-xs font-semibold hover:bg-green-100 transition-colors flex items-center justify-center gap-1"
+                  className="flex-1 py-2 rounded-xl bg-gain-soft text-gain text-xs font-semibold hover:bg-gain-soft transition-colors flex items-center justify-center gap-1"
                 >
                   <PiggyBank size={13} /> Depositar
                 </button>
                 {/* Botão: remover meta */}
                 <button
                   onClick={() => deleteMut.mutate(g.id)}
-                  className="flex-1 py-2 rounded-xl bg-red-50 text-red-400 text-xs font-semibold hover:bg-red-100 transition-colors"
+                  className="flex-1 py-2 rounded-xl bg-loss-soft text-loss text-xs font-semibold hover:bg-loss-soft transition-colors"
                 >
                   Remover
                 </button>
@@ -320,7 +299,7 @@ function GoalsContent() {
         <div className="finance-card p-16 text-center">
           <Target size={40} className="mx-auto text-gray-300 mb-3" />
           <p className="text-gray-500 text-sm">Nenhuma meta criada ainda</p>
-          <button onClick={() => setShowForm(true)} className="mt-4 text-green-500 text-sm font-medium hover:underline">
+          <button onClick={() => setShowForm(true)} className="mt-4 text-gain text-sm font-medium hover:underline">
             Criar primeira meta
           </button>
         </div>
@@ -341,9 +320,9 @@ function GoalsContent() {
   );
 }
 
-export default function GoalsPage() {
+function GoalsPage() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh] app-surface">
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Suspense fallback={<SkeletonCard lines={4} />}>

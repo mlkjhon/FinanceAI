@@ -4,8 +4,9 @@ import { dashboardApi, getUserData } from '../lib/api';
 import { FinanceCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
 import { formatCurrency } from '../lib/utils';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from '../components/icons';
 import { Link } from '@tanstack/react-router';
+import { DonutRing } from '../components/ConicChart';
 
 export const Route = createFileRoute('/categorias')({
   component: CategoriasPage,
@@ -18,40 +19,23 @@ function DonutChart({ data }: { data: { categoria: string; valor: number }[] }) 
   }
 
   const colors = ['#10B981', '#34D399', '#6EE7B7', '#059669', '#047857'];
-  let offset = 0;
-  const radius = 60;
-  const circ = 2 * Math.PI * radius;
 
   return (
     <div className="flex flex-col md:flex-row items-center gap-8 justify-center">
-      <svg viewBox="0 0 160 160" className="w-48 h-48 shrink-0 -rotate-90">
-        <circle cx="80" cy="80" r={radius} fill="none" stroke="#10B981" strokeWidth="20" strokeOpacity="0.1" />
-        {data.map((d, i) => {
-          const dash = (d.valor / total) * circ;
-          const strokeDasharray = `${dash} ${circ}`;
-          const strokeDashoffset = -offset;
-          offset += dash;
-          return (
-            <circle
-              key={d.categoria}
-              cx="80" cy="80" r={radius}
-              fill="none"
-              stroke={colors[i % colors.length]}
-              strokeWidth="24"
-              strokeDasharray={strokeDasharray}
-              strokeDashoffset={strokeDashoffset}
-            />
-          );
-        })}
-      </svg>
+      <DonutRing
+        className="w-48 h-48"
+        hole={0.667}
+        segments={data.map((d, i) => ({ value: d.valor, color: colors[i % colors.length] }))}
+        label={'Gastos por categoria: ' + data.map((d) => d.categoria + ' ' + Math.round((d.valor / total) * 100) + '%').join(', ')}
+      />
       <div className="space-y-3 w-full md:w-auto">
         {data.map((d, i) => (
           <div key={d.categoria} className="flex items-center justify-between gap-6 text-sm">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[i % colors.length] }} />
-              <span className="text-gray-600 dark:text-gray-300 font-medium">{d.categoria}</span>
+              <span className="text-gray-600 font-medium">{d.categoria}</span>
             </div>
-            <span className="font-semibold text-gray-900 dark:text-white">{Math.round((d.valor / total) * 100)}%</span>
+            <span className="font-semibold text-gray-900">{Math.round((d.valor / total) * 100)}%</span>
           </div>
         ))}
       </div>
@@ -72,23 +56,23 @@ function CategoriasPage() {
   const total = gastos.reduce((acc, curr) => acc + curr.valor, 0);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] font-sans text-gray-900 pb-20">
+    <div className="min-h-[100dvh] app-surface font-sans text-gray-900 pb-20">
       <Navbar />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <div className="stagger max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
         <div className="flex items-center gap-4 mb-8">
           <Link to="/dashboard" className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors">
             <ArrowLeft size={20} className="text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Análise de Categorias</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Análise de categorias</h1>
             <p className="text-gray-500">Detalhamento completo de seus gastos por categoria.</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <FinanceCard>
-            <h2 className="font-semibold text-gray-900 mb-6">Visão Geral</h2>
+            <h2 className="font-semibold text-gray-900 mb-6">Visão geral</h2>
             <div className="min-h-[250px] flex items-center justify-center">
               {isLoading ? (
                 <div className="text-gray-400">Carregando gráfico...</div>

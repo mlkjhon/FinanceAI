@@ -6,6 +6,7 @@ import './styles.css';
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
+import { NotFoundPage } from './components/NotFoundPage';
 
 // Create Query Client
 export const queryClient = new QueryClient();
@@ -14,6 +15,8 @@ export const queryClient = new QueryClient();
 const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
+  // Rotas inexistentes caem na página 404 da marca.
+  defaultNotFoundComponent: NotFoundPage,
   context: {
     queryClient,
   },

@@ -1,34 +1,24 @@
 import React, { useState } from 'react';
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { TrendingUp, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
+import { loginSchema, registerSchema, type LoginForm, type RegisterForm } from '../lib/schemas/auth';
+import { TrendingUp, Eye, EyeOff, Loader2, ArrowLeft } from '../components/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 
+type AuthSearch = { tab?: 'login' | 'register'; email?: string };
+
 export const Route = createFileRoute('/auth')({
+  // A landing manda ?tab=register&email=... para o cadastro já começar preenchido.
+  validateSearch: (search: Record<string, unknown>): AuthSearch => ({
+    tab: search.tab === 'register' ? 'register' : undefined,
+    email: typeof search.email === 'string' ? search.email.slice(0, 254) : undefined,
+  }),
   component: AuthPage,
 });
 
-const loginSchema = z.object({
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(6, 'Mínimo 6 caracteres'),
-});
-
-const registerSchema = z.object({
-  nome: z.string().min(2, 'Nome muito curto'),
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(6, 'Mínimo 6 caracteres'),
-  confirmPassword: z.string(),
-}).refine((d) => d.password === d.confirmPassword, {
-  message: 'Senhas não coincidem',
-  path: ['confirmPassword'],
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
-type RegisterForm = z.infer<typeof registerSchema>;
 
 function InputField({
   label, type = 'text', error, placeholder, ...rest
@@ -43,14 +33,14 @@ function InputField({
   const isPassword = type === 'password';
   return (
     <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
+      <label className="block text-sm font-medium text-gray-700">{label}</label>
       <div className="relative">
         <input
           type={isPassword ? (showPwd ? 'text' : 'password') : type}
           placeholder={placeholder}
           className={cn(
-            'w-full px-4 py-3 rounded-xl border text-sm bg-white dark:bg-[var(--color-finance-card-dark)] text-gray-900 dark:text-white placeholder-gray-400 outline-none transition-all',
-            'border-gray-200 dark:border-gray-700 focus:border-[var(--color-finance-primary)] focus:ring-2 focus:ring-[var(--color-finance-primary)]/20',
+            'w-full px-4 py-3 rounded-xl border text-sm bg-white text-gray-900 placeholder-gray-400 outline-none transition-[color,background-color,border-color,box-shadow,opacity]',
+            'border-gray-200 focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-finance-primary)]/20',
             error && 'border-[var(--color-finance-error)] focus:ring-[var(--color-finance-error)]/20'
           )}
           {...(rest as React.InputHTMLAttributes<HTMLInputElement>)}
@@ -70,15 +60,19 @@ function InputField({
   );
 }
 
-export default function AuthPage() {
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+function AuthPage() {
+  const search = Route.useSearch();
+  const [tab, setTab] = useState<'login' | 'register'>(search.tab ?? 'login');
   const [apiError, setApiError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
   const { login, register } = useAuth();
 
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
-  const registerForm = useForm<RegisterForm>({ resolver: zodResolver(registerSchema) });
+  const registerForm = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { email: search.email ?? '' },
+  });
 
   const onLogin = async (data: LoginForm) => {
     setApiError('');
@@ -101,21 +95,26 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-[100dvh] flex">
       {/* Left panel */}
       <div className="hidden lg:flex w-1/2 gradient-hero flex-col items-center justify-center p-12 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
-          <svg viewBox="0 0 400 400" className="w-full h-full">
-            <circle cx="200" cy="200" r="150" fill="none" stroke="white" strokeWidth="0.5" />
-            <circle cx="200" cy="200" r="100" fill="none" stroke="white" strokeWidth="0.5" />
-            <circle cx="200" cy="200" r="50" fill="none" stroke="white" strokeWidth="0.5" />
-            {[0, 60, 120, 180, 240, 300].map((angle) => {
-              const rad = (angle * Math.PI) / 180;
-              return (
-                <line key={angle} x1="200" y1="200" x2={200 + 150 * Math.cos(rad)} y2={200 + 150 * Math.sin(rad)} stroke="white" strokeWidth="0.3" />
-              );
-            })}
-          </svg>
+          <div className="absolute left-1/2 top-1/2 h-[75%] aspect-square -translate-x-1/2 -translate-y-1/2">
+            {[100, 66, 33].map((size) => (
+              <span
+                key={size}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/80"
+                style={{ width: size + '%', height: size + '%' }}
+              />
+            ))}
+            {[0, 60, 120].map((angle) => (
+              <span
+                key={angle}
+                className="absolute left-0 top-1/2 h-px w-full bg-white/60"
+                style={{ transform: 'rotate(' + angle + 'deg)' }}
+              />
+            ))}
+          </div>
         </div>
         <div className="relative z-10 text-center text-white">
           <div className="flex items-center justify-center gap-3 mb-8">
@@ -129,7 +128,7 @@ export default function AuthPage() {
             Tome controle das suas finanças com o poder da IA. Dashboard, Metas, Orçamentos e Insights em um único lugar.
           </p>
           <div className="mt-10 grid grid-cols-3 gap-4 text-center">
-            {[['2.4k+', 'Usuários'], ['98%', 'Satisfação'], ['R$ 1M+', 'Economizados']].map(([v, l]) => (
+            {[['16', 'Indexadores'], ['13', 'Tipos de investimento'], ['6', 'Módulos']].map(([v, l]) => (
               <div key={l} className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
                 <p className="font-brand font-bold text-xl">{v}</p>
                 <p className="text-white/60 text-xs mt-1">{l}</p>
@@ -140,8 +139,8 @@ export default function AuthPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[var(--color-finance-bg-light)] dark:bg-[var(--color-finance-bg-dark)] relative">
-        <Link to="/" className="absolute top-8 left-8 flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[var(--color-finance-bg-light)] relative">
+        <Link to="/" className="absolute top-8 left-8 flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
           <ArrowLeft size={16} />
           Voltar para Home
         </Link>
@@ -151,22 +150,22 @@ export default function AuthPage() {
             <div className="w-9 h-9 rounded-xl gradient-hero flex items-center justify-center">
               <TrendingUp size={18} className="text-white" />
             </div>
-            <span className="font-brand font-bold text-xl text-[var(--color-finance-primary)] dark:text-white">
+            <span className="font-brand font-bold text-xl text-[var(--color-accent)]">
               Finance<span className="text-[var(--color-finance-accent)]">AI</span>
             </span>
           </div>
 
           {/* Tab toggle */}
-          <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800/50 p-1 mb-8">
+          <div className="flex rounded-xl bg-gray-100 p-1 mb-8">
             {(['login', 'register'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => { setTab(t); setApiError(''); }}
                 className={cn(
-                  'flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all',
+                  'flex-1 py-2.5 rounded-lg text-sm font-semibold transition-[color,background-color,border-color,box-shadow,opacity]',
                   tab === t
-                    ? 'bg-white dark:bg-[var(--color-finance-card-dark)] text-[var(--color-finance-primary)] shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    ? 'bg-white text-[var(--color-accent)] shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
                 )}
               >
                 {t === 'login' ? 'Entrar' : 'Criar conta'}
@@ -186,7 +185,7 @@ export default function AuthPage() {
                 className="space-y-5"
               >
                 <div>
-                  <h1 className="font-brand text-2xl font-bold text-gray-900 dark:text-white">Bem-vindo de volta!</h1>
+                  <h1 className="font-brand text-2xl font-bold text-gray-900">Bem-vindo de volta</h1>
                   <p className="text-sm text-gray-500 mt-1">Acesse sua conta FinanceAI</p>
                 </div>
 
@@ -211,9 +210,9 @@ export default function AuthPage() {
                     id="rememberMe"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-[var(--color-finance-primary)] focus:ring-[var(--color-finance-primary)] transition-all"
+                    className="w-4 h-4 rounded border-gray-300 text-[var(--color-accent)] focus:ring-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
                   />
-                  <label htmlFor="rememberMe" className="text-sm text-gray-600 dark:text-gray-300 cursor-pointer">
+                  <label htmlFor="rememberMe" className="text-sm text-gray-600 cursor-pointer">
                     Lembrar de mim
                   </label>
                 </div>
@@ -227,7 +226,7 @@ export default function AuthPage() {
                 <button
                   type="submit"
                   disabled={loginForm.formState.isSubmitting}
-                  className="w-full py-3.5 rounded-xl gradient-hero text-white font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-70"
+                  className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 disabled:opacity-70"
                 >
                   {loginForm.formState.isSubmitting && <Loader2 size={18} className="animate-spin" />}
                   Entrar
@@ -244,7 +243,7 @@ export default function AuthPage() {
                 className="space-y-4"
               >
                 <div>
-                  <h1 className="font-brand text-2xl font-bold text-gray-900 dark:text-white">Criar sua conta</h1>
+                  <h1 className="font-brand text-2xl font-bold text-gray-900">Criar sua conta</h1>
                   <p className="text-sm text-gray-500 mt-1">Comece a transformar suas finanças hoje</p>
                 </div>
 
@@ -285,7 +284,7 @@ export default function AuthPage() {
                 <button
                   type="submit"
                   disabled={registerForm.formState.isSubmitting}
-                  className="w-full py-3.5 rounded-xl gradient-hero text-white font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-70"
+                  className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 disabled:opacity-70"
                 >
                   {registerForm.formState.isSubmitting && <Loader2 size={18} className="animate-spin" />}
                   Criar conta grátis

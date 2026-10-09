@@ -4,9 +4,9 @@ import { dashboardApi } from '../lib/api';
 import { FinanceCard, SkeletonCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
 import { formatCurrency, formatCompactCurrency } from '../lib/utils';
-import { ArrowLeft, TrendingUp, TrendingDown, Scale, CalendarDays } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown, Scale, CalendarDays } from '../components/icons';
 import { Link } from '@tanstack/react-router';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, ReferenceLine,
@@ -31,7 +31,7 @@ function CustomTooltip({ active, payload, label }: any) {
           <div key={p.dataKey} className="flex items-center gap-2 text-sm mt-1.5">
             <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
             <span className="text-gray-600 font-medium">{name}</span>
-            <span className={`font-bold ml-auto ${p.dataKey === 'resultado' ? (value >= 0 ? 'text-green-600' : 'text-red-500') : 'text-gray-900'}`}>
+            <span className={`font-bold ml-auto ${p.dataKey === 'resultado' ? (value >= 0 ? 'text-gain' : 'text-loss') : 'text-gray-900'}`}>
               {prefix}{formatCurrency(value)}
             </span>
           </div>
@@ -112,26 +112,26 @@ function TabelaMensal({ dados }: { dados: any[] }) {
               >
                 <td className="py-4 whitespace-nowrap">
                   <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${positivo ? 'bg-green-50 group-hover:bg-green-100' : 'bg-red-50 group-hover:bg-red-100'}`}>
-                      <CalendarDays size={15} className={positivo ? 'text-green-500' : 'text-red-400'} />
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${positivo ? 'bg-gain-soft group-hover:bg-gain-soft' : 'bg-loss-soft group-hover:bg-loss-soft'}`}>
+                      <CalendarDays size={15} className={positivo ? 'text-gain' : 'text-loss'} />
                     </div>
                     <span className="font-semibold text-gray-800 text-sm">{item.mes}</span>
                   </div>
                 </td>
-                <td className="py-4 text-right text-sm font-semibold text-green-600">
+                <td className="py-4 text-right text-sm font-semibold text-gain">
                   +{formatCurrency(item.entradas)}
                 </td>
-                <td className="py-4 text-right text-sm font-semibold text-red-500">
+                <td className="py-4 text-right text-sm font-semibold text-loss">
                   -{formatCurrency(item.saidas)}
                 </td>
                 <td className="py-4 text-right text-sm">
                    <div className="flex items-center justify-end gap-3">
-                     <span className={`font-semibold ${taxa >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                     <span className={`font-semibold ${taxa >= 0 ? 'text-gain' : 'text-loss'}`}>
                        {taxa >= 0 ? '+' : ''}{taxa.toFixed(1)}%
                      </span>
                      <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden flex justify-start">
                        <motion.div 
-                          className={`h-full rounded-full ${taxa >= 0 ? 'bg-green-400' : 'bg-red-400'}`} 
+                          className={`h-full rounded-full ${taxa >= 0 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-ink)]/15'}`} 
                           initial={{ width: 0 }}
                           animate={{ width: `${Math.min(Math.abs(taxa), 100)}%` }}
                           transition={{ duration: 0.6, delay: i * 0.05 + 0.2 }}
@@ -140,7 +140,7 @@ function TabelaMensal({ dados }: { dados: any[] }) {
                    </div>
                 </td>
                 <td className="py-4 text-right pr-2">
-                  <span className={`inline-flex justify-center min-w-[90px] text-xs font-semibold px-2.5 py-1.5 rounded-full ${positivo ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                  <span className={`inline-flex justify-center min-w-[90px] text-xs font-semibold px-2.5 py-1.5 rounded-full ${positivo ? 'bg-gain-soft text-gain' : 'bg-loss-soft text-loss'}`}>
                     {positivo ? '+' : ''}{formatCurrency(item.resultado)}
                   </span>
                 </td>
@@ -209,9 +209,9 @@ function EntradasSaidasPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] font-sans text-gray-900 pb-20">
+    <div className="min-h-[100dvh] app-surface font-sans text-gray-900 pb-20">
       <Navbar />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <div className="stagger max-w-6xl mx-auto px-4 sm:px-6 py-8">
 
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -222,7 +222,7 @@ function EntradasSaidasPage() {
             <ArrowLeft size={20} className="text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Análise de Fluxo</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Análise de fluxo</h1>
             <p className="text-gray-500 text-sm mt-0.5">Visão detalhada e comparativa entre receitas e despesas.</p>
           </div>
         </div>
@@ -271,13 +271,13 @@ function EntradasSaidasPage() {
             <div className="flex items-center gap-4 w-full sm:w-auto">
               <div className="flex-1 sm:w-48 h-2.5 rounded-full bg-gray-100 overflow-hidden">
                 <motion.div
-                  className={`h-full rounded-full ${taxaMediaEconomia >= 0 ? 'bg-green-400' : 'bg-red-400'}`}
+                  className={`h-full rounded-full ${taxaMediaEconomia >= 0 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-ink)]/15'}`}
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min(Math.abs(taxaMediaEconomia), 100)}%` }}
                   transition={{ duration: 0.9, ease: 'easeOut', delay: 0.5 }}
                 />
               </div>
-              <span className={`text-xl font-bold whitespace-nowrap ${taxaMediaEconomia >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+              <span className={`text-xl font-bold whitespace-nowrap ${taxaMediaEconomia >= 0 ? 'text-gain' : 'text-loss'}`}>
                 {taxaMediaEconomia >= 0 ? '+' : ''}{taxaMediaEconomia.toFixed(1)}%
               </span>
             </div>
@@ -287,7 +287,7 @@ function EntradasSaidasPage() {
         {/* Gráfico Principal */}
         <FinanceCard className="mb-6">
           <div className="mb-6">
-            <h2 className="font-semibold text-gray-900 mb-1">Fluxo de Caixa Mensal</h2>
+            <h2 className="font-semibold text-gray-900 mb-1">Fluxo de caixa mensal</h2>
             <p className="text-xs text-gray-400">Entradas e saídas convergindo para o resultado líquido</p>
           </div>
           {isLoading
@@ -299,7 +299,7 @@ function EntradasSaidasPage() {
         {/* Detalhamento por mês em Tabela */}
         <FinanceCard>
           <div className="mb-4">
-            <h2 className="font-semibold text-gray-900 mb-1">Histórico Detalhado</h2>
+            <h2 className="font-semibold text-gray-900 mb-1">Histórico detalhado</h2>
             <p className="text-xs text-gray-400">Tabela de desempenho financeiro mês a mês</p>
           </div>
           {isLoading ? (

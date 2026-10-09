@@ -1,9 +1,10 @@
-import React, { Suspense } from 'react';
-import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
+import React, { Suspense, lazy } from 'react';
+import { createRootRouteWithContext, Outlet, useRouterState } from '@tanstack/react-router';
 import { QueryClient } from '@tanstack/react-query';
-import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider } from '../contexts/AuthContext';
-import { SplashScreen } from '../components/SplashScreen';
+
+// O splash só existe nas telas do app; a landing não baixa esse código.
+const SplashOverlay = lazy(() => import('../components/SplashScreen').then((m) => ({ default: m.SplashOverlay })));
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -11,8 +12,24 @@ export const Route = createRootRouteWithContext<{
   component: RootLayout,
 });
 
+function RouteFallback() {
+  return (
+    <div className="fixed inset-0 z-[var(--z-splash)] flex items-center justify-center bg-white" role="status" aria-label="Carregando">
+      <div className="w-full max-w-sm space-y-4 px-6">
+        {[100, 85, 70].map((w) => (
+          <span key={w} className="media-frame block h-4 rounded-full" data-loading="" style={{ width: `${w}%` }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RootLayout() {
-  const [splash, setSplash] = React.useState(() => !sessionStorage.getItem('splashShown'));
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // A landing não espera o splash de 3s nem o fade do container:
+  // a headline e a imagem do hero precisam pintar logo (LCP < 2,5s).
+  const isLanding = pathname === '/';
+  const [splash, setSplash] = React.useState(() => !isLanding && !sessionStorage.getItem('splashShown'));
 
   React.useEffect(() => {
     if (splash) {
@@ -26,20 +43,17 @@ function RootLayout() {
 
   return (
     <AuthProvider>
-      <AnimatePresence>
-        {splash && <SplashScreen key="splash" type="initial" />}
-      </AnimatePresence>
+      {!isLanding && (
+        <Suspense fallback={splash ? <RouteFallback /> : null}>
+          <SplashOverlay show={splash} />
+        </Suspense>
+      )}
       {!splash && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="min-h-screen bg-[var(--color-finance-bg-light)] dark:bg-[var(--color-finance-bg-dark)] text-gray-900 dark:text-white transition-colors duration-200"
-        >
-          <Suspense fallback={<SplashScreen type="transition" />}>
+        <div className={isLanding ? 'min-h-[100dvh] bg-white text-gray-900' : 'route-fade min-h-[100dvh] bg-white text-gray-900'}>
+          <Suspense fallback={<RouteFallback />}>
             <Outlet />
           </Suspense>
-        </motion.div>
+        </div>
       )}
     </AuthProvider>
   );

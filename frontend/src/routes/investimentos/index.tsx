@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Navbar } from '../../components/Navbar';
-import { FinanceCard, SkeletonCard } from '../../components/ui';
+import { AnimatedCounter, SkeletonCard } from '../../components/ui';
 import { investimentosApi, Investment } from '../../lib/api';
-import { formatCurrency } from '../../lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Wallet, TrendingUp, PiggyBank, ArrowRight, X } from 'lucide-react';
+import { formatCurrency, descreverTaxa } from '../../lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
+import { Plus, ArrowRight, X } from '../../components/icons';
+
 
 export const Route = createFileRoute('/investimentos/')({
   component: InvestimentosPage,
@@ -61,113 +62,89 @@ function InvestimentosPage() {
   const totalInvestido = investimentos?.reduce((acc, inv) => acc + parseFloat(String(inv.saldo_atual)), 0) || 0;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] font-sans text-gray-900 pb-20">
+    <div className="min-h-[100dvh] app-surface font-sans text-gray-900 pb-20">
       <Navbar />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <div className="stagger max-w-6xl mx-auto px-4 sm:px-6 py-8">
         
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Meus Investimentos</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Acompanhe e gerencie sua carteira de investimentos.</p>
+            <h1 className="text-3xl font-bold tracking-tight text-[var(--color-ink)]">Investimentos</h1>
+            <p className="text-sm text-[var(--color-ink-muted)] mt-1">O rendimento entra no saldo todo dia, sozinho.</p>
           </div>
-          <button 
-            onClick={() => setModalAberto(true)}
-            className="flex items-center gap-2 bg-[var(--color-finance-primary)] text-white px-5 py-2.5 rounded-xl font-medium shadow-sm shadow-[var(--color-finance-primary)]/20 hover:opacity-90 transition-all active:scale-[0.98]"
-          >
-            <Plus size={18} />
-            <span>Novo Investimento</span>
+          <button onClick={() => setModalAberto(true)} className="btn-primary self-start sm:self-auto px-5 py-2.5 text-sm">
+            <Plus size={16} />
+            Novo investimento
           </button>
-        </div>
+        </header>
 
-        {/* Resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <FinanceCard className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500">
-              <Wallet size={24} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Patrimônio Total</p>
-              <h2 className="text-2xl font-bold text-gray-900">{formatCurrency(totalInvestido)}</h2>
-            </div>
-          </FinanceCard>
-          <FinanceCard className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center text-green-500">
-              <TrendingUp size={24} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Rendimento Automático</p>
-              <h2 className="text-lg font-semibold text-gray-900">Ativado diariamente</h2>
-            </div>
-          </FinanceCard>
-        </div>
+        <section className="rounded-[var(--radius-card)] bg-[var(--color-accent)] text-white p-6 sm:p-7 mb-10 flex flex-wrap items-end justify-between gap-6 on-dark" aria-label="Patrimônio">
+          <div>
+            <p className="text-sm text-white/75">Patrimônio investido</p>
+            {isLoading ? (
+              <span className="media-frame block h-10 w-48 mt-3 rounded-lg opacity-30" data-loading="" />
+            ) : (
+              <AnimatedCounter value={totalInvestido} isCurrency className="mt-2 block text-4xl sm:text-5xl text-white" />
+            )}
+          </div>
+          {!!investimentos?.length && (
+            <p data-num className="text-sm text-white/80">
+              {investimentos.length} {investimentos.length === 1 ? "investimento" : "investimentos"}
+            </p>
+          )}
+        </section>
 
-        {/* Lista de Investimentos */}
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Sua Carteira</h2>
+        <h2 className="text-base font-semibold text-[var(--color-ink)] mb-4">Sua carteira</h2>
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} lines={3} />)}
           </div>
         ) : investimentos?.length === 0 ? (
-          <div className="text-center py-16 bg-white border border-gray-100 rounded-3xl shadow-sm">
-            <div className="w-16 h-16 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-4">
-              <PiggyBank size={32} />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Nenhum investimento ainda</h3>
-            <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
-              Comece a montar sua carteira de investimentos adicionando seu primeiro ativo.
+          <div className="finance-card px-6 py-12 flex flex-col items-start gap-3 max-w-xl">
+            <h3 className="text-lg font-semibold text-[var(--color-ink)]">Nenhum investimento ainda</h3>
+            <p className="text-sm text-[var(--color-ink-muted)] max-w-[44ch]">
+              Cadastre um CDB, Tesouro ou poupança e o saldo passa a render automaticamente a cada dia.
             </p>
-            <button 
-              onClick={() => setModalAberto(true)}
-              className="text-[var(--color-finance-primary)] font-medium hover:opacity-80 inline-flex items-center gap-2"
-            >
-              <Plus size={18} />
-              Criar Investimento
+            <button onClick={() => setModalAberto(true)} className="btn-primary px-5 py-2.5 text-sm mt-2">
+              <Plus size={16} />
+              Cadastrar o primeiro
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {investimentos?.map((inv, i) => (
-              <Link 
-                key={inv.id_investimento} 
-                to="/investimentos/$id" 
-                params={{ id: String(inv.id_investimento) }}
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all group cursor-pointer h-full flex flex-col"
+              <li key={inv.id_investimento} className="rise" style={{ "--i": i + 3 } as React.CSSProperties}>
+                <Link
+                  to="/investimentos/$id"
+                  params={{ id: String(inv.id_investimento) }}
+                  className="finance-card pressable group h-full p-5 flex flex-col gap-6"
+                  data-clickable=""
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-lg leading-tight">{inv.nome}</h3>
-                      <p className="text-xs text-gray-400 font-medium">{inv.tipo}</p>
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-[var(--color-ink)] text-lg leading-tight truncate">{inv.nome}</h3>
+                      <p className="text-xs text-[var(--color-ink-muted)] mt-1">{inv.tipo}</p>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">
-                      <ArrowRight size={16} />
-                    </div>
+                    <span className="arrow-nudge text-[var(--color-ink-muted)] group-hover:text-[var(--color-accent)]">
+                      <ArrowRight size={18} />
+                    </span>
                   </div>
-                  
-                  <div className="mt-auto pt-4 border-t border-gray-50 flex justify-between items-end">
+
+                  <div className="mt-auto flex justify-between items-end gap-3">
                     <div>
-                      <p className="text-xs text-gray-500 mb-0.5">Saldo Atual</p>
-                      <p className="font-bold text-gray-900">{formatCurrency(parseFloat(String(inv.saldo_atual)))}</p>
+                      <p className="text-xs text-[var(--color-ink-muted)]">Saldo</p>
+                      <p data-num className="font-semibold text-[var(--color-ink)] text-lg">{formatCurrency(parseFloat(String(inv.saldo_atual)))}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Rendimento</p>
-                      <p className="text-sm font-semibold text-green-600">+{parseFloat(String(inv.taxa_rendimento))}% a.a.</p>
-                    </div>
+                    <p data-num className="text-sm font-medium text-gain text-right">{descreverTaxa(inv)}</p>
                   </div>
-                </motion.div>
-              </Link>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
 
       </div>
 
-      {/* Modal Novo Investimento */}
+      {/* Modal Novo investimento */}
       <AnimatePresence>
         {modalAberto && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -183,7 +160,7 @@ function InvestimentosPage() {
               className="bg-white rounded-3xl shadow-xl w-full max-w-md relative z-10 overflow-hidden"
             >
               <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900">Novo Investimento</h2>
+                <h2 className="text-lg font-bold text-gray-900">Novo investimento</h2>
                 <button onClick={() => setModalAberto(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-full transition-colors">
                   <X size={20} />
                 </button>
@@ -198,7 +175,7 @@ function InvestimentosPage() {
                     value={nome}
                     onChange={e => setNome(e.target.value)}
                     placeholder="Ex: Nubank CDB, Tesouro Selic..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
                   />
                 </div>
                 
@@ -207,7 +184,7 @@ function InvestimentosPage() {
                   <select
                     value={tipo}
                     onChange={e => setTipo(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
                   >
                     {TIPOS_INVESTIMENTO.map(t => (
                       <option key={t} value={t}>{t}</option>
@@ -220,7 +197,7 @@ function InvestimentosPage() {
                   <select
                     value={indexador}
                     onChange={e => setIndexador(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
                   >
                     {INDEXADORES.map(idx => (
                       <option key={idx} value={idx}>{idx}</option>
@@ -240,7 +217,7 @@ function InvestimentosPage() {
                       value={taxa}
                       onChange={e => setTaxa(e.target.value)}
                       placeholder={indexador === 'PREFIXADO' ? "Ex: 10.5" : "Ex: 120"}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-finance-primary)] transition-all"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">%</span>
                   </div>
@@ -258,7 +235,7 @@ function InvestimentosPage() {
                   <button
                     type="submit"
                     disabled={createMutation.isPending}
-                    className="flex-1 bg-[var(--color-finance-primary)] hover:opacity-90 text-white font-medium rounded-xl transition-all disabled:opacity-50 py-3"
+                    className="flex-1 bg-[var(--color-accent)] hover:opacity-90 text-white font-medium rounded-xl transition-[color,background-color,border-color,box-shadow,opacity] disabled:opacity-50 py-3"
                   >
                     {createMutation.isPending ? 'Salvando...' : 'Adicionar'}
                   </button>

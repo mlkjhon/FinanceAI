@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PluggyConnect } from 'react-pluggy-connect';
-import { Loader2, X, FlaskConical, Copy, Check } from 'lucide-react';
+import { Loader2, X, FlaskConical, Copy, Check } from './icons';
 
 interface OpenFinanceWidgetProps {
   onEvent: (event: string, data?: any) => void;
@@ -15,8 +15,8 @@ function CopyButton({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <button onClick={handleCopy} className="ml-2 text-gray-400 hover:text-[var(--color-finance-primary)] transition-colors">
-      {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+    <button onClick={handleCopy} className="ml-2 text-gray-400 hover:text-[var(--color-accent)] transition-colors">
+      {copied ? <Check size={13} className="text-gain" /> : <Copy size={13} />}
     </button>
   );
 }
@@ -87,12 +87,12 @@ export function OpenFinanceWidget({ onEvent, onClose }: OpenFinanceWidgetProps) 
               <li>Clique em <strong>"Abrir Pluggy"</strong> abaixo</li>
               <li>Selecione <strong>"Pluggy Bank"</strong> na lista</li>
               <li>Use as credenciais acima</li>
-              <li>Pronto — conta sincronizada! ✅</li>
+              <li>Pronto: conta sincronizada.</li>
             </ol>
 
             <button
               onClick={() => setShowWidget(true)}
-              className="w-full py-3 rounded-xl gradient-hero text-white font-semibold hover:opacity-90 transition-opacity"
+              className="btn-primary w-full py-3"
             >
               Abrir Pluggy →
             </button>
@@ -103,7 +103,7 @@ export function OpenFinanceWidget({ onEvent, onClose }: OpenFinanceWidgetProps) 
       {/* Loading */}
       {!connectToken && !error && (
         <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-[var(--color-finance-primary)] animate-spin" />
+          <Loader2 className="w-10 h-10 text-[var(--color-accent)] animate-spin" />
           <p className="text-gray-500 font-medium">Iniciando ambiente seguro...</p>
         </div>
       )}
@@ -112,7 +112,7 @@ export function OpenFinanceWidget({ onEvent, onClose }: OpenFinanceWidgetProps) 
       {error && (
         <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center">
           <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
-            <X className="w-6 h-6 text-red-500" />
+            <X className="w-6 h-6 text-loss" />
           </div>
           <h3 className="text-lg font-bold text-gray-900 mb-2">Erro de Conexão</h3>
           <p className="text-sm text-gray-500 mb-6">{error}</p>
