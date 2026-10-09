@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { AnimatedCounter, SkeletonCard } from '../../components/ui';
-import { investimentosApi, Investment } from '../../lib/api';
+import { investimentosApi } from '../../lib/api';
 import { formatCurrency, descreverTaxa } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { modal, backdrop } from '../../lib/motion-tokens';
 import { Plus, ArrowRight, X } from '../../components/icons';
+import { TaxaPreview } from '../../components/investimentos/taxa-preview';
+import { INDEXADORES, SUGESTAO_POR_TIPO, exemploTaxa, nomeIndexador, rotuloTaxa } from '../../lib/investimentos';
 
 
 export const Route = createFileRoute('/investimentos/')({
@@ -20,19 +22,25 @@ const TIPOS_INVESTIMENTO = [
   'BDRs', 'ETFs', 'Outro'
 ];
 
-const INDEXADORES = [
-  'PREFIXADO', 'CDI', 'SELIC', 'IPCA', 'IGPM', 'INPC', 
-  'TR', 'POUPANCA', 'IBOVESPA', 'TLP', 'TJLP', 'TBF', 
-  'PTAX', 'IMA-B', 'IRF-M', 'IDA'
-];
 
 function InvestimentosPage() {
   const queryClient = useQueryClient();
   const [modalAberto, setModalAberto] = useState(false);
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState(TIPOS_INVESTIMENTO[0]);
-  const [taxa, setTaxa] = useState('');
-  const [indexador, setIndexador] = useState(INDEXADORES[0]);
+  const [taxa, setTaxa] = useState(SUGESTAO_POR_TIPO[TIPOS_INVESTIMENTO[0]]?.taxa ?? '');
+  const [indexador, setIndexador] = useState<string>(SUGESTAO_POR_TIPO[TIPOS_INVESTIMENTO[0]]?.indexador ?? 'PREFIXADO');
+  // Enquanto o usuário não mexe em indexador/taxa, o tipo escolhido sugere os dois
+  const [ajustouTaxa, setAjustouTaxa] = useState(false);
+
+  const escolherTipo = (t: string) => {
+    setTipo(t);
+    const sug = SUGESTAO_POR_TIPO[t];
+    if (sug && !ajustouTaxa) {
+      setIndexador(sug.indexador);
+      setTaxa(sug.taxa);
+    }
+  };
 
   const { data: investimentos, isLoading } = useQuery({
     queryKey: ['investimentos'],
@@ -45,7 +53,10 @@ function InvestimentosPage() {
       queryClient.invalidateQueries({ queryKey: ['investimentos'] });
       setModalAberto(false);
       setNome('');
-      setTaxa('');
+      setTipo(TIPOS_INVESTIMENTO[0]);
+      setIndexador(SUGESTAO_POR_TIPO[TIPOS_INVESTIMENTO[0]]?.indexador ?? 'PREFIXADO');
+      setTaxa(SUGESTAO_POR_TIPO[TIPOS_INVESTIMENTO[0]]?.taxa ?? '');
+      setAjustouTaxa(false);
     }
   });
 
@@ -55,7 +66,7 @@ function InvestimentosPage() {
     createMutation.mutate({
       nome,
       tipo,
-      taxa_rendimento: parseFloat(taxa || '0'),
+      taxa_rendimento: parseFloat(String(taxa || '0').replace(',', '.')),
       indexador
     });
   };
@@ -148,95 +159,83 @@ function InvestimentosPage() {
       {/* Modal Novo investimento */}
       <AnimatePresence>
         {modalAberto && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              {...backdrop}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setModalAberto(false)}
-            />
-            <motion.div 
+          <div className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center p-4">
+            <motion.div {...backdrop} className="absolute inset-0 bg-[var(--color-ink)]/30" onClick={() => setModalAberto(false)} />
+            <motion.div
               {...modal}
-              className="bg-white rounded-3xl shadow-xl w-full max-w-md relative z-10 overflow-hidden"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="novo-inv-titulo"
+              className="relative bg-white rounded-[20px] shadow-xl w-full max-w-md max-h-[92dvh] overflow-y-auto"
             >
-              <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900">Novo investimento</h2>
-                <button onClick={() => setModalAberto(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-full transition-colors">
-                  <X size={20} />
+              <div className="px-6 pt-5 pb-2 flex items-center justify-between">
+                <h2 id="novo-inv-titulo" className="font-brand text-lg font-bold text-[var(--color-ink)]">Novo investimento</h2>
+                <button onClick={() => setModalAberto(false)} aria-label="Fechar" className="p-2 -mr-2 rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)]">
+                  <X size={18} />
                 </button>
               </div>
-              
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Nome da Corretora / Ativo</label>
+
+              <form onSubmit={handleSubmit} className="px-6 pb-6 pt-2 space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="inv-nome" className="text-sm font-medium text-[var(--color-ink-soft)]">Nome</label>
                   <input
+                    id="inv-nome"
                     type="text"
                     required
+                    autoFocus
                     value={nome}
-                    onChange={e => setNome(e.target.value)}
-                    placeholder="Ex: Nubank CDB, Tesouro Selic..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Ex.: CDB Nubank, Tesouro Selic 2029"
+                    className="field w-full px-4 py-3 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm"
                   />
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de Investimento</label>
-                  <select
-                    value={tipo}
-                    onChange={e => setTipo(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
-                  >
-                    {TIPOS_INVESTIMENTO.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Indexador</label>
-                  <select
-                    value={indexador}
-                    onChange={e => setIndexador(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
-                  >
-                    {INDEXADORES.map(idx => (
-                      <option key={idx} value={idx}>{idx}</option>
-                    ))}
-                  </select>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label htmlFor="inv-tipo" className="text-sm font-medium text-[var(--color-ink-soft)]">Tipo</label>
+                    <select id="inv-tipo" value={tipo} onChange={(e) => escolherTipo(e.target.value)} className="field w-full px-3 py-3 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm">
+                      {TIPOS_INVESTIMENTO.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="inv-idx" className="text-sm font-medium text-[var(--color-ink-soft)]">Indexador</label>
+                    <select
+                      id="inv-idx"
+                      value={indexador}
+                      onChange={(e) => { setIndexador(e.target.value); setAjustouTaxa(true); }}
+                      className="field w-full px-3 py-3 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm"
+                    >
+                      {INDEXADORES.map((idx) => <option key={idx} value={idx}>{nomeIndexador(idx)}</option>)}
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    {indexador === 'PREFIXADO' ? 'Taxa Anual (%)' : `Porcentagem do ${indexador} (%)`}
-                  </label>
+                <div className="space-y-2">
+                  <label htmlFor="inv-taxa" className="text-sm font-medium text-[var(--color-ink-soft)]">{rotuloTaxa(indexador)}</label>
                   <div className="relative">
                     <input
-                      type="number"
-                      step="0.0001"
+                      id="inv-taxa"
+                      type="text"
+                      inputMode="decimal"
                       required
                       value={taxa}
-                      onChange={e => setTaxa(e.target.value)}
-                      placeholder={indexador === 'PREFIXADO' ? "Ex: 10.5" : "Ex: 120"}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
+                      onChange={(e) => { setTaxa(e.target.value.replace(/[^0-9.,]/g, '')); setAjustouTaxa(true); }}
+                      placeholder={exemploTaxa(indexador)}
+                      className="field w-full px-4 py-3 pr-10 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm"
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">%</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]">%</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1.5">Essa taxa será calculada e aplicada proporcionalmente sobre o saldo todo dia à meia-noite.</p>
                 </div>
 
-                <div className="pt-4 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setModalAberto(false)}
-                    className="flex-1 px-4 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-xl transition-colors"
-                  >
+                <TaxaPreview indexador={indexador} taxa={taxa} />
+                <p className="text-xs text-[var(--color-ink-muted)]">O rendimento entra no saldo todo dia, calculado com essa taxa.</p>
+
+                <div className="pt-2 flex gap-3">
+                  <button type="button" onClick={() => setModalAberto(false)} className="flex-1 px-4 py-3 rounded-full border border-[var(--color-line)] text-sm font-medium text-[var(--color-ink-soft)]">
                     Cancelar
                   </button>
-                  <button
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    className="flex-1 bg-[var(--color-accent)] hover:opacity-90 text-white font-medium rounded-xl transition-[color,background-color,border-color,box-shadow,opacity] disabled:opacity-50 py-3"
-                  >
-                    {createMutation.isPending ? 'Salvando...' : 'Adicionar'}
+                  <button type="submit" disabled={createMutation.isPending} className="btn-primary flex-1 py-3 text-sm disabled:opacity-50">
+                    {createMutation.isPending ? 'Salvando' : 'Adicionar'}
                   </button>
                 </div>
               </form>

@@ -72,21 +72,22 @@ function CategoryBreakdown({ data }: { data: { categoria: string; valor: number;
   );
 }
 
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-[var(--color-line)] rounded-[10px] px-3 py-2 shadow-md">
+      <p className="text-xs text-[var(--color-ink-muted)]">{label}</p>
+      <p data-num className="text-sm font-semibold text-[var(--color-ink)]">{formatCurrency(payload[0].value)}</p>
+    </div>
+  );
+}
+
 function BalanceChart({ data }: { data: { mes: string; saldo: number }[] }) {
   if (!data || !data.length) return <EmptyState text="O gráfico aparece depois do primeiro mês com movimentações." />;
 
   // Com um mês só, repete o ponto para desenhar uma linha
   const chartData = data.length === 1 ? [{ mes: '', saldo: data[0].saldo }, ...data] : data;
 
-  const ChartTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="bg-white border border-[var(--color-line)] rounded-[10px] px-3 py-2 shadow-md">
-        <p className="text-xs text-[var(--color-ink-muted)]">{label}</p>
-        <p data-num className="text-sm font-semibold text-[var(--color-ink)]">{formatCurrency(payload[0].value)}</p>
-      </div>
-    );
-  };
 
   return (
     <ResponsiveContainer width="100%" height="100%">

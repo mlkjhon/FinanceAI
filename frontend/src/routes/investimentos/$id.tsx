@@ -1,9 +1,12 @@
-import { createFileRoute, Link, useParams, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import type { TooltipProps } from '../../lib/chart';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { AnimatedCounter, FinanceCard, SkeletonCard } from '../../components/ui';
-import { investimentosApi } from '../../lib/api';
+import { investimentosApi, type CreateInvestment } from '../../lib/api';
+import { TaxaPreview } from '../../components/investimentos/taxa-preview';
+import { INDEXADORES, nomeIndexador, rotuloTaxa } from '../../lib/investimentos';
 import { formatCurrency, formatCompactCurrency, formatDate, descreverTaxa } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { modal, backdrop } from '../../lib/motion-tokens';
@@ -17,7 +20,7 @@ export const Route = createFileRoute('/investimentos/$id')({
   component: InvestimentoDetailsPage,
 });
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label }: TooltipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white border border-gray-100 shadow-xl rounded-2xl p-4 min-w-[150px]">
@@ -25,7 +28,7 @@ function CustomTooltip({ active, payload, label }: any) {
       <div className="flex items-center gap-2 text-sm">
         <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-accent)]" />
         <span className="text-gray-600">Saldo</span>
-        <span className="font-bold text-gray-900 ml-auto">{formatCurrency(payload[0].value)}</span>
+        <span className="font-bold text-gray-900 ml-auto">{formatCurrency(Number(payload[0].value) || 0)}</span>
       </div>
     </div>
   );
@@ -48,17 +51,13 @@ function InvestimentoDetailsPage() {
     queryFn: () => investimentosApi.get(id),
   });
 
-  const { data: taxasApi } = useQuery({
-    queryKey: ['taxasBrasilAPI'],
-    queryFn: async () => {
-      try {
-        const res = await fetch('https://brasilapi.com.br/api/taxas/v1');
-        return res.json();
-      } catch (e) {
-        return [{ nome: 'cdi', valor: 10.5 }, { nome: 'selic', valor: 10.5 }, { nome: 'ipca', valor: 4.5 }];
-      }
-    },
-    staleTime: 1000 * 60 * 60 * 24 // 24h
+  // Taxa atual e rendimento previsto vêm do servidor, com a mesma conta do crédito diário
+  const saldoAtual = parseFloat(String(inv?.saldo_atual ?? 0)) || 0;
+  const { data: simulacao } = useQuery({
+    queryKey: ['simular-investimento', inv?.indexador, Number(inv?.taxa_rendimento), saldoAtual],
+    queryFn: () => investimentosApi.simular(inv?.indexador || 'PREFIXADO', Number(inv?.taxa_rendimento) || 0, saldoAtual || 1000),
+    enabled: !!inv,
+    staleTime: 5 * 60 * 1000,
   });
 
   const transacaoMutation = useMutation({
@@ -90,7 +89,7 @@ function InvestimentoDetailsPage() {
   });
 
   const updateInvMutation = useMutation({
-    mutationFn: (data: any) => investimentosApi.update(id, data),
+    mutationFn: (data: CreateInvestment) => investimentosApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investimentos', id] });
       setModalEditAberto(false);
@@ -146,36 +145,7 @@ function InvestimentoDetailsPage() {
 
   const historicoInvertido = [...(inv?.historico || [])].reverse();
 
-  const getTaxaAnual = (invData: any) => {
-    let taxa = parseFloat(String(invData.taxa_rendimento));
-    const idx = (invData.indexador || 'PREFIXADO').toUpperCase();
-    if (idx === 'PREFIXADO') return taxa;
-    if (!taxasApi) return 0;
-
-    const getT = (n: string) => taxasApi.find((t:any) => t.nome.toLowerCase() === n.toLowerCase())?.valor || 0;
-    
-    // Default fallback approximations for frontend display if API fails
-    const defaultTaxas: any = { cdi: 10.5, selic: 10.5, ipca: 4.5, igpm: 4.0, inpc: 4.5, tr: 1.5, ibovespa: 10.0 };
-    const getVal = (n: string) => getT(n) || defaultTaxas[n] || 0;
-
-    if (idx === 'CDI') return (taxa / 100) * getVal('cdi');
-    if (idx === 'SELIC') return (taxa / 100) * getVal('selic');
-    if (idx === 'IPCA') return getVal('ipca') + taxa;
-    if (idx === 'IGPM') return getVal('igpm') + taxa;
-    if (idx === 'INPC') return getVal('inpc') + taxa;
-    if (idx === 'IBOVESPA') return (taxa / 100) * getVal('ibovespa');
-    if (idx === 'TR') return getVal('tr') + taxa;
-    if (['TLP', 'TJLP', 'TBF'].includes(idx)) return 6.0 + taxa;
-    if (['PTAX', 'IMA-B', 'IRF-M', 'IDA'].includes(idx)) return 5.0 + taxa;
-    if (idx === 'POUPANCA' || idx === 'POUPANÇA') {
-        const selic = getVal('selic');
-        const rendimentoBase = selic > 8.5 ? 6.17 : (selic * 0.70);
-        return (taxa / 100) * (rendimentoBase + getVal('tr'));
-    }
-    return taxa;
-  };
-
-  const rendimentoPrevisto = inv ? (parseFloat(String(inv.saldo_atual)) * (getTaxaAnual(inv) / 100)) / 365 : 0;
+  const rendimentoPrevisto = saldoAtual > 0 && simulacao ? simulacao.exemplo.porDia : 0;
 
   return (
     <div className="min-h-[100dvh] app-surface font-sans text-gray-900 pb-20">
@@ -236,7 +206,7 @@ function InvestimentoDetailsPage() {
                 )}
               </div>
               <div className="flex flex-wrap gap-3">
-                <button onClick={() => openModal('aporte')} className="pressable inline-flex items-center gap-2 rounded-full bg-white text-[var(--color-accent)] px-5 py-2.5 text-sm font-semibold">
+                <button onClick={() => openModal('aporte')} className="pressable inline-flex items-center gap-2 rounded-full bg-[#fff] text-[#047857] px-5 py-2.5 text-sm font-semibold">
                   <TrendingUp size={16} /> Aportar
                 </button>
                 <button onClick={() => openModal('resgate')} className="pressable inline-flex items-center gap-2 rounded-full border border-white/40 text-white px-5 py-2.5 text-sm font-semibold">
@@ -489,18 +459,14 @@ function InvestimentoDetailsPage() {
                     onChange={e => setEditForm({...editForm, indexador: e.target.value})}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
                   >
-                    {[
-                      'PREFIXADO', 'CDI', 'SELIC', 'IPCA', 'IGPM', 'INPC', 
-                      'TR', 'POUPANCA', 'IBOVESPA', 'TLP', 'TJLP', 'TBF', 
-                      'PTAX', 'IMA-B', 'IRF-M', 'IDA'
-                    ].map(idx => (
-                      <option key={idx} value={idx}>{idx}</option>
+                    {INDEXADORES.map(idx => (
+                      <option key={idx} value={idx}>{nomeIndexador(idx)}</option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    {editForm.indexador === 'PREFIXADO' ? 'Taxa de Rendimento (% ao ano)' : `Porcentagem do ${editForm.indexador} (%)`}
+                    {rotuloTaxa(editForm.indexador)}
                   </label>
                   <input
                     type="number"
@@ -511,6 +477,7 @@ function InvestimentoDetailsPage() {
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
                   />
                 </div>
+                <TaxaPreview indexador={editForm.indexador} taxa={editForm.taxa_rendimento} valor={saldoAtual > 0 ? saldoAtual : 1000} />
 
                 <div className="pt-4 flex gap-3">
                   <button

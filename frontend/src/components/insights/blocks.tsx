@@ -7,7 +7,8 @@ import { cn } from '../../lib/utils';
 import { ease } from '../../lib/motion-tokens';
 import type { Bloco, BlocoDe } from '../../lib/insights/types';
 import { ChartView } from './charts';
-import { StreamText, fmt, diaCurto } from './primitives';
+import { StreamText } from './primitives';
+import { fmt, diaCurto } from '../../lib/insights/format';
 
 // ---------- KPI ----------
 
@@ -181,7 +182,7 @@ function Story({ b }: { b: BlocoDe<'story'> }) {
               >
                 <span
                   key={k === i ? `on-${i}` : `off-${k}`}
-                  className={cn('block h-full w-full bg-white rounded-full origin-left', k < i ? 'scale-x-100' : k === i ? (reduce ? 'scale-x-100' : 'story-fill') : 'scale-x-0')}
+                  className={cn('block h-full w-full bg-[#fff] rounded-full origin-left', k < i ? 'scale-x-100' : k === i ? (reduce ? 'scale-x-100' : 'story-fill') : 'scale-x-0')}
                   style={k === i && !reduce ? { animationDuration: `${DURACAO_SLIDE}ms`, animationPlayState: pausado ? 'paused' : 'running' } : undefined}
                 />
               </button>

@@ -5,7 +5,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { dashboardApi } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { formatCurrency, formatCompactCurrency, cn } from '../lib/utils';
-import { DetailHeader, Headline, Strong, MetricStrip, ChartTooltip, EmptyDetail, detailSkeleton, nomeMes } from '../components/detail';
+import { DetailHeader, Headline, Strong, MetricStrip, ChartTooltip, EmptyDetail, DetailSkeleton } from '../components/detail';
+import { nomeMes } from '../lib/datas';
 
 export const Route = createFileRoute('/evolucao-saldo')({
   beforeLoad: () => {
@@ -26,7 +27,7 @@ function EvolucaoContent() {
     queryFn: () => dashboardApi.summary('all'),
   });
 
-  if (isLoading) return detailSkeleton;
+  if (isLoading) return <DetailSkeleton />;
 
   const meses = [...(summary?.evolucao_saldo ?? [])].sort((a, b) => chave(a.mes) - chave(b.mes));
   if (!meses.length) return <EmptyDetail text="Ainda não há meses com movimentações para mostrar a evolução." />;

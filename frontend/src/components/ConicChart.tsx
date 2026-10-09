@@ -31,14 +31,14 @@ export function DonutRing({
   label: string;
 }) {
   const total = segments.reduce((s, d) => s + d.value, 0) || 1;
-  let acc = 0;
-  const stops = segments.map((s) => {
-    const from = (acc / total) * 100;
-    acc += s.value;
-    const to = (acc / total) * 100;
+  // soma acumulada até o fim de cada segmento
+  const fins = segments.reduce<number[]>((arr, s) => [...arr, (arr.at(-1) ?? 0) + s.value], []);
+  const stops = segments.map((s, i) => {
+    const from = ((i > 0 ? fins[i - 1] : 0) / total) * 100;
+    const to = (fins[i] / total) * 100;
     return `${s.color} ${from.toFixed(3)}% ${to.toFixed(3)}%`;
   });
-  const covered = (acc / total) * 100;
+  const covered = ((fins.at(-1) ?? 0) / total) * 100;
   const gradient = `conic-gradient(${[...stops, `${track} ${covered.toFixed(3)}% 100%`].join(', ')})`;
   const mask = ringMask(hole);
 
@@ -64,7 +64,7 @@ export function ProgressRing({ pct, className, children }: { pct: number; classN
   const clamped = Math.max(0, Math.min(100, pct));
   const reduce = useReducedMotion();
   const mv = useMotionValue(reduce ? clamped : 0);
-  const background = useTransform(mv, (p) => `conic-gradient(#047857 0% ${p}%, #E5E7EB ${p}% 100%)`);
+  const background = useTransform(mv, (p) => `conic-gradient(#047857 0% ${p}%, var(--color-line) ${p}% 100%)`);
   const mask = ringMask(0.82);
 
   useEffect(() => {

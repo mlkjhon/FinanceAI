@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "icons": "node scripts/subset-icons.mjs"
+    "icons": "node scripts/subset-icons.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -27,15 +28,21 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.0.0",
     "@tanstack/router-vite-plugin": "^1.119.0",
     "@types/node": "^25.9.3",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^4.7.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
     "subset-font": "^2.9.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.46.4",
     "vite": "^5.4.21"
   }
 }

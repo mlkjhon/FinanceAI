@@ -19,7 +19,9 @@ export function SmartImage({
 
   useEffect(() => {
     // imagem já em cache: o onLoad pode ter disparado antes da hidratação do handler
-    if (ref.current?.complete && ref.current.naturalWidth > 0) setLoaded(true);
+    if (!(ref.current?.complete && ref.current.naturalWidth > 0)) return;
+    const id = requestAnimationFrame(() => setLoaded(true));
+    return () => cancelAnimationFrame(id);
   }, []);
 
   return (

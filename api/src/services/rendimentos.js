@@ -1,70 +1,141 @@
 import { BD } from '../../db.js';
 
-// Fallbacks caso a BrasilAPI esteja fora do ar
-const TAXAS_PADRAO = {
-    cdi: 10.5, selic: 10.5, ipca: 4.5, igpm: 4.0, inpc: 4.5, tr: 1.5,
-    ibovespa: 10.0, ifix: 8.0, sp500: 10.0, nasdaq: 12.0, dowjones: 9.0,
-    bitcoin: 50.0, ethereum: 40.0, dolar: 3.0, euro: 2.0, libor: 5.0,
-    sofr: 5.0, euribor: 3.5, tlp: 6.0, tjlp: 6.5, tbf: 10.0
+/*
+ * Taxas de mercado usadas no rendimento diário e na tela de investimentos.
+ * - BrasilAPI (/taxas/v1): CDI, Selic e IPCA 12 meses.
+ * - Banco Central, API SGS: IGP-M e INPC (12 meses compostos), TR e poupança
+ *   (% ao mês, anualizadas) e TJLP (% ao ano).
+ * Indexadores sem fonte pública simples ficam com valor de referência e são
+ * marcados como "estimativa" para a tela não fingir que é dado oficial.
+ */
+const ESTIMATIVAS = {
+    cdi: 10.5, selic: 10.5, ipca: 4.5, igpm: 4.0, inpc: 4.5, tr: 1.5, poupanca: 6.17, tjlp: 6.5,
+    ibovespa: 10.0, tlp: 6.0, tbf: 10.0, ptax: 5.0, imab: 5.0, irfm: 5.0, ida: 5.0,
 };
 
-// Cache das taxas por 1 hora para nao chamar a BrasilAPI a cada requisicao
-let cacheTaxas = null;
-let cacheTaxasEm = 0;
+const SGS = {
+    igpm: { serie: 189, tipo: 'mensal12' },
+    inpc: { serie: 188, tipo: 'mensal12' },
+    tr: { serie: 226, tipo: 'aoMes' },
+    poupanca: { serie: 195, tipo: 'aoMes' },
+    tjlp: { serie: 256, tipo: 'aoAno' },
+};
 
-export const buscarTaxasAtuais = async () => {
-    if (cacheTaxas && Date.now() - cacheTaxasEm < 60 * 60 * 1000) return cacheTaxas;
+const arred = (v, c = 2) => Math.round(v * 10 ** c) / 10 ** c;
 
-    const taxas = { ...TAXAS_PADRAO };
-    try {
-        const response = await fetch('https://brasilapi.com.br/api/taxas/v1', { signal: AbortSignal.timeout(3000) });
-        const lista = await response.json();
-        const getTaxa = (nome) => lista.find(t => t.nome.toLowerCase() === nome)?.valor;
+async function buscarSGS(serie, n) {
+    const r = await fetch(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados/ultimos/${n}?formato=json`, { signal: AbortSignal.timeout(4000) });
+    if (!r.ok) throw new Error(`SGS ${serie}: HTTP ${r.status}`);
+    const dados = await r.json();
+    return dados.map((d) => ({ data: d.data, valor: parseFloat(d.valor) })).filter((d) => Number.isFinite(d.valor));
+}
 
-        for (const nome of ['cdi', 'selic', 'ipca']) {
-            const valor = getTaxa(nome);
-            if (valor) taxas[nome] = valor;
-        }
-    } catch (err) {
-        console.warn('⚠️ [RENDIMENTOS] Erro ao buscar taxas da BrasilAPI, usando fallback.', err.message);
+async function taxaSGS({ serie, tipo }) {
+    if (tipo === 'mensal12') {
+        const meses = await buscarSGS(serie, 12);
+        if (meses.length < 12) throw new Error(`SGS ${serie}: poucos meses`);
+        return { valor: arred((meses.reduce((acc, m) => acc * (1 + m.valor / 100), 1) - 1) * 100), referencia: `12 meses até ${meses.at(-1).data.slice(3)}` };
     }
+    // TR e poupança vêm uma linha por dia de aniversário; pega a mais recente
+    const linhas = await buscarSGS(serie, 3);
+    const ultima = linhas.sort((a, b) => b.data.split('/').reverse().join('').localeCompare(a.data.split('/').reverse().join('')))[0];
+    if (!ultima) throw new Error(`SGS ${serie}: vazio`);
+    if (tipo === 'aoAno') return { valor: ultima.valor, referencia: ultima.data };
+    return { valor: arred((Math.pow(1 + ultima.valor / 100, 12) - 1) * 100), referencia: ultima.data };
+}
 
-    cacheTaxas = taxas;
-    cacheTaxasEm = Date.now();
-    return taxas;
+// Cache de 6 horas: essas taxas mudam no máximo uma vez por dia
+let cache = null;
+let cacheEm = 0;
+
+export const buscarTaxasDetalhadas = async () => {
+    if (cache && Date.now() - cacheEm < 6 * 60 * 60 * 1000) return cache;
+
+    const taxas = Object.fromEntries(Object.entries(ESTIMATIVAS).map(([k, v]) => [k, { valor: v, fonte: 'estimativa', referencia: null }]));
+
+    const brasil = fetch('https://brasilapi.com.br/api/taxas/v1', { signal: AbortSignal.timeout(4000) })
+        .then((r) => r.json())
+        .then((lista) => {
+            for (const nome of ['cdi', 'selic', 'ipca']) {
+                const v = lista.find((t) => t.nome.toLowerCase() === nome)?.valor;
+                if (v) taxas[nome] = { valor: v, fonte: 'BrasilAPI', referencia: nome === 'ipca' ? '12 meses' : 'ao ano' };
+            }
+        })
+        .catch((err) => console.warn('⚠️ [TAXAS] BrasilAPI indisponível, usando estimativa:', err.message));
+
+    const bcb = Object.entries(SGS).map(([nome, cfg]) =>
+        taxaSGS(cfg)
+            .then(({ valor, referencia }) => { taxas[nome] = { valor, fonte: 'Banco Central', referencia }; })
+            .catch((err) => console.warn(`⚠️ [TAXAS] ${nome} indisponível, usando estimativa:`, err.message))
+    );
+
+    await Promise.all([brasil, ...bcb]);
+    cache = { taxas, atualizadoEm: new Date().toISOString() };
+    cacheEm = Date.now();
+    return cache;
+};
+
+// Formato antigo (só os números), usado pelo rendimento diário
+export const buscarTaxasAtuais = async () => {
+    const { taxas } = await buscarTaxasDetalhadas();
+    return Object.fromEntries(Object.entries(taxas).map(([k, t]) => [k, t.valor]));
+};
+
+/*
+ * Como cada indexador vira taxa ao ano. "percentual": o usuário informa % do
+ * índice (110% do CDI). "spread": índice + taxa fixa (IPCA + 6%).
+ */
+export const INDEXADORES = {
+    PREFIXADO: { regra: 'prefixado' },
+    CDI: { regra: 'percentual', base: 'cdi' },
+    SELIC: { regra: 'percentual', base: 'selic' },
+    POUPANCA: { regra: 'percentual', base: 'poupanca' },
+    IBOVESPA: { regra: 'percentual', base: 'ibovespa' },
+    IPCA: { regra: 'spread', base: 'ipca' },
+    IGPM: { regra: 'spread', base: 'igpm' },
+    INPC: { regra: 'spread', base: 'inpc' },
+    TR: { regra: 'spread', base: 'tr' },
+    TJLP: { regra: 'spread', base: 'tjlp' },
+    TLP: { regra: 'spread', base: 'tlp' },
+    TBF: { regra: 'spread', base: 'tbf' },
+    PTAX: { regra: 'spread', base: 'ptax' },
+    'IMA-B': { regra: 'spread', base: 'imab' },
+    'IRF-M': { regra: 'spread', base: 'irfm' },
+    IDA: { regra: 'spread', base: 'ida' },
+};
+
+const normalizarIndexador = (i) => {
+    const up = (i || 'PREFIXADO').toUpperCase();
+    return up === 'POUPANÇA' ? 'POUPANCA' : up;
 };
 
 // Calcula a taxa anual efetiva (%) de um investimento com base no indexador
 export const calcularTaxaAnual = (inv, taxasAtuais) => {
-    let taxaAnual = parseFloat(inv.taxa_rendimento); // Ex: 120 (para 120% CDI) ou 10 (para 10% Prefixado)
-    const indexador = (inv.indexador || 'PREFIXADO').toUpperCase();
+    const taxa = parseFloat(inv.taxa_rendimento) || 0; // Ex: 120 (para 120% CDI) ou 10 (para 10% Prefixado)
+    const cfg = INDEXADORES[normalizarIndexador(inv.indexador)] || INDEXADORES.PREFIXADO;
+    if (cfg.regra === 'prefixado') return taxa;
+    const base = taxasAtuais[cfg.base] ?? ESTIMATIVAS[cfg.base] ?? 0;
+    return cfg.regra === 'percentual' ? (taxa / 100) * base : base + taxa;
+};
 
-    if (indexador === 'CDI') {
-        taxaAnual = (taxaAnual / 100) * taxasAtuais.cdi;
-    } else if (indexador === 'SELIC') {
-        taxaAnual = (taxaAnual / 100) * taxasAtuais.selic;
-    } else if (indexador === 'IPCA') {
-        taxaAnual = taxasAtuais.ipca + taxaAnual;
-    } else if (indexador === 'IGPM') {
-        taxaAnual = taxasAtuais.igpm + taxaAnual;
-    } else if (indexador === 'INPC') {
-        taxaAnual = taxasAtuais.inpc + taxaAnual;
-    } else if (indexador === 'IBOVESPA') {
-        taxaAnual = (taxaAnual / 100) * taxasAtuais.ibovespa;
-    } else if (indexador === 'TR') {
-        taxaAnual = taxasAtuais.tr + taxaAnual;
-    } else if (['TLP', 'TJLP', 'TBF'].includes(indexador)) {
-        taxaAnual = 6.0 + taxaAnual; // Fallback generico
-    } else if (['PTAX', 'IMA-B', 'IRF-M', 'IDA'].includes(indexador)) {
-        taxaAnual = 5.0 + taxaAnual; // Fallback generico
-    } else if (indexador === 'POUPANCA' || indexador === 'POUPANÇA') {
-        // Regra da Poupança: se Selic > 8.5%, rende 6.17% (0.5% a.m.) + TR. Senão, 70% da Selic + TR
-        const rendimentoBase = taxasAtuais.selic > 8.5 ? 6.17 : (taxasAtuais.selic * 0.70);
-        taxaAnual = (taxaAnual / 100) * (rendimentoBase + taxasAtuais.tr);
-    }
-    // PREFIXADO mantem a taxa inserida
-
-    return taxaAnual;
+// Simulação para a tela: taxa efetiva, de onde veio a base e quanto rende
+export const simularInvestimento = async ({ indexador, taxa, valor = 1000 }) => {
+    const { taxas, atualizadoEm } = await buscarTaxasDetalhadas();
+    const nome = normalizarIndexador(indexador);
+    const cfg = INDEXADORES[nome] || INDEXADORES.PREFIXADO;
+    const base = cfg.base ? taxas[cfg.base] : null;
+    const numeros = Object.fromEntries(Object.entries(taxas).map(([k, t]) => [k, t.valor]));
+    const taxaAnual = calcularTaxaAnual({ taxa_rendimento: taxa, indexador: nome }, numeros);
+    // Mesma conta do crédito diário: taxa anual / 365, aplicada ao saldo
+    const porDia = (valor * taxaAnual) / 100 / 365;
+    return {
+        indexador: nome,
+        regra: cfg.regra,
+        base: base ? { nome: cfg.base, ...base } : null,
+        taxaAnual: arred(taxaAnual),
+        exemplo: { valor, porDia: arred(porDia, 4), porMes: arred(porDia * 30), porAno: arred(porDia * 365) },
+        atualizadoEm,
+    };
 };
 
 // 'YYYY-MM-DD' + n dias (aritmetica de calendario pura, sem fuso)

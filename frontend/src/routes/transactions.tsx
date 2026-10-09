@@ -3,7 +3,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog } from '@base-ui/react/dialog';
 import { AnimatePresence, motion } from 'motion/react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { txSchema, type TxForm } from '../lib/schemas/transaction';
 import { Plus, Search, X, Loader2 } from '../components/icons';
@@ -61,7 +61,7 @@ const fieldCls =
 
 function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose: () => void; onSaved: () => void }) {
   const qc = useQueryClient();
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue } = useForm<TxForm>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, control, getValues, setValue } = useForm<TxForm>({
     resolver: zodResolver(txSchema),
     defaultValues: tx
       ? {
@@ -75,23 +75,23 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
       : { tipo: 'despesa', data: hojeISO() },
   });
 
-  const tipo = watch('tipo');
-  const id_categoria = watch('id_categoria');
+  // useWatch (e não watch) para o React Compiler conseguir memorizar o componente
+  const tipo = useWatch({ control, name: 'tipo' });
+  const id_categoria = useWatch({ control, name: 'id_categoria' });
 
   const { data: cats } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.list });
   const { data: subcats } = useQuery({
     queryKey: ['subcategorias', id_categoria],
     queryFn: () => subcategoriasApi.list(id_categoria),
     enabled: !!id_categoria,
-  } as any);
+  });
 
   // Seleciona a primeira subcategoria quando a categoria muda (mantém a da edição)
   useEffect(() => {
-    const list = subcats as Array<{ id: string }> | undefined;
-    if (!list?.length) return;
-    if (tx?.id_subcategoria && list.some((s) => s.id === tx.id_subcategoria) && watch('id_subcategoria')) return;
-    setValue('id_subcategoria', list[0].id);
-  }, [subcats]);
+    if (!subcats?.length) return;
+    if (tx?.id_subcategoria && subcats.some((s) => s.id === tx.id_subcategoria) && getValues('id_subcategoria')) return;
+    setValue('id_subcategoria', subcats[0].id);
+  }, [subcats, tx?.id_subcategoria, getValues, setValue]);
 
   const filteredCats = cats?.filter((c) => c.tipo === tipo) ?? [];
 
@@ -196,7 +196,7 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
               <label htmlFor="tx-sub" className="text-sm font-medium text-[var(--color-ink-soft)]">Subcategoria</label>
               <select id="tx-sub" {...register('id_subcategoria')} disabled={!id_categoria} className={cn(fieldCls, 'disabled:opacity-50')}>
                 <option value="">Nenhuma</option>
-                {(subcats as any[] | undefined)?.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                {subcats?.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
               </select>
             </div>
           </div>
@@ -335,7 +335,7 @@ function TransactionsContent() {
     queryKey: ['transactions', 'all'],
     queryFn: () => transactionsApi.list({ limit: '100000' }),
   });
-  const all = data?.data ?? [];
+  const all = useMemo(() => data?.data ?? [], [data]);
 
   // Destaca a linha que apareceu depois de salvar uma transação nova
   useEffect(() => {
@@ -352,7 +352,7 @@ function TransactionsContent() {
       }
     }
     knownIds.current = ids;
-  }, [data]);
+  }, [data, all]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { formatCurrency, cn } from '../lib/utils';
-import { DetailHeader, Headline, Strong, MetricStrip, EmptyDetail, detailSkeleton, nomeMes } from '../components/detail';
+import { DetailHeader, Headline, Strong, MetricStrip, EmptyDetail, DetailSkeleton } from '../components/detail';
+import { nomeMes } from '../lib/datas';
 
 export const Route = createFileRoute('/entradas-saidas')({
   beforeLoad: () => {
@@ -119,7 +120,7 @@ function FluxoContent() {
 
   const [ativo, setAtivo] = useState<number | null>(null);
 
-  if (isLoading) return detailSkeleton;
+  if (isLoading) return <DetailSkeleton />;
   if (!meses.length) return <EmptyDetail text="Ainda não há meses com movimentações." />;
 
   const entrou = meses.reduce((s, m) => s + m.entradas, 0);

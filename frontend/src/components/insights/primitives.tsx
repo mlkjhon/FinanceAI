@@ -1,20 +1,6 @@
-import { useEffect, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
-import { formatCurrency, cn } from '../../lib/utils';
+import { cn } from '../../lib/utils';
 import type { EstadoIA } from '../../lib/insights/types';
-
-export function fmt(valor: number, formato: 'moeda' | 'pct' | 'numero' | 'texto' = 'moeda') {
-  if (formato === 'pct') return `${valor.toLocaleString('pt-BR', { maximumFractionDigits: Math.abs(valor) < 10 ? 1 : 0 })}%`;
-  if (formato === 'numero') return Math.round(valor).toLocaleString('pt-BR');
-  if (formato === 'texto') return String(valor);
-  return formatCurrency(valor);
-}
-
-// "2026-10-01" -> "1 out"
-export function diaCurto(iso: string) {
-  const d = new Date(`${iso}T12:00:00`);
-  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '').replace(' de ', ' ');
-}
 
 /*
  * Texto da IA aparecendo palavra a palavra. O texto inteiro já ocupa o espaço
@@ -65,14 +51,3 @@ export function AiStatus({ estado }: { estado: EstadoIA }) {
   );
 }
 
-// Contagem regressiva visual simples para "há X s" na barra de comando
-export function useAutoHide(valor: unknown, ms: number) {
-  const [visivel, setVisivel] = useState(false);
-  useEffect(() => {
-    if (!valor) return;
-    setVisivel(true);
-    const t = setTimeout(() => setVisivel(false), ms);
-    return () => clearTimeout(t);
-  }, [valor, ms]);
-  return visivel;
-}

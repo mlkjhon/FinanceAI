@@ -7,6 +7,33 @@ export class ApiError extends Error {
   }
 }
 
+// Formato cru que a API devolve (números do Postgres às vezes vêm como texto)
+type Num = number | string;
+interface TransacaoApi {
+  id_transacao: number;
+  descricao: string;
+  valor: Num;
+  tipo: string;
+  id_categoria?: number | null;
+  id_subcategoria?: number | null;
+  categoria_nome?: string | null;
+  data_registro?: string;
+  data_pagamento?: string;
+  created_at?: string;
+}
+interface CategoriaApi { id_categoria: number; nome: string; tipo: string }
+interface SubcategoriaApi { id_subcategoria: number; id_categoria: number; nome: string }
+interface OrcamentoApi { id_orcamento: number; id_categoria: number; categoria_nome: string; valor_limite: Num; valor_gasto?: Num | null; mes: number; ano: number }
+interface MetaApi { id_meta: number; titulo: string; valor_meta: Num; valor_atual?: Num | null; data_objetivo?: string; descricao?: string }
+interface DashboardApi {
+  saldoTotal?: Num;
+  resumoMes?: { entradas?: Num; saidas?: Num };
+  evolucaoMensal?: { mes: string; saldo: Num; entradas?: Num; saidas?: Num }[];
+  resumoCategorias?: { nome: string; total: Num }[];
+  ultimasTransacoes?: { descricao: string; valor: Num; tipo: string; categoria_nome?: string; data_registro: string }[];
+}
+type RespostaSimples = Record<string, unknown>;
+
 export function getUserData(): User | null {
   const data = localStorage.getItem('finance_user') || sessionStorage.getItem('finance_user');
   return data ? JSON.parse(data) : null;
@@ -57,7 +84,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 204 || res.status === 201) {
     const text = await res.text();
-    try { return JSON.parse(text); } catch { return text as any; }
+    try { return JSON.parse(text); } catch { return text as unknown as T; }
   }
   
   return res.json();
@@ -80,7 +107,7 @@ export const authApi = {
 // Transactions
 export const transactionsApi = {
   list: async (params?: TransactionFilters) => {
-    const data = await request<any[]>('/transacoes');
+    const data = await request<TransacaoApi[]>('/transacoes');
     let filtered = data.map(d => ({
       id: String(d.id_transacao),
       descricao: d.descricao,
@@ -116,7 +143,7 @@ export const transactionsApi = {
   },
   create: async (data: CreateTransaction) => {
     const user = getUserData();
-    return request<any>('/transacoes', {
+    return request<RespostaSimples>('/transacoes', {
       method: 'POST',
       body: JSON.stringify({
         id_usuario: user?.id,
@@ -132,7 +159,7 @@ export const transactionsApi = {
     });
   },
   update: async (id: string, data: Partial<CreateTransaction>) => {
-    return request<any>(`/transacoes/${id}`, {
+    return request<RespostaSimples>(`/transacoes/${id}`, {
       method: 'PUT',
       body: JSON.stringify({
         descricao: data.descricao,
@@ -153,7 +180,7 @@ export const transactionsApi = {
 // Categories
 export const categoriesApi = {
   list: async () => {
-    const res = await request<any[]>('/categorias');
+    const res = await request<CategoriaApi[]>('/categorias');
     return res.map(c => ({
       id: String(c.id_categoria),
       nome: c.nome,
@@ -161,7 +188,7 @@ export const categoriesApi = {
     }));
   },
   create: (data: CreateCategory) =>
-    request<any>('/categorias', { method: 'POST', body: JSON.stringify(data) }),
+    request<RespostaSimples>('/categorias', { method: 'POST', body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/categorias/${id}`, { method: 'DELETE' }),
 };
@@ -170,7 +197,7 @@ export const categoriesApi = {
 export const subcategoriasApi = {
   list: async (id_categoria?: string) => {
     const qs = id_categoria ? `?id_categoria=${id_categoria}` : '';
-    const res = await request<any[]>(`/subcategorias${qs}`);
+    const res = await request<SubcategoriaApi[]>(`/subcategorias${qs}`);
     return res.map(s => ({
       id: String(s.id_subcategoria),
       id_categoria: String(s.id_categoria),
@@ -183,7 +210,7 @@ export const subcategoriasApi = {
 export const budgetsApi = {
   list: async () => {
     const user = getUserData();
-    const data = await request<any[]>(`/orcamentos?id_usuario=${user?.id}`);
+    const data = await request<OrcamentoApi[]>(`/orcamentos?id_usuario=${user?.id}`);
     return data.map(d => ({
       id: String(d.id_orcamento),
       categoria_id: String(d.id_categoria),
@@ -196,7 +223,7 @@ export const budgetsApi = {
   },
   create: async (data: CreateBudget) => {
     const user = getUserData();
-    return request<any>('/orcamentos', {
+    return request<RespostaSimples>('/orcamentos', {
       method: 'POST',
       body: JSON.stringify({
         id_usuario: user?.id,
@@ -215,7 +242,7 @@ export const budgetsApi = {
 export const goalsApi = {
   list: async () => {
     const user = getUserData();
-    const data = await request<any[]>(`/metas?id_usuario=${user?.id}`);
+    const data = await request<MetaApi[]>(`/metas?id_usuario=${user?.id}`);
     return data.map(d => ({
       id: String(d.id_meta),
       nome: d.titulo,
@@ -227,7 +254,7 @@ export const goalsApi = {
   },
   create: async (data: CreateGoal) => {
     const user = getUserData();
-    return request<any>('/metas', {
+    return request<RespostaSimples>('/metas', {
       method: 'POST',
       body: JSON.stringify({
         id_usuario: user?.id,
@@ -244,7 +271,7 @@ export const goalsApi = {
   // Deposita dinheiro na meta E desconta automaticamente do saldo geral
   adicionarDinheiro: async (id: string, valor: number) => {
     const user = getUserData();
-    return request<any>(`/metas/${id}/adicionar`, {
+    return request<RespostaSimples>(`/metas/${id}/adicionar`, {
       method: 'PATCH',
       body: JSON.stringify({ id_usuario: user?.id, valor }),
     });
@@ -259,7 +286,7 @@ export const dashboardApi = {
     if (id_conexao && id_conexao !== 'all') {
       url += `&id_conexao=${id_conexao}`;
     }
-    const data = await request<any>(url);
+    const data = await request<DashboardApi>(url);
     const receitas = typeof data.resumoMes?.entradas === 'string' ? parseFloat(data.resumoMes?.entradas) : (data.resumoMes?.entradas || 0);
     const despesas = typeof data.resumoMes?.saidas === 'string' ? parseFloat(data.resumoMes?.saidas) : (data.resumoMes?.saidas || 0);
     const saldoTotal = typeof data.saldoTotal === 'string' ? parseFloat(data.saldoTotal) : (data.saldoTotal || 0);
@@ -268,17 +295,17 @@ export const dashboardApi = {
       receitas_mes: receitas,
       despesas_mes: despesas,
       economia_mes: Math.max(receitas - despesas, 0),
-      evolucao_saldo: data.evolucaoMensal?.map((e: any) => ({
+      evolucao_saldo: data.evolucaoMensal?.map((e) => ({
         mes: e.mes,
         saldo: typeof e.saldo === 'string' ? parseFloat(e.saldo) : e.saldo,
         entradas: typeof e.entradas === 'string' ? parseFloat(e.entradas) : (e.entradas || 0),
         saidas: typeof e.saidas === 'string' ? parseFloat(e.saidas) : (e.saidas || 0),
       })) || [],
-      gastos_por_categoria: data.resumoCategorias?.map((c: any) => ({
+      gastos_por_categoria: data.resumoCategorias?.map((c) => ({
         categoria: c.nome,
         valor: typeof c.total === 'string' ? parseFloat(c.total) : c.total
       })) || [],
-      ultimas_transacoes: data.ultimasTransacoes?.map((d: any) => ({
+      ultimas_transacoes: data.ultimasTransacoes?.map((d) => ({
         id: Math.random().toString(),
         descricao: d.descricao,
         valor: typeof d.valor === 'string' ? parseFloat(d.valor) : d.valor,
@@ -420,6 +447,15 @@ export interface PaginatedResponse<T> {
 }
 
 // Investimentos
+export interface SimulacaoInvestimento {
+  indexador: string;
+  regra: 'prefixado' | 'percentual' | 'spread';
+  base: { nome: string; valor: number; fonte: string; referencia: string | null } | null;
+  taxaAnual: number;
+  exemplo: { valor: number; porDia: number; porMes: number; porAno: number };
+  atualizadoEm: string;
+}
+
 export interface Investment {
   id_investimento: number;
   id_usuario: number;
@@ -456,6 +492,9 @@ export interface CreateInvestmentTransaction {
 
 export const investimentosApi = {
   list: () => request<Investment[]>('/investimentos'),
+  // Taxa atual do indexador (BrasilAPI / Banco Central) e quanto rende, com a conta do crédito diário
+  simular: (indexador: string, taxa: number, valor = 1000) =>
+    request<SimulacaoInvestimento>(`/investimentos/simular?indexador=${encodeURIComponent(indexador)}&taxa=${taxa}&valor=${valor}`),
   get: (id: string | number) => request<Investment>(`/investimentos/${id}`),
   create: (data: CreateInvestment) =>
     request<{ message: string; investimento: Investment }>('/investimentos', {

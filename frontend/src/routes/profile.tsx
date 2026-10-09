@@ -4,12 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'motion/react';
 import { Collapse } from '../components/collapse';
 import { HoldToDelete } from '../components/hold-to-delete';
-import { User, Mail, LogOut, Loader2 } from '../components/icons';
-import { authApi, categoriesApi, type CreateCategory } from '../lib/api';
+import { Mail, LogOut, Loader2 } from '../components/icons';
+import { categoriesApi, type CreateCategory } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { FinanceCard, SkeletonCard, Badge } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from '@tanstack/react-router';
+import { Segmented } from '../components/segmented';
+import { salvarPreferencia, usePreferenciaTema } from '../lib/theme';
 
 export const Route = createFileRoute('/profile')({
   beforeLoad: () => {
@@ -36,6 +38,8 @@ function ProfileContent() {
     mutationFn: categoriesApi.delete,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
   });
+
+  const preferencia = usePreferenciaTema();
 
   const handleLogout = () => {
     logout();
@@ -68,6 +72,32 @@ function ProfileContent() {
             <LogOut size={16} />
             Sair
           </button>
+        </div>
+      </FinanceCard>
+
+      {/* Aparência */}
+      <FinanceCard>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="font-brand font-semibold text-[var(--color-ink)]">Aparência</h2>
+            <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">“Sistema” acompanha o tema do seu computador ou celular.</p>
+          </div>
+          <Segmented
+            id="tema"
+            label="Tema"
+            value={preferencia}
+            onChange={(p) => {
+              // transição curta de cor só durante a troca
+              document.documentElement.classList.add('trocando-tema');
+              salvarPreferencia(p);
+              setTimeout(() => document.documentElement.classList.remove('trocando-tema'), 300);
+            }}
+            options={[
+              { value: 'sistema', label: 'Sistema' },
+              { value: 'claro', label: 'Claro' },
+              { value: 'escuro', label: 'Escuro' },
+            ]}
+          />
         </div>
       </FinanceCard>
 

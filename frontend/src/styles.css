@@ -867,3 +867,72 @@
   .menu-pop { transition-duration: 0ms; }
   .story-fill { animation: none; transform: scaleX(1); }
 }
+
+/* ---------- Tema escuro ----------
+ * Ativado por <html data-theme="dark"> (preferência do usuário ou do sistema).
+ * Os tokens do app ganham versões escuras e a escala de cinzas do Tailwind é
+ * invertida, então as telas antigas (text-gray-*, bg-gray-*) acompanham sem
+ * reescrever. O verde da marca segue como fundo de botão (texto branco passa
+ * contraste); como TEXTO ele clareia para manter a leitura no fundo escuro.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #121a16;
+  --color-surface: #0b110e;
+  --color-ink: #e8eee9;
+  --color-ink-soft: #b9c4be;
+  --color-ink-muted: #8b9790;
+  --color-line: #26322c;
+  --color-finance-bg-light: #121a16;
+  --color-accent-texto: #34d399;
+
+  --color-gray-50: #161f1a;
+  --color-gray-100: #1b2520;
+  --color-gray-200: #26322c;
+  --color-gray-300: #36433c;
+  --color-gray-400: #6e7b74;
+  --color-gray-500: #8b9790;
+  --color-gray-600: #aeb9b3;
+  --color-gray-700: #cbd3ce;
+  --color-gray-800: #e0e6e2;
+  --color-gray-900: #eef2ef;
+
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 10px 24px -6px rgb(0 0 0 / 0.5);
+  --shadow-xl: 0 20px 40px -10px rgb(0 0 0 / 0.55);
+}
+
+:root[data-theme="dark"] .bg-white { background-color: var(--color-bg); }
+:root[data-theme="dark"] .bg-white\/95 { background-color: color-mix(in oklab, var(--color-bg) 95%, transparent); }
+:root[data-theme="dark"] .bg-white\/90 { background-color: color-mix(in oklab, var(--color-bg) 90%, transparent); }
+
+/* Verde e vermelho como texto: versões claras para o fundo escuro */
+:root[data-theme="dark"] .text-gain,
+:root[data-theme="dark"] .text-\[var\(--color-accent\)\] { color: var(--color-accent-texto); }
+:root[data-theme="dark"] .text-loss { color: #f87171; }
+:root[data-theme="dark"] .text-amber-800 { color: #fbbf24; }
+
+/* Blocos "invertidos" (tinta como fundo): no escuro a tinta é clara, o texto vira escuro */
+:root[data-theme="dark"] .bg-\[var\(--color-ink\)\] { color: var(--color-bg); }
+
+/* Campos de formulário */
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea { color: var(--color-ink); }
+:root[data-theme="dark"] option { background-color: var(--color-bg); color: var(--color-ink); }
+
+/* Gráficos do recharts: grade e eixos recessivos no escuro */
+:root[data-theme="dark"] .recharts-cartesian-grid line { stroke: var(--color-line); }
+:root[data-theme="dark"] .recharts-cartesian-axis-tick-value { fill: var(--color-ink-muted); }
+:root[data-theme="dark"] .recharts-tooltip-cursor { fill: color-mix(in oklab, var(--color-ink) 6%, transparent); }
+
+/* Troca de tema suave (cor de fundo e texto), sem animar layout */
+@media (prefers-reduced-motion: no-preference) {
+  :root.trocando-tema body,
+  :root.trocando-tema .finance-card,
+  :root.trocando-tema nav {
+    transition: background-color 250ms ease, color 250ms ease, border-color 250ms ease;
+  }
+}
+/* Logo: "Finance" em verde-escuro some no fundo escuro */
+:root[data-theme="dark"] .text-\[var\(--color-finance-primary-hover\)\] { color: #34d399; }

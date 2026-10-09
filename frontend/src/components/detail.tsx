@@ -1,4 +1,5 @@
 import React from 'react';
+import type { TooltipProps } from '../lib/chart';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft } from './icons';
 import { AnimatedCounter } from './ui';
@@ -9,14 +10,6 @@ import { cn, formatCurrency } from '../lib/utils';
  * (evolução do saldo, categorias, entradas e saídas).
  */
 
-// "10/2026" -> "out 2026" (ou "outubro" com long)
-export function nomeMes(mmYYYY: string, estilo: 'short' | 'long' = 'short') {
-  const [m, y] = (mmYYYY || '').split('/');
-  if (!m || !y) return mmYYYY;
-  const d = new Date(Number(y), Number(m) - 1, 15);
-  const mes = d.toLocaleDateString('pt-BR', { month: estilo }).replace('.', '');
-  return estilo === 'long' ? mes : `${mes} ${y}`;
-}
 
 export function DetailHeader({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
@@ -73,16 +66,16 @@ export function MetricStrip({ items }: {
 }
 
 // Tooltip dos gráficos recharts
-export function ChartTooltip({ active, payload, label, names }: any) {
+export function ChartTooltip({ active, payload, label, names }: TooltipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white border border-[var(--color-line)] rounded-[10px] px-3 py-2.5 shadow-md min-w-[160px]">
       <p className="text-xs text-[var(--color-ink-muted)] mb-1.5">{label}</p>
-      {payload.map((p: any) => (
+      {payload.map((p) => (
         <div key={p.dataKey} className="flex items-center gap-2 text-sm py-0.5">
           <span className="w-2 h-2 rounded-[3px]" style={{ backgroundColor: p.color }} />
-          <span className="text-[var(--color-ink-soft)]">{names?.[p.dataKey] ?? p.name}</span>
-          <span className="font-semibold text-[var(--color-ink)] ml-auto pl-3" data-num>{formatCurrency(Math.abs(p.value))}</span>
+          <span className="text-[var(--color-ink-soft)]">{names?.[String(p.dataKey)] ?? p.name}</span>
+          <span className="font-semibold text-[var(--color-ink)] ml-auto pl-3" data-num>{formatCurrency(Math.abs(Number(p.value) || 0))}</span>
         </div>
       ))}
     </div>
@@ -98,10 +91,12 @@ export function EmptyDetail({ text }: { text: string }) {
   );
 }
 
-export const detailSkeleton = (
+export function DetailSkeleton() {
+  return (
   <div className="space-y-6" role="status" aria-label="Carregando">
     <span className="media-frame block h-8 w-2/3 rounded-lg" data-loading="" />
     <span className="media-frame block h-16 w-full rounded-lg" data-loading="" />
     <span className="media-frame block h-64 w-full rounded-[var(--radius-card)]" data-loading="" />
   </div>
-);
+  );
+}

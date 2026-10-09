@@ -40,6 +40,18 @@
       <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@400,401,500,600&display=swap" />
       <style>[data-reveal]{opacity:1!important;transform:none!important;clip-path:none!important}</style>
     </noscript>
+    <!-- Tema antes da primeira pintura (sem piscar branco no modo escuro). A landing é sempre clara. -->
+    <script>
+      (function () {
+        try {
+          var p = localStorage.getItem("financeai:tema");
+          var escuro = p === "escuro" || (p !== "claro" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var t = location.pathname === "/" || !escuro ? "light" : "dark";
+          document.documentElement.dataset.theme = t;
+          document.documentElement.style.colorScheme = t;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

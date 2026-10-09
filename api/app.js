@@ -5,7 +5,6 @@ import express from 'express';
 import rotasUsuarios from "./src/routes/rotasUsuarios.js";
 import rotasTransacoes from "./src/routes/rotasTransacoes.js";
 import rotasDashboard from "./src/routes/rotasDashboard.js";
-import rotasChat from "./src/routes/rotasChat.js";
 import rotasCategorias from "./src/routes/rotasCategorias.js";
 import rotasSubcategorias from "./src/routes/rotasSubcategorias.js";
 import rotasMetas from "./src/routes/rotasMetas.js";
@@ -57,7 +56,6 @@ app.get('/test-gemini', async (req, res) => {
 app.use(rotasUsuarios);
 app.use(rotasTransacoes);
 app.use(rotasDashboard);
-app.use(rotasChat);
 app.use(rotasCategorias);
 app.use(rotasSubcategorias);
 app.use(rotasMetas);

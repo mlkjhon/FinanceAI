@@ -6,7 +6,7 @@ import { transactionsApi, type Transaction } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { Segmented } from '../components/segmented';
 import { formatCurrency, formatDate, cn } from '../lib/utils';
-import { DetailHeader, Headline, Strong, MetricStrip, EmptyDetail, detailSkeleton } from '../components/detail';
+import { DetailHeader, Headline, Strong, MetricStrip, EmptyDetail, DetailSkeleton } from '../components/detail';
 
 export const Route = createFileRoute('/categorias')({
   beforeLoad: () => {
@@ -130,7 +130,7 @@ function CategoriasContent() {
     return { grupos, total, maior };
   }, [data, periodo]);
 
-  if (isLoading) return detailSkeleton;
+  if (isLoading) return <DetailSkeleton />;
 
   const top = grupos[0];
   const pctTop = top && total > 0 ? Math.round((top.total / total) * 100) : 0;

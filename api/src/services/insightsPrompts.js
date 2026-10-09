@@ -46,7 +46,7 @@ ${JSON.stringify(snapshot)}
 
 O QUE FAZER:
 - Crie de 6 a 10 blocos variados. O primeiro é OBRIGATORIAMENTE um "story" (size "full", priority 10) com o resumo do período.
-- Depois, ordene por relevância para este usuário (priority alta = topo): o que mudou, o que preocupa, onde dá para economizar.
+- Escreva os blocos JÁ NA ORDEM em que devem aparecer (eles vão para a tela conforme você escreve): depois do story, o mais relevante para este usuário primeiro (o que mudou, o que preocupa, onde dá para economizar).
 - Use tipos variados (gráficos, tabela, dicas, anomalias, projeção, metas, desafio). Só crie um bloco se os dados acima sustentarem.
   Ex.: sem anomalias na lista -> não crie anomaly; sem metas -> não crie goal de meta existente; projecaoFimMes null -> sem forecast.
 - Dicas e desafios precisam ser específicos (citar categoria ou estabelecimento real dos dados) e acionáveis.

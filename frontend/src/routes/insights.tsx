@@ -8,7 +8,7 @@ import { Icon } from '../components/icons';
 import { BlocoFrame, BlocoSkeleton } from '../components/insights/frame';
 import { CommandBar } from '../components/insights/command-bar';
 import { AiStatus } from '../components/insights/primitives';
-import { analisar, executarComando, lerFixados, salvarFixados } from '../lib/insights/client';
+import { analisar, buscarFixadosServidor, executarComando, lerFixados, salvarFixados, salvarFixadosServidor } from '../lib/insights/client';
 import type { Bloco, EstadoIA, Operacao, Periodo } from '../lib/insights/types';
 
 export const Route = createFileRoute('/insights')({
@@ -44,7 +44,29 @@ function InsightsPage() {
 
   const periodo: Periodo = chave === 'custom' ? custom : chave;
 
+  const [fixadosProntos, setFixadosProntos] = useState(false);
+
+  // Fixados do servidor chegam antes da primeira análise (com limite de 2,5s)
+  useEffect(() => {
+    let vivo = true;
+    const limite = setTimeout(() => vivo && setFixadosProntos(true), 2500);
+    buscarFixadosServidor().then((doServidor) => {
+      if (!vivo) return;
+      if (doServidor && doServidor.length) setBlocos(comStoryNoTopo(doServidor));
+      clearTimeout(limite);
+      setFixadosProntos(true);
+    });
+    return () => { vivo = false; clearTimeout(limite); };
+  }, []);
+
+  // Salva local na hora e no servidor quando o conjunto de fixados muda
+  const assinaturaFixados = blocos.filter((b) => b.fixado).map((b) => b.id + JSON.stringify(b.pedido)).join('|');
   useEffect(() => salvarFixados(blocos), [blocos]);
+  useEffect(() => {
+    if (!fixadosProntos) return;
+    const t = setTimeout(() => salvarFixadosServidor(blocosRef.current), 800);
+    return () => clearTimeout(t);
+  }, [assinaturaFixados, fixadosProntos]);
 
   /*
    * Os blocos que chegam vão para uma fila e entram um a cada 110ms. Assim a
@@ -99,10 +121,11 @@ function InsightsPage() {
 
   // A página se monta sozinha ao abrir e quando o período muda
   useEffect(() => {
+    if (!fixadosProntos) return;
     gerar(periodo);
     return () => abort.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chave, chave === 'custom' ? `${custom.inicio}|${custom.fim}` : '']);
+  }, [fixadosProntos, chave, chave === 'custom' ? `${custom.inicio}|${custom.fim}` : '']);
 
   const marcarNovos = (ids: string[]) => {
     if (!ids.length) return;

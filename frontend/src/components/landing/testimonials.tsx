@@ -44,10 +44,15 @@ export function Testimonials() {
     return () => ro.disconnect();
   }, []);
 
-  // Ao redimensionar, reposiciona sem animar.
+  // Ao redimensionar, reposiciona sem animar (o índice vem de uma ref para a
+  // troca de slide não disparar este efeito e cortar a animação do carrossel)
+  const indexRef = useRef(index);
   useEffect(() => {
-    x.set(-index * width);
-  }, [width]);
+    indexRef.current = index;
+  }, [index]);
+  useEffect(() => {
+    x.set(-indexRef.current * width);
+  }, [width, x]);
 
   const goTo = (next: number, velocity = 0, instant = false) => {
     const clamped = Math.max(0, Math.min(n - 1, next));

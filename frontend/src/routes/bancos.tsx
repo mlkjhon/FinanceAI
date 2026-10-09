@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { modal } from '../lib/motion-tokens';
-import { Plus, CreditCard, Building2, MoreHorizontal, Wallet, ShieldCheck, Trash2 } from '../components/icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, CreditCard, Building2, Wallet, ShieldCheck, Trash2 } from '../components/icons';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '../components/Navbar';
 import { FinanceCard, SkeletonCard } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,10 +22,15 @@ function formatCurrency(val: number | string | null) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val));
 }
 
+// Item que o widget da Pluggy devolve ao conectar
+interface ConexaoPendente { item?: { id?: string; connector?: { name?: string } } }
+interface Conexao { id: string; instituicao: string; data_criacao: string }
+interface Conta { id: string; id_conexao: string; nome: string; tipo: string; saldo: number | string; limite?: number | string | null; ultimos_digitos?: string | null }
+
 function BancosPage() {
   const { user } = useAuth();
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
-  const [pendingConnection, setPendingConnection] = useState<any>(null);
+  const [pendingConnection, setPendingConnection] = useState<ConexaoPendente | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; nome: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -37,15 +42,15 @@ function BancosPage() {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
       const res = await fetch(`${API_URL}/conexoes/${user?.id}`);
       if (!res.ok) throw new Error('Erro ao buscar dados');
-      return res.json() as Promise<{ conexoes: any[]; contas: any[] }>;
+      return res.json() as Promise<{ conexoes: Conexao[]; contas: Conta[] }>;
     },
     enabled: !!user?.id,
   });
 
-  const handleWidgetEvent = async (event: string, eventData?: any) => {
+  const handleWidgetEvent = async (event: string, eventData?: unknown) => {
     if (event === 'SUCCESS') {
       // Guarda os dados pendentes para o modal de confirmação em vez de salvar direto
-      setPendingConnection(eventData);
+      setPendingConnection((eventData ?? {}) as ConexaoPendente);
     }
   };
 
@@ -170,10 +175,10 @@ function BancosPage() {
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-bold text-gray-900">
-                                {conta.tipo === 'CREDITO' ? formatCurrency(Math.abs(conta.saldo)) : formatCurrency(conta.saldo)}
+                                {conta.tipo === 'CREDITO' ? formatCurrency(Math.abs(Number(conta.saldo))) : formatCurrency(Number(conta.saldo))}
                               </p>
                               {conta.tipo === 'CREDITO' && (
-                                <p className="text-[10px] text-gray-400">Limite: {formatCurrency(conta.limite)}</p>
+                                <p className="text-[10px] text-gray-400">Limite: {formatCurrency(Number(conta.limite ?? 0))}</p>
                               )}
                             </div>
                           </div>

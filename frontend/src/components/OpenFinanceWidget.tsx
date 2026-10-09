@@ -3,7 +3,7 @@ import { PluggyConnect } from 'react-pluggy-connect';
 import { Loader2, X, FlaskConical, Copy, Check } from './icons';
 
 interface OpenFinanceWidgetProps {
-  onEvent: (event: string, data?: any) => void;
+  onEvent: (event: string, data?: unknown) => void;
   onClose: () => void;
 }
 
@@ -37,8 +37,8 @@ export function OpenFinanceWidget({ onEvent, onClose }: OpenFinanceWidgetProps) 
         const body = await res.json();
         if (!res.ok || !body.connectToken) throw new Error(body.error || 'Erro ao gerar token');
         setConnectToken(body.connectToken);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro ao gerar token');
       }
     }
     fetchToken();

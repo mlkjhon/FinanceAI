@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { createRootRouteWithContext, Outlet, useRouterState } from '@tanstack/react-router';
 import { QueryClient } from '@tanstack/react-query';
 import { AuthProvider } from '../contexts/AuthContext';
+import { forcarTemaClaro } from '../lib/theme';
 
 // O splash só existe nas telas do app; a landing não baixa esse código.
 const SplashOverlay = lazy(() => import('../components/SplashScreen').then((m) => ({ default: m.SplashOverlay })));
@@ -29,6 +30,8 @@ function RootLayout() {
   // A landing não espera o splash de 3s nem o fade do container:
   // a headline e a imagem do hero precisam pintar logo (LCP < 2,5s).
   const isLanding = pathname === '/';
+  // A landing é sempre clara; o resto do app segue a preferência do usuário
+  React.useLayoutEffect(() => forcarTemaClaro(isLanding), [isLanding]);
   const [splash, setSplash] = React.useState(() => !isLanding && !sessionStorage.getItem('splashShown'));
 
   React.useEffect(() => {
@@ -49,7 +52,7 @@ function RootLayout() {
         </Suspense>
       )}
       {!splash && (
-        <div className={isLanding ? 'min-h-[100dvh] bg-white text-gray-900' : 'route-fade min-h-[100dvh] bg-white text-gray-900'}>
+        <div className={isLanding ? 'min-h-[100dvh] bg-white text-gray-900' : 'route-fade min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)]'}>
           <Suspense fallback={<RouteFallback />}>
             <Outlet />
           </Suspense>

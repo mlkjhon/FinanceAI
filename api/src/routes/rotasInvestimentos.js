@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
 import { autenticar } from "../middlewares/autenticar.js";
-import { processarRendimentosPendentes } from "../services/rendimentos.js";
+import { processarRendimentosPendentes, simularInvestimento } from "../services/rendimentos.js";
 
 const router = Router();
 
@@ -21,6 +21,27 @@ const emTransacao = async (fn) => {
         cliente.release();
     }
 };
+
+/*
+ * Taxa atual do indexador e quanto o investimento rende, com a mesma conta do
+ * crédito diário. Usado no formulário (ao escolher o indexador) e no detalhe.
+ * GET /investimentos/simular?indexador=CDI&taxa=110&valor=1000
+ */
+router.get('/investimentos/simular', autenticar, async (req, res) => {
+    try {
+        const taxa = parseFloat(req.query.taxa);
+        const valor = parseFloat(req.query.valor);
+        const resultado = await simularInvestimento({
+            indexador: String(req.query.indexador || 'PREFIXADO'),
+            taxa: Number.isFinite(taxa) ? taxa : 0,
+            valor: Number.isFinite(valor) && valor > 0 ? valor : 1000,
+        });
+        res.status(200).json(resultado);
+    } catch (error) {
+        console.error('❌ ERRO AO SIMULAR INVESTIMENTO ❌', error.message);
+        res.status(500).json({ error: 'Não foi possível consultar as taxas agora.' });
+    }
+});
 
 // Listar todos os investimentos do usuario com o saldo calculado
 router.get('/investimentos', autenticar, async (req, res) => {

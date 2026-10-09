@@ -40,16 +40,17 @@ export function StatCard({ title, value, trend, isCurrency = true, color = 'prim
 interface AnimatedCounterProps {
   value: number;
   isCurrency?: boolean;
+  decimais?: number;
   color?: string;
   className?: string;
 }
 
-export function AnimatedCounter({ value, isCurrency = false, color, className }: AnimatedCounterProps) {
+export function AnimatedCounter({ value, isCurrency = false, decimais = 0, color, className }: AnimatedCounterProps) {
   const ref = React.useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true });
   const reduce = useReducedMotion();
   const mv = useMotionValue(reduce ? value : 0);
-  const text = useTransform(mv, (v) => (isCurrency ? formatCurrency(v) : Math.round(v).toLocaleString('pt-BR')));
+  const text = useTransform(mv, (v) => (isCurrency ? formatCurrency(v) : v.toLocaleString('pt-BR', { minimumFractionDigits: decimais, maximumFractionDigits: decimais })));
 
   React.useEffect(() => {
     if (!inView) return;

@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { TooltipProps } from '../../lib/chart';
 import { useEffect, useMemo, useState } from 'react';
 import { animate, useReducedMotion } from 'motion/react';
 import {
@@ -6,7 +7,8 @@ import {
 } from 'recharts';
 import { formatCompactCurrency, cn } from '../../lib/utils';
 import type { BlocoDe } from '../../lib/insights/types';
-import { fmt } from './primitives';
+import { fmt } from '../../lib/insights/format';
+import { useTema, type Tema } from '../../lib/theme';
 
 /*
  * Paleta categórica validada (dataviz/validate_palette, modo claro: todas as
@@ -14,19 +16,22 @@ import { fmt } from './primitives';
  * ficam abaixo de 3:1 com o fundo, por isso todo gráfico de categoria leva
  * rótulos visíveis (legenda com valores). Máximo de 6 + "Outros".
  */
-export const CATEGORICA = ['#047857', '#2a78d6', '#eb6834', '#4a3aa7', '#eda100', '#e87ba4'];
+// Claro (fundo #fcfcfb) e escuro (fundo #0f1613): os dois validados separadamente
+const CATEGORICA = {
+  light: ['#047857', '#2a78d6', '#eb6834', '#4a3aa7', '#eda100', '#e87ba4'],
+  dark: ['#059669', '#3987e5', '#d95926', '#9085e9', '#c98500', '#d55181'],
+};
 const OUTROS = '#9ca3af';
-// Pares (atual x anterior, gasto x limite): a referência fica neutra
-const PAR = ['#047857', '#9aa5b1'];
 
-const corSerie = (i: number, total: number) => (total === 2 ? PAR[i] : CATEGORICA[i % CATEGORICA.length]);
+// Pares (atual x anterior, gasto x limite) usam os slots 1 e 2: verde x cinza reprovou no teste de daltonismo
+const corSerie = (i: number, tema: Tema) => CATEGORICA[tema][i % CATEGORICA[tema].length];
 
-function TooltipBox({ active, payload, label }: any) {
+function TooltipBox({ active, payload, label }: TooltipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white border border-[var(--color-line)] rounded-[10px] px-3 py-2.5 shadow-md min-w-[150px]">
       <p className="text-xs text-[var(--color-ink-muted)] mb-1">{label}</p>
-      {payload.map((p: any) => (
+      {payload.map((p) => (
         <div key={p.dataKey} className="flex items-center gap-2 text-sm py-0.5">
           <span className="w-2 h-2 rounded-[3px]" style={{ backgroundColor: p.color }} />
           <span className="text-[var(--color-ink-soft)]">{p.name}</span>
@@ -38,12 +43,13 @@ function TooltipBox({ active, payload, label }: any) {
 }
 
 function Legenda({ series }: { series: { chave: string; rotulo: string }[] }) {
+  const tema = useTema();
   if (series.length < 2) return null;
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-ink-soft)] mt-3">
       {series.map((s, i) => (
         <span key={s.chave} className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-[3px]" style={{ backgroundColor: corSerie(i, series.length) }} />
+          <span className="w-2.5 h-2.5 rounded-[3px]" style={{ backgroundColor: corSerie(i, tema) }} />
           {s.rotulo}
         </span>
       ))}
@@ -55,6 +61,7 @@ const eixo = { fontSize: 11, fill: '#6b7280' };
 
 export function ChartView({ data }: { data: BlocoDe<'chart'>['data'] }) {
   const reduce = useReducedMotion();
+  const tema = useTema();
   if (data.subtipo === 'donut') return <Donut data={data} />;
   // Rótulos longos (estabelecimentos) não cabem no eixo X: barras deitadas
   const rotulosLongos = data.pontos.some((p) => String(p.rotulo).length > 10);
@@ -78,14 +85,14 @@ export function ChartView({ data }: { data: BlocoDe<'chart'>['data'] }) {
             <LineChart data={data.pontos} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               {comum}
               {data.series.map((s, i) => (
-                <Line key={s.chave} type="monotone" dataKey={s.chave} name={s.rotulo} stroke={corSerie(i, data.series.length)} strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: corSerie(i, data.series.length) }} activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }} {...anim} />
+                <Line key={s.chave} type="monotone" dataKey={s.chave} name={s.rotulo} stroke={corSerie(i, tema)} strokeWidth={2} dot={{ r: 3, strokeWidth: 0, fill: corSerie(i, tema) }} activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }} {...anim} />
               ))}
             </LineChart>
           ) : data.subtipo === 'area' ? (
             <AreaChart data={data.pontos} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               {comum}
               {data.series.map((s, i) => (
-                <Area key={s.chave} type="monotone" dataKey={s.chave} name={s.rotulo} stroke={corSerie(i, data.series.length)} strokeWidth={2} fill={corSerie(i, data.series.length)} fillOpacity={0.12} {...anim} />
+                <Area key={s.chave} type="monotone" dataKey={s.chave} name={s.rotulo} stroke={corSerie(i, tema)} strokeWidth={2} fill={corSerie(i, tema)} fillOpacity={0.12} {...anim} />
               ))}
             </AreaChart>
           ) : (
@@ -97,7 +104,7 @@ export function ChartView({ data }: { data: BlocoDe<'chart'>['data'] }) {
                   dataKey={s.chave}
                   name={s.rotulo}
                   stackId={data.subtipo === 'stacked' ? 'a' : undefined}
-                  fill={corSerie(i, data.series.length)}
+                  fill={corSerie(i, tema)}
                   radius={data.subtipo === 'stacked' && i < data.series.length - 1 ? [0, 0, 0, 0] : [4, 4, 0, 0]}
                   maxBarSize={44}
                   {...anim}
@@ -118,34 +125,34 @@ export function ChartView({ data }: { data: BlocoDe<'chart'>['data'] }) {
  */
 function Donut({ data }: { data: BlocoDe<'chart'>['data'] }) {
   const reduce = useReducedMotion();
+  const tema = useTema();
   const chave = data.series[0].chave;
   const itens = useMemo(() => {
     const todos = data.pontos.map((p) => ({ rotulo: String(p.rotulo), valor: Number(p[chave]) || 0 })).filter((p) => p.valor > 0);
-    if (todos.length <= 6) return todos.map((t, i) => ({ ...t, cor: CATEGORICA[i] }));
+    if (todos.length <= 6) return todos.map((t, i) => ({ ...t, cor: CATEGORICA[tema][i] }));
     const resto = todos.slice(5).reduce((s, t) => s + t.valor, 0);
-    return [...todos.slice(0, 5).map((t, i) => ({ ...t, cor: CATEGORICA[i] })), { rotulo: 'Outros', valor: resto, cor: OUTROS }];
-  }, [data, chave]);
+    return [...todos.slice(0, 5).map((t, i) => ({ ...t, cor: CATEGORICA[tema][i] })), { rotulo: 'Outros', valor: resto, cor: OUTROS }];
+  }, [data, chave, tema]);
   const total = itens.reduce((s, t) => s + t.valor, 0) || 1;
   const [ativo, setAtivo] = useState<number | null>(null);
 
   const [v, setV] = useState(reduce ? 100 : 0);
   useEffect(() => {
-    if (reduce) { setV(100); return; }
+    if (reduce) return;
     const c = animate(0, 100, { duration: 0.9, ease: [0.23, 1, 0.32, 1], onUpdate: setV });
     return () => c.stop();
   }, [reduce]);
 
+  const fins = itens.reduce<number[]>((arr, t) => [...arr, (arr.at(-1) ?? 0) + t.valor], []);
   const background = (() => {
-    let acc = 0;
     const paradas = itens.map((t, i) => {
-      const de = (acc / total) * v;
-      acc += t.valor;
-      const ate = (acc / total) * v;
+      const de = ((i > 0 ? fins[i - 1] : 0) / total) * v;
+      const ate = (fins[i] / total) * v;
       const cor = ativo === null || ativo === i ? t.cor : `${t.cor}55`;
       // 0.4% de folga entre fatias = o "espaço de 2px" da skill
-      return `${cor} ${de.toFixed(2)}% ${Math.max(de, ate - 0.4).toFixed(2)}%, #fff ${Math.max(de, ate - 0.4).toFixed(2)}% ${ate.toFixed(2)}%`;
+      return `${cor} ${de.toFixed(2)}% ${Math.max(de, ate - 0.4).toFixed(2)}%, var(--color-bg) ${Math.max(de, ate - 0.4).toFixed(2)}% ${ate.toFixed(2)}%`;
     });
-    return `conic-gradient(${paradas.join(', ')}, #eef2ef ${v}% 100%)`;
+    return `conic-gradient(${paradas.join(', ')}, var(--color-line) ${v}% 100%)`;
   })();
   const mascara = 'radial-gradient(closest-side, transparent 64%, #000 64.8%)';
 
@@ -184,6 +191,7 @@ function Donut({ data }: { data: BlocoDe<'chart'>['data'] }) {
  * cresce da base (scaleX) em cascata e o valor fica escrito na ponta.
  */
 function BarrasDeitadas({ data }: { data: BlocoDe<'chart'>['data'] }) {
+  const tema = useTema();
   const max = Math.max(...data.pontos.flatMap((p) => data.series.map((s) => Number(p[s.chave]) || 0)), 1);
   return (
     <div>
@@ -199,7 +207,7 @@ function BarrasDeitadas({ data }: { data: BlocoDe<'chart'>['data'] }) {
                     <span className="flex-1 h-2.5 rounded-r-[4px] overflow-hidden">
                       <span
                         className="bar-x block h-full rounded-r-[4px]"
-                        style={{ width: `${Math.max((v / max) * 100, 0.8)}%`, backgroundColor: corSerie(j, data.series.length), ['--i' as string]: i } as React.CSSProperties}
+                        style={{ width: `${Math.max((v / max) * 100, 0.8)}%`, backgroundColor: corSerie(j, tema), ['--i' as string]: i } as React.CSSProperties}
                       />
                     </span>
                     <span className="w-24 shrink-0 text-right text-xs font-medium text-[var(--color-ink)]" data-num>{fmt(v)}</span>

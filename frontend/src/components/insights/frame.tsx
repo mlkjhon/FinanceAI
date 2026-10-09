@@ -8,7 +8,7 @@ import { ease } from '../../lib/motion-tokens';
 import type { Bloco } from '../../lib/insights/types';
 import { BlocoConteudo } from './blocks';
 
-export const SPAN: Record<Bloco['size'], string> = {
+const SPAN: Record<Bloco['size'], string> = {
   sm: 'col-span-12 sm:col-span-6 lg:col-span-4',
   md: 'col-span-12 lg:col-span-6',
   lg: 'col-span-12 lg:col-span-8',

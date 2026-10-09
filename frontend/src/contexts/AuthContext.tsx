@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { authApi, setUserData, removeUserData, getUserData, type User } from '../lib/api';
 
 interface AuthContextType {
@@ -13,16 +13,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const data = getUserData();
-    if (data) {
-      setUser(data);
-    }
-    setIsLoading(false);
-  }, []);
+  // A sessão está no storage do navegador: dá para ler já no estado inicial
+  const [user, setUser] = useState<User | null>(() => getUserData());
+  const isLoading = false;
 
   const login = useCallback(async (email: string, password: string, remember: boolean = false) => {
     const res = await authApi.login(email, password);
@@ -51,6 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// O hook mora junto do provider de propósito (mesmo contexto)
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');

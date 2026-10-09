@@ -46,7 +46,7 @@ export async function analisar(
   let resto = '';
   const processar = (linha: string) => {
     if (!linha.trim()) return;
-    let e: any;
+    let e: { evento?: string; bloco?: unknown };
     try {
       e = JSON.parse(linha);
     } catch {
@@ -57,7 +57,7 @@ export async function analisar(
       if (ok.success) aoReceber({ evento: 'bloco', bloco: ok.data });
       else console.warn('[insights] bloco ignorado', ok.error.issues);
     } else {
-      aoReceber(e);
+      aoReceber(e as EventoAnalise);
     }
   };
 
@@ -85,9 +85,10 @@ export async function executarComando(comando: string, periodo: Periodo, blocos:
   if (!res.ok) await falhou(res);
   const data = await res.json();
   const operacoes = (Array.isArray(data.operacoes) ? data.operacoes : [])
-    .map((o: unknown) => Operacao.safeParse(o))
-    .filter((r: any) => r.success)
-    .map((r: any) => r.data as Operacao);
+    .flatMap((o: unknown) => {
+      const r = Operacao.safeParse(o);
+      return r.success ? [r.data] : [];
+    });
   return { operacoes, resposta: String(data.resposta || '') };
 }
 
@@ -106,5 +107,32 @@ export function salvarFixados(blocos: Bloco[]) {
     localStorage.setItem(CHAVE_FIXADOS, JSON.stringify(blocos.filter((b) => b.fixado)));
   } catch {
     /* sem storage: os fixados valem só nesta sessão */
+  }
+}
+
+// Fixados no servidor (banco). O localStorage acima fica como cópia local.
+export async function buscarFixadosServidor(): Promise<Bloco[] | null> {
+  try {
+    const res = await fetch(`${API_BASE}/insights/fixados`, { headers: headers() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (Array.isArray(data.blocos) ? data.blocos : []).flatMap((b: unknown) => {
+      const r = Bloco.safeParse(b);
+      return r.success ? [r.data] : [];
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function salvarFixadosServidor(blocos: Bloco[]) {
+  try {
+    await fetch(`${API_BASE}/insights/fixados`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify({ blocos: blocos.filter((b) => b.fixado) }),
+    });
+  } catch {
+    /* sem rede: fica só a cópia local até a próxima mudança */
   }
 }
