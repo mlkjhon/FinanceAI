@@ -14,14 +14,15 @@ import { Testimonials } from '../components/landing/testimonials';
 import { Faq } from '../components/landing/faq';
 import { FinalCta } from '../components/landing/final-cta';
 import { SiteFooter } from '../components/landing/site-footer';
+import { getToken } from '../lib/api';
 
 // Abaixo da dobra e com Base UI (tooltip): sai do bundle crítico.
 const Simulator = lazy(() => import('../components/landing/simulator').then((m) => ({ default: m.Simulator })));
 
 export const Route = createFileRoute('/')({
+  // Logado (com ou sem "manter conectado") não vê a landing: vai direto para o app
   beforeLoad: () => {
-    const token = localStorage.getItem('finance_token');
-    if (token) throw redirect({ to: '/dashboard' });
+    if (getToken()) throw redirect({ to: '/dashboard', replace: true });
   },
   component: LandingPage,
 });

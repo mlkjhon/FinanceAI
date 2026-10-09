@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router';
+import { getToken } from '../lib/api';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Counter } from '../components/motion/counter';
 import { spring, ease } from '../lib/motion-tokens';
@@ -18,6 +19,10 @@ export const Route = createFileRoute('/auth')({
     tab: search.tab === 'register' ? 'register' : undefined,
     email: typeof search.email === 'string' ? search.email.slice(0, 254) : undefined,
   }),
+  // Já logado: a tela de entrar/cadastrar não faz sentido, volta para o app
+  beforeLoad: () => {
+    if (getToken()) throw redirect({ to: '/dashboard', replace: true });
+  },
   component: AuthPage,
 });
 
