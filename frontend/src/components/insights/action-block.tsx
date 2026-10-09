@@ -10,6 +10,8 @@ import { fmt, diaCurto } from '../../lib/insights/format';
 import { nomeIndexador } from '../../lib/investimentos';
 import type { BlocoDe } from '../../lib/insights/types';
 import { StreamText } from './primitives';
+import { MoneyInput } from '../money-input';
+import { deNumero, paraNumero } from '../../lib/dinheiro';
 
 type Acao = BlocoDe<'action'>['data'];
 
@@ -41,10 +43,10 @@ export function ActionBlock({ b }: { b: BlocoDe<'action'> }) {
   const d = b.data;
   const cfg = CONFIG[d.acao];
   const qc = useQueryClient();
-  const [valorTexto, setValorTexto] = useState(d.valor != null ? String(d.valor).replace('.', ',') : '');
+  const [valorTexto, setValorTexto] = useState(() => deNumero(d.valor));
   const [estado, setEstado] = useState<'pronto' | 'executando' | 'feito' | 'erro'>('pronto');
   const [erro, setErro] = useState('');
-  const valor = parseFloat(valorTexto.replace(/\./g, '').replace(',', '.')) || 0;
+  const valor = paraNumero(valorTexto) ?? 0;
   const precisaValor = d.acao !== 'criar_investimento';
   const valorInvalido = precisaValor && (valor <= 0 || (d.acao === 'depositar_meta' && d.falta != null && valor > d.falta + 0.001));
 
@@ -118,12 +120,11 @@ export function ActionBlock({ b }: { b: BlocoDe<'action'> }) {
             </dt>
             <dd className="flex items-center gap-1 font-semibold text-[var(--color-ink)]">
               R$
-              <input
+              <MoneyInput
                 id={`valor-${b.id}`}
-                inputMode="decimal"
                 value={valorTexto}
                 disabled={estado === 'feito' || estado === 'executando'}
-                onChange={(e) => setValorTexto(e.target.value.replace(/[^0-9.,]/g, ''))}
+                onValueChange={setValorTexto}
                 aria-invalid={valorInvalido}
                 className="field w-24 rounded-md border border-[var(--color-line)] bg-[var(--color-bg)] px-2 py-1 text-right tabular-nums disabled:opacity-70"
               />

@@ -2,10 +2,12 @@ import React, { Suspense } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Wallet, Plus, AlertCircle } from '../components/icons';
-import { budgetsApi, categoriesApi } from '../lib/api';
+import { budgetsApi, categoriesApi, transactionsApi } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter, SkeletonCard, ProgressBar } from '../components/ui';
-import { Collapse } from '../components/collapse';
+import { Sheet, AmountField, Campo } from '../components/sheet';
+import { campoClasse } from '../lib/classes';
+import { deNumero, paraNumero } from '../lib/dinheiro';
 import { HoldToDelete } from '../components/hold-to-delete';
 import { formatCurrency } from '../lib/utils';
 
@@ -26,6 +28,7 @@ function BudgetsContent() {
   const [showForm, setShowForm] = React.useState(false);
   const [catId, setCatId] = React.useState('');
   const [limite, setLimite] = React.useState('');
+  const [tentou, setTentou] = React.useState(false);
 
   const { data: budgets, isLoading } = useQuery({
     queryKey: ['budgets', mes, ano],
@@ -33,10 +36,12 @@ function BudgetsContent() {
   });
 
   const { data: cats } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.list });
+  // mesma consulta da tela de transações (já fica em cache)
+  const { data: txs } = useQuery({ queryKey: ['transactions', 'all'], queryFn: () => transactionsApi.list({ limit: '100000' }), enabled: showForm });
 
   const createMut = useMutation({
     mutationFn: budgetsApi.create,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['budgets'] }); setShowForm(false); setCatId(''); setLimite(''); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['budgets'] }); setShowForm(false); setCatId(''); setLimite(''); setTentou(false); },
   });
 
   const deleteMut = useMutation({
@@ -45,6 +50,28 @@ function BudgetsContent() {
   });
 
   const filtered = budgets?.filter((b) => b.mes === mes && b.ano === ano) ?? [];
+  // só categorias de despesa que ainda não têm orçamento no mês escolhido
+  const jaTem = new Set(filtered.map((b) => b.categoria_id));
+  const categoriasLivres = cats?.filter((c) => c.tipo === 'despesa' && !jaTem.has(c.id)) ?? [];
+  const valorLimite = paraNumero(limite);
+  // média de gasto da categoria nos 3 meses completos antes do mês escolhido (referência para o limite)
+  const nomeCat = cats?.find((c) => c.id === catId)?.nome;
+  const mediaCategoria = (() => {
+    if (!nomeCat || !txs) return null;
+    const meses = [1, 2, 3].map((k) => {
+      const d = new Date(ano, mes - 1 - k, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const total = txs.data
+      .filter((t) => t.tipo === 'despesa' && t.categoria_nome === nomeCat && meses.includes((t.data || '').slice(0, 7)))
+      .reduce((soma, t) => soma + t.valor, 0);
+    return total > 0 ? Math.round((total / 3) * 100) / 100 : null;
+  })();
+  const salvar = () => {
+    setTentou(true);
+    if (!catId || !valorLimite) return;
+    createMut.mutate({ categoria_id: catId, valor_limite: valorLimite, mes, ano });
+  };
 
   return (
     <div className="stagger space-y-6 pb-16">
@@ -61,8 +88,7 @@ function BudgetsContent() {
             {[2024, 2025, 2026].map((y) => <option key={y}>{y}</option>)}
           </select>
           <button
-            onClick={() => setShowForm(!showForm)}
-            aria-expanded={showForm}
+            onClick={() => setShowForm(true)}
             className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
           >
             <Plus size={16} /> Novo
@@ -70,29 +96,46 @@ function BudgetsContent() {
         </div>
       </div>
 
-      <Collapse open={showForm}>
-        <div className="finance-card p-5">
-          <h3 className="font-brand font-semibold text-gray-900 mb-4">Criar orçamento</h3>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <select value={catId} onChange={(e) => setCatId(e.target.value)} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm">
-              <option value="">Selecionar categoria</option>
-              {cats?.filter((c) => c.tipo === 'despesa').map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-            </select>
-            <input
-              type="number" value={limite} onChange={(e) => setLimite(e.target.value)}
-              placeholder="Limite (R$)" step="0.01"
-              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm"
-            />
-            <button
-              disabled={!catId || !limite || createMut.isPending}
-              onClick={() => createMut.mutate({ categoria_id: catId, valor_limite: Number(limite), mes, ano })}
-              className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50"
-            >
-              Salvar
+      <Sheet
+        open={showForm}
+        onOpenChange={setShowForm}
+        title="Novo orçamento"
+        onSubmit={salvar}
+        footer={
+          <button type="submit" disabled={createMut.isPending} className="btn-primary w-full py-3.5 text-sm disabled:opacity-60">
+            {createMut.isPending && <span className="spinner" aria-hidden />}
+            Criar orçamento
+          </button>
+        }
+      >
+        <p className="text-sm text-[var(--color-ink-muted)]">Para {MONTHS[mes - 1].toLowerCase()} de {ano}</p>
+        <AmountField
+          id="orc-limite"
+          label="Limite para o mês"
+          value={limite}
+          onChange={setLimite}
+          erro={tentou && !valorLimite ? 'Informe um limite maior que zero' : undefined}
+          autoFocus
+        />
+        <Campo id="orc-cat" label="Categoria" ajuda={categoriasLivres.length ? undefined : 'Todas as categorias de despesa já têm orçamento neste mês.'}>
+          <select id="orc-cat" value={catId} onChange={(e) => setCatId(e.target.value)} aria-invalid={tentou && !catId} className={campoClasse}>
+            <option value="">Escolha a categoria</option>
+            {categoriasLivres.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
+        </Campo>
+        {tentou && !catId && <p className="-mt-4 text-xs text-loss">Escolha uma categoria</p>}
+        {mediaCategoria != null && (
+          <div className="rise flex items-center justify-between gap-3 rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm">
+            <span className="text-[var(--color-ink-muted)]">
+              Você gasta em média <strong className="text-[var(--color-ink)]" data-num>{formatCurrency(mediaCategoria)}</strong> por mês com {nomeCat}
+            </span>
+            <button type="button" onClick={() => setLimite(deNumero(mediaCategoria))} className="shrink-0 text-sm font-medium text-[var(--color-accent)]">
+              Usar
             </button>
           </div>
-        </div>
-      </Collapse>
+        )}
+        {createMut.isError && <p role="alert" className="text-sm text-loss">Não deu para criar o orçamento. Tente de novo.</p>}
+      </Sheet>
 
       {isLoading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

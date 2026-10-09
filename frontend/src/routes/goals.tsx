@@ -1,14 +1,15 @@
 import React, { Suspense } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'motion/react';
-import { Target, Plus, Calendar, PiggyBank, X, Check } from '../components/icons';
+import { Target, Plus, Calendar, PiggyBank } from '../components/icons';
 import { goalsApi } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter, SkeletonCard } from '../components/ui';
-import { Collapse } from '../components/collapse';
+import { Sheet, AmountField, Campo } from '../components/sheet';
+import { MoneyInput } from '../components/money-input';
+import { campoClasse } from '../lib/classes';
+import { deNumero, paraNumero } from '../lib/dinheiro';
 import { HoldToDelete } from '../components/hold-to-delete';
-import { modal, backdrop } from '../lib/motion-tokens';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { ProgressRing } from '../components/ConicChart';
 
@@ -30,112 +31,23 @@ function CircularProgress({ value, max }: { value: number; max: number }) {
   );
 }
 
-// Modal para adicionar dinheiro a uma meta
-function ModalDeposito({
-  meta,
-  onClose,
-  onConfirm,
-  isLoading,
-}: {
-  meta: { id: string; nome: string; valor_meta: number; valor_atual: number };
-  onClose: () => void;
-  onConfirm: (valor: number) => void;
-  isLoading: boolean;
-}) {
-  const [valor, setValor] = React.useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const num = parseFloat(valor);
-    if (!isNaN(num) && num > 0) onConfirm(num);
-  };
-
-  return (
-    // Fundo escurecido ao redor do modal
-    <div className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center p-4">
-      <motion.div {...backdrop} className="absolute inset-0 bg-[var(--color-ink)]/30" onClick={onClose} />
-      <motion.div
-        {...modal}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Depositar em ${meta.nome}`}
-        className="relative bg-white rounded-[20px] shadow-xl w-full max-w-sm p-6 space-y-5"
-      >
-        {/* Cabeçalho do modal */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gain-soft flex items-center justify-center">
-              <PiggyBank size={16} className="text-gain" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 text-sm">Adicionar à meta</h3>
-              <p className="text-xs text-gray-400">{meta.nome}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <X size={16} className="text-gray-400" />
-          </button>
-        </div>
-
-        {/* Progresso atual da meta */}
-        <div className="bg-gray-50 rounded-xl p-3 text-center">
-          <p className="text-xs text-gray-500 mb-1">Progresso atual</p>
-          <p className="font-semibold text-gray-900">
-            {formatCurrency(meta.valor_atual)} <span className="text-gray-400 font-normal text-xs">de</span> {formatCurrency(meta.valor_meta)}
-          </p>
-        </div>
-
-        {/* Formulário */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700">Valor a depositar (R$)</label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              placeholder="Ex: 150,00"
-              autoFocus
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/15 transition-[color,background-color,border-color,box-shadow,opacity]"
-            />
-            <p className="text-xs text-[var(--color-ink-muted)]">O valor sai do seu saldo e entra na meta.</p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium hover:bg-gray-50 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading || !valor || parseFloat(valor) <= 0}
-              className="flex-1 py-2.5 rounded-xl bg-[var(--color-accent)] text-white text-sm font-semibold hover:bg-[#065f46] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <span className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-              ) : (
-                <><Check size={15} /> Confirmar</>
-              )}
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </div>
-  );
-}
-
 function GoalsContent() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = React.useState(false);
-  const [form, setForm] = React.useState({ nome: '', valor_meta: '', valor_atual: '', data_alvo: '', descricao: '' });
+  const formVazio = { nome: '', valor_meta: '', valor_atual: '', data_alvo: '', descricao: '' };
+  const [form, setForm] = React.useState(formVazio);
+  const [tentou, setTentou] = React.useState(false);
 
-  // Estado para controlar qual meta está com o modal de depósito aberto
-  const [metaDeposito, setMetaDeposito] = React.useState<null | {
-    id: string; nome: string; valor_meta: number; valor_atual: number;
-  }>(null);
+  // Painel de depósito: a meta continua guardada enquanto o painel faz a animação de saída
+  type MetaResumo = { id: string; nome: string; valor_meta: number; valor_atual: number };
+  const [depositoAberto, setDepositoAberto] = React.useState(false);
+  const [metaDeposito, setMetaDeposito] = React.useState<MetaResumo | null>(null);
+  const [valorDeposito, setValorDeposito] = React.useState('');
+  const abrirDeposito = (m: MetaResumo) => {
+    setMetaDeposito(m);
+    setValorDeposito('');
+    setDepositoAberto(true);
+  };
 
   const { data: goals, isLoading } = useQuery({ queryKey: ['goals'], queryFn: goalsApi.list });
 
@@ -145,7 +57,8 @@ function GoalsContent() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['goals'] });
       setShowForm(false);
-      setForm({ nome: '', valor_meta: '', valor_atual: '', data_alvo: '', descricao: '' });
+      setForm(formVazio);
+      setTentou(false);
     },
   });
 
@@ -162,19 +75,28 @@ function GoalsContent() {
       // Recarrega as metas E o dashboard (pois o saldo vai mudar)
       qc.invalidateQueries({ queryKey: ['goals'] });
       qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      setMetaDeposito(null);
+      setDepositoAberto(false);
     },
   });
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const valorMeta = paraNumero(form.valor_meta);
+  const criarMeta = () => {
+    setTentou(true);
+    if (!form.nome.trim() || !valorMeta) return;
     createMut.mutate({
-      nome: form.nome,
-      valor_meta: Number(form.valor_meta),
-      valor_atual: Number(form.valor_atual) || 0,
+      nome: form.nome.trim(),
+      valor_meta: valorMeta,
+      valor_atual: paraNumero(form.valor_atual) ?? 0,
       data_alvo: form.data_alvo || undefined,
       descricao: form.descricao || undefined,
     });
+  };
+
+  const valorDep = paraNumero(valorDeposito);
+  const faltaDeposito = metaDeposito ? Math.max(metaDeposito.valor_meta - metaDeposito.valor_atual, 0) : 0;
+  const depositar = () => {
+    if (!metaDeposito || !valorDep) return;
+    depositoMut.mutate({ id: metaDeposito.id, valor: valorDep });
   };
 
   return (
@@ -185,55 +107,67 @@ function GoalsContent() {
           <h1 className="font-brand font-bold text-3xl tracking-tight text-[var(--color-ink)]">Metas</h1>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
-          aria-expanded={showForm}
+          onClick={() => setShowForm(true)}
           className="btn-primary px-5 py-2.5 text-sm"
         >
           <Plus size={16} /> Nova meta
         </button>
       </div>
 
-      {/* Formulário de criação de meta */}
-      <Collapse open={showForm}>
-        <div className="finance-card p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">Criar nova meta</h3>
-          <form onSubmit={onSubmit} className="grid sm:grid-cols-2 gap-3">
-            {[
-              { label: 'Nome da meta', key: 'nome', placeholder: 'Ex: Viagem para o Japão', type: 'text' },
-              { label: 'Valor da meta (R$)', key: 'valor_meta', placeholder: '10000', type: 'number' },
-              { label: 'Valor inicial (R$)', key: 'valor_atual', placeholder: '0', type: 'number' },
-              { label: 'Data alvo', key: 'data_alvo', placeholder: '', type: 'date' },
-            ].map(({ label, key, placeholder, type }) => (
-              <div key={key} className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">{label}</label>
-                <input
-                  type={type}
-                  value={form[key as keyof typeof form]}
-                  onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
-                  placeholder={placeholder}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/15"
-                />
-              </div>
-            ))}
-            <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Descrição (opcional)</label>
-              <input
-                type="text"
-                value={form.descricao}
-                onChange={(e) => setForm((prev) => ({ ...prev, descricao: e.target.value }))}
-                placeholder="Adicione detalhes sobre sua meta"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/15"
+      {/* Nova meta: mesmo painel da nova transação */}
+      <Sheet
+        open={showForm}
+        onOpenChange={setShowForm}
+        title="Nova meta"
+        onSubmit={criarMeta}
+        footer={
+          <button type="submit" disabled={createMut.isPending} className="btn-primary w-full py-3.5 text-sm disabled:opacity-60">
+            {createMut.isPending && <span className="spinner" aria-hidden />}
+            Criar meta
+          </button>
+        }
+      >
+        <AmountField
+          id="meta-valor"
+          label="Quanto você quer juntar"
+          value={form.valor_meta}
+          onChange={(t) => setForm((f) => ({ ...f, valor_meta: t }))}
+          erro={tentou && !valorMeta ? 'Informe um valor maior que zero' : undefined}
+          autoFocus
+        />
+        <Campo id="meta-nome" label="Nome da meta">
+          <input
+            id="meta-nome"
+            value={form.nome}
+            onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+            placeholder="Ex.: viagem para o Chile"
+            aria-invalid={tentou && !form.nome.trim()}
+            className={campoClasse}
+          />
+        </Campo>
+        {tentou && !form.nome.trim() && <p className="-mt-4 text-xs text-loss">Dê um nome para a meta</p>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Campo id="meta-atual" label="Já tenho guardado">
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--color-ink-muted)]">R$</span>
+              <MoneyInput
+                id="meta-atual"
+                value={form.valor_atual}
+                onValueChange={(t) => setForm((f) => ({ ...f, valor_atual: t }))}
+                placeholder="0,00"
+                className={campoClasse + ' pl-10'}
               />
             </div>
-            <div className="sm:col-span-2 flex gap-3">
-              <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold">Cancelar</button>
-              <button type="submit" disabled={createMut.isPending || !form.nome || !form.valor_meta} className="flex-1 py-2.5 rounded-xl bg-[var(--color-accent)] text-white text-sm font-semibold hover:bg-[#065f46] disabled:opacity-50 transition-colors">
-                Criar meta
-              </button>
-            </div>
-          </form>
+          </Campo>
+          <Campo id="meta-data" label="Até quando (opcional)">
+            <input id="meta-data" type="date" value={form.data_alvo} onChange={(e) => setForm((f) => ({ ...f, data_alvo: e.target.value }))} className={campoClasse} />
+          </Campo>
         </div>
-      </Collapse>
+        <Campo id="meta-desc" label="Descrição (opcional)">
+          <input id="meta-desc" value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Ex.: passagens e hospedagem" className={campoClasse} />
+        </Campo>
+        {createMut.isError && <p role="alert" className="text-sm text-loss">Não deu para criar a meta. Tente de novo.</p>}
+      </Sheet>
 
       {/* Lista de metas */}
       {isLoading ? (
@@ -286,7 +220,7 @@ function GoalsContent() {
               <div className="flex gap-2 pt-1">
                 {/* Botão: adicionar dinheiro à meta */}
                 <button
-                  onClick={() => setMetaDeposito({ id: g.id, nome: g.nome, valor_meta: g.valor_meta, valor_atual: g.valor_atual })}
+                  onClick={() => abrirDeposito({ id: g.id, nome: g.nome, valor_meta: g.valor_meta, valor_atual: g.valor_atual })}
                   className="flex-1 py-2 rounded-full bg-gain-soft text-gain text-xs font-semibold flex items-center justify-center gap-1"
                 >
                   <PiggyBank size={13} /> Depositar
@@ -307,17 +241,44 @@ function GoalsContent() {
         </div>
       )}
 
-      {/* Modal de depósito (aparece por cima quando clicar em depositar) */}
-      <AnimatePresence>
+      {/* Depositar: mesmo painel, com o progresso da meta */}
+      <Sheet
+        open={depositoAberto}
+        onOpenChange={setDepositoAberto}
+        title={metaDeposito ? 'Depositar em ' + metaDeposito.nome : 'Depositar'}
+        onSubmit={depositar}
+        footer={
+          <button type="submit" disabled={depositoMut.isPending || !valorDep} className="btn-primary w-full py-3.5 text-sm disabled:opacity-60">
+            {depositoMut.isPending ? <span className="spinner" aria-hidden /> : <PiggyBank size={16} />}
+            {valorDep ? 'Depositar ' + formatCurrency(valorDep) : 'Depositar'}
+          </button>
+        }
+      >
         {metaDeposito && (
-          <ModalDeposito
-            meta={metaDeposito}
-            onClose={() => setMetaDeposito(null)}
-            onConfirm={(valor) => depositoMut.mutate({ id: metaDeposito.id, valor })}
-            isLoading={depositoMut.isPending}
-          />
+          <>
+            <div className="rounded-xl bg-[var(--color-surface)] p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+              <div>
+                <p className="text-[var(--color-ink-muted)]">Guardado</p>
+                <p className="font-semibold text-[var(--color-ink)]" data-num>
+                  {formatCurrency(metaDeposito.valor_atual)} de {formatCurrency(metaDeposito.valor_meta)}
+                </p>
+              </div>
+              {faltaDeposito > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setValorDeposito(deNumero(faltaDeposito))}
+                  className="shrink-0 rounded-full bg-gain-soft px-3 py-1.5 text-xs font-semibold text-gain"
+                >
+                  Completar a meta ({formatCurrency(faltaDeposito)})
+                </button>
+              )}
+            </div>
+            <AmountField id="dep-valor" label="Valor do depósito" value={valorDeposito} onChange={setValorDeposito} autoFocus />
+            <p className="text-xs text-[var(--color-ink-muted)]">O valor sai do seu saldo e entra na meta.</p>
+            {depositoMut.isError && <p role="alert" className="text-sm text-loss">Não deu para depositar. Tente de novo.</p>}
+          </>
         )}
-      </AnimatePresence>
+      </Sheet>
     </div>
   );
 }

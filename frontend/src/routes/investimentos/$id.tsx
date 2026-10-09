@@ -5,6 +5,8 @@ import React, { useState } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { AnimatedCounter, FinanceCard, SkeletonCard } from '../../components/ui';
 import { investimentosApi, type CreateInvestment } from '../../lib/api';
+import { MoneyInput } from '../../components/money-input';
+import { paraNumero } from '../../lib/dinheiro';
 import { TaxaPreview } from '../../components/investimentos/taxa-preview';
 import { INDEXADORES, nomeIndexador, rotuloTaxa } from '../../lib/investimentos';
 import { formatCurrency, formatCompactCurrency, formatDate, descreverTaxa } from '../../lib/utils';
@@ -98,10 +100,11 @@ function InvestimentoDetailsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!valor || parseFloat(valor) <= 0) return;
+    const numero = paraNumero(valor);
+    if (!numero || numero <= 0) return;
     transacaoMutation.mutate({
       tipo: tipoTransacao,
-      valor: parseFloat(valor)
+      valor: numero
     });
   };
 
@@ -376,13 +379,11 @@ function InvestimentoDetailsPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Valor (R$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <MoneyInput
                     required
                     value={valor}
-                    onChange={e => setValor(e.target.value)}
-                    placeholder="Ex: 500.00"
+                    onValueChange={setValor}
+                    placeholder="Ex.: 1.500,00"
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
                   />
                 </div>

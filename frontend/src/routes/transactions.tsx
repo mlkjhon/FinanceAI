@@ -12,6 +12,8 @@ import { Navbar } from '../components/Navbar';
 import { AnimatedCounter } from '../components/ui';
 import { formatCurrency, cn } from '../lib/utils';
 import { Segmented } from '../components/segmented';
+import { AmountField } from '../components/sheet';
+import { deNumero, paraNumero } from '../lib/dinheiro';
 import { HoldToDelete } from '../components/hold-to-delete';
 
 export const Route = createFileRoute('/transactions')({
@@ -61,7 +63,7 @@ const fieldCls =
 
 function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose: () => void; onSaved: () => void }) {
   const qc = useQueryClient();
-  const { register, handleSubmit, formState: { errors, isSubmitting }, control, getValues, setValue } = useForm<TxForm>({
+  const { register, handleSubmit, formState: { errors, isSubmitting, isSubmitted }, control, getValues, setValue } = useForm<TxForm>({
     resolver: zodResolver(txSchema),
     defaultValues: tx
       ? {
@@ -72,8 +74,14 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
           id_subcategoria: tx.id_subcategoria || '',
           data: diaDe(tx),
         }
-      : { tipo: 'despesa', data: hojeISO() },
+      : { tipo: 'despesa', data: hojeISO(), valor: 0 },
   });
+
+  // Texto do campo de valor (com pontos de milhar); o número vai para o formulário
+  const [valorTexto, setValorTexto] = useState(() => deNumero(tx?.valor));
+  useEffect(() => {
+    register('valor');
+  }, [register]);
 
   // useWatch (e não watch) para o React Compiler conseguir memorizar o componente
   const tipo = useWatch({ control, name: 'tipo' });
@@ -146,26 +154,20 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
           options={[{ value: 'despesa', label: 'Saída' }, { value: 'receita', label: 'Entrada' }]}
         />
 
-        <div>
-          <label htmlFor="tx-valor" className="metric-label">Valor</label>
-          <div className="mt-1 flex items-baseline gap-2 border-b border-[var(--color-line)] pb-2 focus-within:border-[var(--color-accent)] transition-colors duration-150">
-            <span className={cn('font-brand text-2xl font-bold whitespace-nowrap shrink-0', tipo === 'receita' ? 'text-gain' : 'text-[var(--color-ink-muted)]')}>
-              {tipo === 'receita' ? '+R$' : '-R$'}
-            </span>
-            <input
-              id="tx-valor"
-              {...register('valor')}
-              type="number"
-              step="0.01"
-              inputMode="decimal"
-              placeholder="0,00"
-              autoFocus={!tx}
-              aria-invalid={!!errors.valor}
-              className="amount-input"
-            />
-          </div>
-          {errors.valor && <p className="mt-1.5 text-xs text-loss">{errors.valor.message}</p>}
-        </div>
+        <AmountField
+          id="tx-valor"
+          label="Valor"
+          value={valorTexto}
+          onChange={(t) => {
+            setValorTexto(t);
+            // o formulário guarda o número; a tela mostra com pontos de milhar
+            setValue('valor', (paraNumero(t) ?? 0) as TxForm['valor'], { shouldValidate: isSubmitted });
+          }}
+          prefixo={tipo === 'receita' ? '+R$' : '-R$'}
+          prefixoClasse={tipo === 'receita' ? 'text-gain' : undefined}
+          erro={errors.valor?.message}
+          autoFocus={!tx}
+        />
 
         <div className="space-y-2">
           <label htmlFor="tx-desc" className="text-sm font-medium text-[var(--color-ink-soft)]">Descrição</label>
