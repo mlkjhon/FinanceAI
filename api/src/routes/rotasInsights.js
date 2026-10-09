@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { BD } from "../../db.js";
 import { autenticar } from "../middlewares/autenticar.js";
+import { gerarTexto } from "../services/gemini.js";
 
 const router = Router();
 
@@ -11,13 +12,13 @@ router.get('/insights', autenticar, async (req, res) => {
     try {
         // Busca um resumo dos gastos do usuário por categoria
         const queryGastos = `
-            SELECT c.nome AS categoria, COALESCE(SUM(t.valor), 0) AS total
+            SELECT COALESCE(c.nome, 'Sem categoria') AS categoria, COALESCE(SUM(t.valor), 0) AS total
             FROM transacoes t
-            INNER JOIN subcategorias s ON t.id_subcategoria = s.id_subcategoria
-            INNER JOIN categorias c ON s.id_categoria = c.id_categoria
+            LEFT JOIN subcategorias s ON t.id_subcategoria = s.id_subcategoria
+            LEFT JOIN categorias c ON s.id_categoria = c.id_categoria
             WHERE t.tipo = 'S' AND t.id_usuario = $1
               AND DATE_TRUNC('month', t.data_registro) = DATE_TRUNC('month', CURRENT_DATE)
-            GROUP BY c.nome
+            GROUP BY COALESCE(c.nome, 'Sem categoria')
             ORDER BY total DESC
             LIMIT 5
         `;
@@ -62,36 +63,17 @@ Formato exato:
 ]
 Tipos permitidos: economia, gasto, sugestao, padrao`;
 
-        const API_KEY = process.env.GEMINI_API_KEY;
-        if (!API_KEY) {
-            return res.status(500).json({ error: 'API_KEY não configurada' });
-        }
-
-        const url_gemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-
         try {
-            const response = await fetch(url_gemini, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: promptInsights }] }]
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.error) {
-                return res.status(500).json({ error: 'Erro na IA: ' + data.error.message });
-            }
-
-            const textoResposta = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+            const textoResposta = await gerarTexto(promptInsights);
             const textoLimpo = textoResposta.replace(/```json|```/g, '').trim();
-            const dicas = JSON.parse(textoLimpo);
+            const inicio = textoLimpo.indexOf('[');
+            const fim = textoLimpo.lastIndexOf(']');
+            const dicas = JSON.parse(textoLimpo.slice(inicio, fim + 1));
             const dicasComId = dicas.map((d, i) => ({ ...d, id: String(i + 1) }));
             return res.status(200).json(dicasComId);
         } catch (error) {
             console.error('Erro ao gerar insights:', error.message);
-            return res.status(500).json({ error: 'Erro ao gerar dicas personalizadas: ' + error.message });
+            return res.status(502).json({ error: 'Não foi possível gerar as dicas: ' + error.message });
         }
     } catch (dbError) {
         console.error('Erro no banco de dados:', dbError.message);

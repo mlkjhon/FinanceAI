@@ -15,6 +15,7 @@ import rotasOpenFinance from "./src/routes/rotasOpenFinance.js";
 import rotasInvestimentos from "./src/routes/rotasInvestimentos.js";
 
 import { BD, testarConexao } from "./db.js";
+import { gerarTexto, GEMINI_MODEL } from "./src/services/gemini.js";
 
 import swaggerUI from "swagger-ui-express";
 import swagger from './config/swagger.js';
@@ -37,38 +38,18 @@ app.get('/', async (req, res) => {
     res.redirect('/swagger')
 });
 
-// Rota de teste para verificar Gemini API
+// Diagnóstico do Gemini: mostra se a chave existe e se o modelo responde
 app.get('/test-gemini', async (req, res) => {
     try {
-        const API_KEY = process.env.GEMINI_API_KEY;
-        console.log('[TEST-GEMINI] API_KEY carregada:', API_KEY ? 'SIM' : 'NAO');
-        
-        if (!API_KEY) {
-            return res.status(500).json({ erro: 'GEMINI_API_KEY nao configurada!' });
-        }
-        
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-        console.log('[TEST-GEMINI] Testando API...');
-        
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: 'Ola! Voce funciona?' }] }]
-            })
-        });
-        
-        console.log('[TEST-GEMINI] Status:', response.status);
-        const data = await response.json();
-        
-        res.json({
-            status: response.status,
-            api_key_loaded: !!API_KEY,
-            response: data
-        });
+        const texto = await gerarTexto('Responda apenas: ok');
+        res.json({ status: 200, api_key_loaded: true, modelo: GEMINI_MODEL, resposta: texto.trim() });
     } catch (error) {
-        console.error('[TEST-GEMINI] Erro:', error.message);
-        res.status(500).json({ erro: error.message });
+        res.status(error.status || 500).json({
+            status: error.status || 500,
+            api_key_loaded: !!process.env.GEMINI_API_KEY,
+            modelo: GEMINI_MODEL,
+            erro: error.message,
+        });
     }
 });
 

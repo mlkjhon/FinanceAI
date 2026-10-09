@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
 import { autenticar } from "../middlewares/autenticar.js";
+import { gerarTexto } from "../services/gemini.js";
 
 const router = Router();
 
@@ -34,11 +35,6 @@ router.post('/chat', autenticar, async (req, res) => {
     }
 
     try {
-        const API_KEY = process.env.GEMINI_API_KEY;
-        if (!API_KEY) {
-            return res.status(500).json({ error: 'API_KEY não configurada' });
-        }
-        
         const resumoQuery = `
             SELECT 
                 COALESCE(SUM(CASE WHEN tipo = 'E' THEN valor ELSE 0 END), 0) AS entradas,
@@ -86,46 +82,30 @@ Regras obrigatórias:
 - Respostas diretas, no máximo 3 parágrafos curtos
 - Fale português brasileiro informal`;
 
-        const url_gemini = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-
-        let resposta_ia = "Não consegui formular uma resposta.";
+        let resposta_ia;
         try {
-            const response = await fetch(url_gemini, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: `${systemPrompt}\n\nUsuário diz: ${mensagem}` }] }]
-                })
-            });
+            resposta_ia = await gerarTexto(`${systemPrompt}
 
-            const data = await response.json();
-            
-            if (data.error) {
-                resposta_ia = `Erro na IA: ${data.error.message}`;
-            } else if (data && data.candidates && data.candidates.length > 0) {
-                resposta_ia = data.candidates[0].content.parts[0].text;
-                
-                const matchIndex = resposta_ia.indexOf('{"acao"');
-                if (matchIndex !== -1) {
-                    try {
-                        const jsonStr = resposta_ia.substring(matchIndex);
-                        const action = JSON.parse(jsonStr.trim());
-                        
-                        if (action.acao === 'transacao') {
-                            await BD.query(
-                                `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria) VALUES ($1, $2, $3, $4, NULL)`,
-                                [id_usuario, action.descricao, action.valor, action.tipo]
-                            );
-                        }
-                        resposta_ia = resposta_ia.substring(0, matchIndex).trim();
-                    } catch (e) {
-                        console.error('Erro ao processar JSON da IA:', e.message);
-                    }
-                }
-            }
+Usuário diz: ${mensagem}`);
         } catch (geminiError) {
-            console.error('Erro ao chamar Gemini:', geminiError.message);
-            resposta_ia = 'Desculpe, não consegui gerar uma resposta no momento. Tente novamente em instantes!';
+            // Não salva o erro no histórico como se fosse resposta da IA
+            return res.status(502).json({ error: 'A IA não respondeu: ' + geminiError.message });
+        }
+
+        const matchIndex = resposta_ia.indexOf('{"acao"');
+        if (matchIndex !== -1) {
+            try {
+                const action = JSON.parse(resposta_ia.substring(matchIndex).trim());
+                if (action.acao === 'transacao') {
+                    await BD.query(
+                        `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria) VALUES ($1, $2, $3, $4, NULL)`,
+                        [id_usuario, action.descricao, action.valor, action.tipo]
+                    );
+                }
+                resposta_ia = resposta_ia.substring(0, matchIndex).trim();
+            } catch (e) {
+                console.error('Erro ao processar JSON da IA:', e.message);
+            }
         }
 
         const comando = `INSERT INTO chat (id_usuario, mensagem, resposta) VALUES ($1, $2, $3) RETURNING *`;

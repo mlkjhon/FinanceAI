@@ -25,9 +25,10 @@ const iconMap: Record<string, React.ReactNode> = {
 type ChatMsg = { role: 'user' | 'ai'; content: string };
 
 function InsightsContent() {
-  const { data: insights, isLoading: insightsLoading, refetch: refetchInsights, isFetching } = useQuery({
+  const { data: insights, isLoading: insightsLoading, refetch: refetchInsights, isFetching, error: insightsError, isFetched } = useQuery({
     queryKey: ['insights'],
     queryFn: insightsApi.list,
+    retry: false,
     // Não busca automaticamente ao montar para evitar custo de API desnecessário
     staleTime: 5 * 60 * 1000, // 5 minutos de cache
   });
@@ -74,8 +75,9 @@ function InsightsContent() {
     try {
       const res = await insightsApi.chat(userMsg);
       setChat((prev) => [...prev, { role: 'ai', content: res.reply }]);
-    } catch {
-      setChat((prev) => [...prev, { role: 'ai', content: 'Desculpe, não consegui processar agora. Tente de novo em instantes.' }]);
+    } catch (e) {
+      const motivo = e instanceof Error && e.message ? e.message : 'Tente de novo em instantes.';
+      setChat((prev) => [...prev, { role: 'ai', content: `Não consegui responder agora. ${motivo}` }]);
     } finally {
       setIsAiLoading(false);
     }
@@ -167,6 +169,16 @@ function InsightsContent() {
         {insightsLoading || isFetching ? (
           <div className="grid sm:grid-cols-2 gap-4">
             {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} lines={3} />)}
+          </div>
+        ) : insightsError ? (
+          <div role="alert" className="finance-card px-6 py-8 max-w-xl">
+            <p className="font-semibold text-[var(--color-ink)]">Não foi possível gerar as dicas.</p>
+            <p className="text-sm text-[var(--color-ink-muted)] mt-1">{(insightsError as Error).message}</p>
+          </div>
+        ) : isFetched && insights?.length === 0 ? (
+          <div className="finance-card px-6 py-8 max-w-xl">
+            <p className="font-semibold text-[var(--color-ink)]">Ainda não há gastos neste mês.</p>
+            <p className="text-sm text-[var(--color-ink-muted)] mt-1">As dicas usam as despesas do mês atual. Registre algumas e gere de novo.</p>
           </div>
         ) : insights?.length ? (
           <div className="grid sm:grid-cols-2 gap-4">
