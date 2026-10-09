@@ -4,7 +4,7 @@
  * Apagar o depósito precisa desfazer as três coisas juntas.
  */
 export const PREFIXO_META = 'Investido na meta: ';
-export const ehDepositoMeta = (descricao = '') => String(descricao).startsWith(PREFIXO_META);
+export const ehDepositoMeta = (descricao = '') => String(descricao).startsWith(PREFIXO_META) && !String(descricao).endsWith(' (meta encerrada)');
 
 // Qual meta recebeu essa transação: pelo histórico (ligação exata) ou, nas antigas, pelo título
 async function metaDaTransacao(cliente, id_usuario, transacao) {

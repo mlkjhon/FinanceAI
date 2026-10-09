@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { transactionsApi, type Transaction } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { Segmented } from '../components/segmented';
-import { formatCurrency, formatDate, cn } from '../lib/utils';
+import { formatCurrency, formatDate, cn, descricaoVisivel } from '../lib/utils';
 import { DetailHeader, Headline, Strong, MetricStrip, EmptyDetail, DetailSkeleton } from '../components/detail';
 
 export const Route = createFileRoute('/categorias')({
@@ -82,7 +82,7 @@ function CategoriaRow({ g, index, total, aberto, onToggle }: { g: Grupo; index: 
             <ul className="px-5 pb-4 space-y-2.5">
               {recentes.map((t) => (
                 <li key={t.id} className="flex items-baseline justify-between gap-4 text-sm pl-3 border-l-2 border-[var(--color-line)]">
-                  <span className="min-w-0 truncate text-[var(--color-ink-soft)]">{t.descricao}</span>
+                  <span className="min-w-0 truncate text-[var(--color-ink-soft)]">{descricaoVisivel(t.descricao)}</span>
                   <span className="shrink-0 flex items-baseline gap-3">
                     <span className="text-xs text-[var(--color-ink-muted)]" data-num>{formatDate(t.data)}</span>
                     <span className="font-medium text-[var(--color-ink)]" data-num>{formatCurrency(t.valor)}</span>

@@ -7,7 +7,7 @@ import { dashboardApi } from '../lib/api';
 import { AnimatedCounter, FinanceCard, SkeletonCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
-import { formatCurrency, formatDate } from '../lib/utils';
+import { formatCurrency, formatDate, descricaoVisivel } from '../lib/utils';
 import { DonutRing } from '../components/ConicChart';
 
 export const Route = createFileRoute('/dashboard')({
@@ -26,7 +26,7 @@ function TransactionRow({ t, index }: { t: { descricao: string; valor: number; t
   return (
     <li className="rise flex items-baseline justify-between gap-4 py-3.5" style={{ '--i': index + 4 } as React.CSSProperties}>
       <div className="min-w-0">
-        <p className="text-sm font-medium text-[var(--color-ink)] truncate">{t.descricao}</p>
+        <p className="text-sm font-medium text-[var(--color-ink)] truncate">{descricaoVisivel(t.descricao)}</p>
         <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">
           {t.categoria_nome || 'Sem categoria'} · {formatDate(t.data)}
         </p>

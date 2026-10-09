@@ -168,8 +168,9 @@ router.get('/metas/:id_meta', autenticar, async (req, res) => {
 
 /*
  * Apagar a meta devolve o dinheiro: os depósitos (saídas "Investido na meta: …")
- * são apagados, então o valor volta para o saldo. O "já tenho guardado" da criação
- * nunca saiu do saldo, então não há nada a devolver dele. Tudo ou nada.
+ * ficam no histórico e entra UMA transação "Devolvido da meta: …" com a soma deles,
+ * para o dinheiro aparecer voltando em Transações. O "já tenho guardado" da criação
+ * nunca saiu do saldo, então não entra na devolução. Tudo ou nada.
  */
 router.delete('/metas/:id_meta', autenticar, async (req, res) => {
     const { id_meta } = req.params;
@@ -201,16 +202,24 @@ router.delete('/metas/:id_meta', autenticar, async (req, res) => {
             await cliente.query('ROLLBACK TO SAVEPOINT historico');
         }
 
-        // Os ligados pelo histórico + os antigos (sem histórico) pelo título
-        const apagadas = await cliente.query(
-            `DELETE FROM transacoes
+        // Os ligados pelo histórico + os antigos (sem histórico) pelo título.
+        // Ganham "(meta encerrada)" na descrição: deixam de contar como depósito de alguma meta.
+        const depositos = await cliente.query(
+            `UPDATE transacoes SET descricao = descricao || ' (meta encerrada)'
              WHERE id_usuario = $1
                AND (id_transacao = ANY($2::int[])
                     OR (descricao = $3 AND NOT (id_transacao = ANY($4::int[]))))
              RETURNING valor`,
             [id_usuario, desta, `Investido na meta: ${titulo}`, deOutras]
         );
-        const devolvido = apagadas.rows.reduce((s, t) => s + Number(t.valor || 0), 0);
+        const devolvido = Math.round(depositos.rows.reduce((s, t) => s + Number(t.valor || 0), 0) * 100) / 100;
+        if (devolvido > 0) {
+            await cliente.query(
+                `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria, data_registro)
+                 VALUES ($1, $2, $3, 'E', NULL, CURRENT_DATE)`,
+                [id_usuario, `Devolvido da meta: ${titulo}`, devolvido]
+            );
+        }
 
         await cliente.query('SAVEPOINT movs');
         await cliente.query('DELETE FROM metas_movimentos WHERE id_meta = $1 AND id_usuario = $2', [id_meta, id_usuario])
@@ -219,7 +228,7 @@ router.delete('/metas/:id_meta', autenticar, async (req, res) => {
         await cliente.query('DELETE FROM metas_financeiras WHERE id_meta = $1 AND id_usuario = $2', [id_meta, id_usuario]);
         await cliente.query('COMMIT');
 
-        return res.status(200).json({ message: 'Meta deletada com sucesso.', devolvido: Math.round(devolvido * 100) / 100 });
+        return res.status(200).json({ message: 'Meta deletada com sucesso.', devolvido });
     } catch (error) {
         await cliente.query('ROLLBACK').catch(() => {});
         console.error('Erro ao deletar meta:', error.message);

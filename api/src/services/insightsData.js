@@ -13,9 +13,13 @@ const arred = (v) => Math.round(v * 100) / 100;
 const iso = (d) => d.toISOString().slice(0, 10);
 const mesDe = (dia) => dia.slice(0, 7);
 
-// Aporte em investimento ou depósito em meta sai da conta, mas não é consumo
+// Aporte/resgate de investimento e depósito/devolução de meta: dinheiro mudando de lugar,
+// não é consumo (saída) nem renda (entrada)
 const ehTransferencia = (descricao = '') =>
-    /^\[INV:\d+\]/.test(descricao) || /^Investido na meta:/i.test(descricao);
+    /^\[INV(:\d+)?\]/.test(descricao)
+    || /^Investido na meta:/i.test(descricao)
+    || /^Devolvido da meta:/i.test(descricao)
+    || /\(investimento encerrado\)$/i.test(descricao);
 
 export async function carregarContexto(idUsuario, hoje = new Date()) {
     const desde = new Date(hoje.getFullYear(), hoje.getMonth() - 12, 1);
@@ -71,7 +75,7 @@ export function criarContexto({ lancamentos, metas = [], orcamentos = [], invest
         lancamentos: lancamentos.map((l) => ({
             ...l,
             valor: Number(l.valor),
-            transferencia: l.tipo === 'S' && ehTransferencia(l.descricao),
+            transferencia: ehTransferencia(l.descricao),
         })),
         metas,
         orcamentos,
@@ -88,9 +92,9 @@ export function criarContexto({ lancamentos, metas = [], orcamentos = [], invest
  * - folgaMes: o que entrou no mês menos TUDO o que saiu (aportes e depósitos já
  *   feitos contam como saída). Sem folga, nada de aportar/depositar/investir.
  * - aporte ou depósito feito há menos de DIAS_SEM_REPETIR dias: não sugere de novo.
- * - meta nova só se não houver nenhuma meta em andamento.
- * - orçamento só para categoria sem orçamento cujo gasto está crescendo
- *   (passou da média no mês ou subiu no último mês); conta fixa não entra.
+ * - meta nova: sem metas em andamento, qualquer uma; com metas, só a reserva de emergência.
+ * - orçamento só para categoria sem orçamento com gasto variável que pesa (>= 10%)
+ *   ou que está crescendo; conta fixa (aluguel) não entra.
  * - investimento novo só para quem ainda não tem nenhum e costuma sobrar dinheiro.
  */
 export const DIAS_SEM_REPETIR = 25;
@@ -121,7 +125,11 @@ export function necessidades(ctx) {
         ctx.lancamentos.some((l) => l.descricao === `Investido na meta: ${titulo}` && recente(l.dia)) || feitoRecente('depositar_meta', titulo);
     const depositarEm = folgaMes > 0 ? metasAbertas.filter((m) => !depositoRecente(m.titulo)).map((m) => m.titulo) : [];
 
-    const criarMeta = metasAbertas.length === 0 && sobraMedia > 0 && !feitoRecente('criar_meta');
+    // Meta nova: quem costuma sobrar dinheiro e não tem meta em andamento pode criar qualquer uma;
+    // quem já tem metas, só a reserva de emergência (se ainda não existir)
+    const temReserva = ctx.metas.some((m) => /reserva|emerg/i.test(m.titulo));
+    const criarMeta = sobraMedia > 0 && !feitoRecente('criar_meta') && (metasAbertas.length === 0 || !temReserva);
+    const soReserva = metasAbertas.length > 0;
 
     // Orçamento: média dos 3 meses fechados x o que já foi gasto neste mês
     const [ano, mes] = hoje.split('-').map(Number);
@@ -141,17 +149,22 @@ export function necessidades(ctx) {
     // Está crescendo: o mês atual já passou 10% da média, ou o último mês fechado
     // veio 20% acima dos dois anteriores. Conta fixa (aluguel igual todo mês) não entra.
     const crescendo = (c) => (atual[c] || 0) > media[c] * 1.1 || (antes[c] > 0 && (ultimo[c] || 0) > antes[c] * 1.2);
+    // Gasto variável (mercado, lazer, delivery...) que pesa: >= 10% dos gastos. Conta fixa
+    // (mesmo valor nos 3 meses, como aluguel) não precisa de orçamento.
+    const porMes = (c) => fechados.map((m) => ctx.lancamentos.filter((l) => l.tipo === 'S' && !l.transferencia && l.categoria === c && mesDe(l.dia) === m).reduce((s, l) => s + l.valor, 0));
+    const fixa = (c) => { const v = porMes(c); return v.every((x) => x > 0) && Math.max(...v) <= Math.min(...v) * 1.1; };
+    const pesa = (c) => media[c] >= 0.1 * Object.values(media).reduce((a, b) => a + b, 0);
     const orcamentoPara = Object.keys(media)
         .filter((c) => c !== 'Sem categoria' && media[c] >= 50)
         .filter((c) => ctx.categorias.some((k) => mesmoNome(k.nome, c) && ['S', 'despesa'].includes(k.tipo)))
         .filter((c) => !comOrcamento.some((o) => mesmoNome(o, c)) && !feitoRecente('criar_orcamento', c))
-        .filter(crescendo)
+        .filter((c) => crescendo(c) || (!fixa(c) && pesa(c)))
         .sort((a, b) => media[b] - media[a])
         .slice(0, 3);
 
     const criarInvestimento = ctx.investimentos.length === 0 && sobraMedia > 0 && folgaMes > 0 && !feitoRecente('criar_investimento');
 
-    return { folgaMes, sobraMedia, aportar, depositarEm, criarMeta, orcamentoPara, criarInvestimento };
+    return { folgaMes, sobraMedia, aportar, depositarEm, criarMeta, soReserva, orcamentoPara, criarInvestimento };
 }
 
 // ---------- Períodos ----------
@@ -253,9 +266,10 @@ export const funcoes = {
             const p = periodo ? resolverPeriodo(periodo, ctx.hoje) : base;
             const calc = (pp) => {
                 const lista = noPeriodo(ctx, pp);
-                const entradas = soma(lista.filter((l) => l.tipo === 'E'));
+                const entradas = soma(lista.filter((l) => l.tipo === 'E' && !l.transferencia));
                 const saidas = soma(gastos(lista));
-                const guardado = soma(lista.filter((l) => l.transferencia));
+                // líquido: o que foi para metas/investimentos menos o que voltou deles
+                const guardado = arred(soma(lista.filter((l) => l.transferencia && l.tipo === 'S')) - soma(lista.filter((l) => l.transferencia && l.tipo === 'E')));
                 return {
                     entradas,
                     saidas,
@@ -312,7 +326,7 @@ export const funcoes = {
                     );
                     return { mes, total: soma(filtrados) };
                 }
-                return { mes, entradas: soma(doMes.filter((l) => l.tipo === 'E')), saidas: soma(gastos(doMes)) };
+                return { mes, entradas: soma(doMes.filter((l) => l.tipo === 'E' && !l.transferencia)), saidas: soma(gastos(doMes)) };
             });
         },
     },

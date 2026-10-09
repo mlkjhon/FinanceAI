@@ -233,6 +233,7 @@ function montarAcao(ctx, p, valores, periodoBase) {
         case 'criar_meta': {
             if (!p.nomeSugerido || !valor) return null;
             if (!livre && !nec.criarMeta) return null;
+            if (!livre && nec.soReserva && !/reserva|emerg/i.test(p.nomeSugerido)) return null;
             if (ctx.metas.some((m) => igual(m.titulo, p.nomeSugerido))) return null;
             const data = p.dataObjetivo && p.dataObjetivo > hoje ? p.dataObjetivo : null;
             return { acao: p.acao, texto, titulo: p.nomeSugerido, valor, dataObjetivo: data };

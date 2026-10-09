@@ -50,7 +50,7 @@ const alvos = (snap) =>
 AÇÕES LIBERADAS AGORA (acoesNecessarias; o servidor descarta qualquer outra):
 - aportar: ${snap.acoesNecessarias?.aportar ? 'sim' : 'NÃO'}
 - depositar_meta em: ${JSON.stringify(snap.acoesNecessarias?.depositarEm || [])}
-- criar_meta: ${snap.acoesNecessarias?.criarMeta ? 'sim' : 'NÃO'}
+- criar_meta: ${snap.acoesNecessarias?.criarMeta ? (snap.acoesNecessarias.soReserva ? 'sim, só "Reserva de emergência" (valorBase = gastos médios do mês, fator 3 a 6)' : 'sim') : 'NÃO'}
 - criar_orcamento para: ${JSON.stringify(snap.acoesNecessarias?.orcamentoPara || [])}
 - criar_investimento: ${snap.acoesNecessarias?.criarInvestimento ? 'sim' : 'NÃO'}
 - sobra do mês até agora (já descontando aportes e depósitos): ${snap.acoesNecessarias?.folgaMes ?? 0}`;
@@ -70,7 +70,8 @@ O QUE FAZER:
 - Crie de 6 a 10 blocos variados. O primeiro é OBRIGATORIAMENTE um "story" (size "full", priority 10) com o resumo do período.
 - Escreva os blocos JÁ NA ORDEM em que devem aparecer (eles vão para a tela conforme você escreve): depois do story, o mais relevante para este usuário primeiro (o que mudou, o que preocupa, onde dá para economizar).
 - Use tipos variados (gráficos, tabela, anomalias, projeção, metas, comparativo). Só crie um bloco se os dados acima sustentarem.
-- Blocos "action" são OPCIONAIS: crie no máximo 2, e SOMENTE das ações liberadas acima (quando o usuário realmente precisa). Se nada estiver liberado, NÃO crie nenhum "action": é melhor nenhuma ação do que uma ação desnecessária.
+- Blocos "action": SOMENTE das ações liberadas acima. Se houver alguma liberada, crie 1 a 3 delas (prefira variar: meta, orçamento, depósito, aporte), sempre com o botão que executa. Se nada estiver liberado, NÃO crie nenhum "action".
+- Nunca recomende criar meta, orçamento ou investimento só em texto (story, anomaly, forecast): se a recomendação faz sentido e está liberada, ela vira um bloco "action" com botão; se não está liberada, não recomende.
   Ex.: sem anomalias na lista -> não crie anomaly; sem metas -> não crie goal de meta existente; projecaoFimMes null -> sem forecast.
 - Ações precisam nascer dos dados e do que está liberado: orçamento para a categoria que estourou ou cresceu, depósito na meta mais atrasada, aporte quando sobrou dinheiro (o valor nunca passa da sobra do mês). Nunca repita o que o usuário acabou de fazer. NÃO crie blocos "tip" nem "challenge".
 - Tamanhos: kpi "sm"; ação, anomalia e projeção "sm" ou "md"; gráficos e tabelas "md" ou "lg".

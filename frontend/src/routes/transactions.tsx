@@ -11,7 +11,7 @@ import { transactionsApi, categoriesApi, subcategoriasApi, type Category, type T
 import { Collapse } from '../components/collapse';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter } from '../components/ui';
-import { formatCurrency, cn } from '../lib/utils';
+import { formatCurrency, cn, descricaoVisivel } from '../lib/utils';
 import { Segmented } from '../components/segmented';
 import { AmountField } from '../components/sheet';
 import { deNumero, paraNumero } from '../lib/dinheiro';
@@ -333,7 +333,7 @@ function LedgerRow({ tx, isNew, onOpen, revealIndex }: { tx: Transaction; isNew:
           {inicial}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium text-[var(--color-ink)] truncate" title={tx.descricao}>{tx.descricao}</span>
+          <span className="block text-sm font-medium text-[var(--color-ink)] truncate" title={descricaoVisivel(tx.descricao)}>{descricaoVisivel(tx.descricao)}</span>
           <span className="block text-xs mt-0.5 truncate text-[var(--color-ink-muted)]">
             {tx.categoria_nome || 'Sem categoria'}
           </span>

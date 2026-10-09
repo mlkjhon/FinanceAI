@@ -236,10 +236,10 @@ router.delete('/investimentos/:id', autenticar, async (req, res) => {
         let devolvido = 0;
         await emTransacao(async (cliente) => {
             /*
-             * O dinheiro do investimento volta para o saldo:
-             * - apagar os aportes/resgates da conta principal devolve aportes - resgates;
-             * - os rendimentos nunca passaram pela conta principal, então entram agora
-             *   como uma entrada, para o saldo receber o valor atual inteiro do investimento.
+             * Encerrar o investimento = resgatar tudo: os aportes e resgates antigos
+             * ficam no histórico (aconteceram de verdade) e entra UMA transação de
+             * entrada com o valor atual inteiro (aportes - resgates + rendimentos).
+             * Assim o dinheiro aparece voltando em Transações.
              */
             const resumo = await cliente.query(
                 `SELECT i.nome,
@@ -249,18 +249,20 @@ router.delete('/investimentos/:id', autenticar, async (req, res) => {
                  WHERE i.id_investimento = $1 GROUP BY i.nome`,
                 [id]
             );
-            const { nome, rendimentos = 0, saldo = 0 } = resumo.rows[0] || {};
+            const { nome, saldo = 0 } = resumo.rows[0] || {};
             devolvido = Math.max(Math.round(saldo * 100) / 100, 0);
-            if (rendimentos > 0.004) {
+            if (devolvido > 0) {
                 await cliente.query(
                     `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria, data_registro)
                      VALUES ($1, $2, $3, 'E', NULL, CURRENT_DATE)`,
-                    [id_usuario, `Rendimentos de ${nome} (investimento encerrado)`, Math.round(rendimentos * 100) / 100]
+                    [id_usuario, `Resgate de ${nome} (investimento encerrado)`, devolvido]
                 );
             }
-            // Deletar da conta principal apenas os aportes/resgates DESTE investimento (marcados com [INV:id_transacao_inv])
+            // Os aportes/resgates antigos continuam em Transações com o marcador genérico [INV]
+            // (o investimento deixa de existir; apagar um deles depois não mexe em nada)
             await cliente.query(
-                `DELETE FROM transacoes t
+                `UPDATE transacoes t
+                 SET descricao = '[INV]' || substr(t.descricao, strpos(t.descricao, ']') + 1)
                  WHERE t.id_usuario = $1
                    AND EXISTS (
                        SELECT 1 FROM transacoes_investimentos ti

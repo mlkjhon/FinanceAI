@@ -14,6 +14,11 @@ export function formatCurrency(value: number, locale = 'pt-BR', currency = 'BRL'
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
 }
 
+// Aportes/resgates de investimento levam um marcador interno ("[INV:12] Aporte em CDB"); na tela ele some
+export function descricaoVisivel(descricao: string) {
+  return String(descricao || '').replace(/^[INV(:d+)?]s*/, '');
+}
+
 export function formatDate(dateStr: string) {
   if (!dateStr) return '';
   const texto = String(dateStr);
