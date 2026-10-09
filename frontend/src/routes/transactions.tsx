@@ -1,17 +1,18 @@
-import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, useReducedMotion } from 'motion/react';
 import { Dialog } from '@base-ui/react/dialog';
+import { AnimatePresence, motion } from 'motion/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { txSchema, type TxForm } from '../lib/schemas/transaction';
-import { Plus, Search, X, Loader2, Trash2 } from '../components/icons';
+import { Plus, Search, X, Loader2 } from '../components/icons';
 import { transactionsApi, categoriesApi, subcategoriasApi, type Transaction, type CreateTransaction } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter } from '../components/ui';
 import { formatCurrency, cn } from '../lib/utils';
-import { spring } from '../lib/motion-tokens';
+import { Segmented } from '../components/segmented';
+import { HoldToDelete } from '../components/hold-to-delete';
 
 export const Route = createFileRoute('/transactions')({
   beforeLoad: () => {
@@ -52,84 +53,6 @@ const rotuloDoDia = (iso: string) => {
 };
 
 const sinal = (tx: Transaction) => (tx.tipo === 'receita' ? tx.valor : -tx.valor);
-
-// ---------- Controle segmentado ----------
-
-/*
- * Indicador desliza entre as opções. Frequência: dezenas por dia, então é rápido
- * (spring.snappy, ~250ms, sem bounce) e some com reduced motion.
- */
-function Segmented<T extends string>({ id, value, options, onChange, label }: {
-  id: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string;
-}) {
-  const reduce = useReducedMotion();
-  return (
-    <div role="group" aria-label={label} className="inline-flex self-start rounded-full bg-[var(--color-ink)]/[0.05] p-1">
-      {options.map((o) => {
-        const active = o.value === value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-
-            aria-pressed={active}
-            onClick={() => onChange(o.value)}
-            className={cn(
-              'relative px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-150',
-              active ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink-soft)]'
-            )}
-          >
-            {active && (
-              <motion.span
-                layoutId={reduce ? undefined : id}
-                transition={spring.snappy}
-                className="absolute inset-0 -z-10 rounded-full bg-white shadow-sm"
-              />
-            )}
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ---------- Segurar para excluir ----------
-
-function HoldToDelete({ onConfirm, pending }: { onConfirm: () => void; pending: boolean }) {
-  const [holding, setHolding] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  const start = () => {
-    if (pending) return;
-    setHolding(true);
-    timer.current = setTimeout(() => { setHolding(false); onConfirm(); }, 2000);
-  };
-  const cancel = () => { clearTimeout(timer.current); setHolding(false); };
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  return (
-    <button
-      type="button"
-      className="hold-btn w-full rounded-full border border-[var(--color-finance-error)]/30 py-3 text-sm font-semibold text-loss"
-      data-holding={holding ? '' : undefined}
-      onPointerDown={start}
-      onPointerUp={cancel}
-      onPointerLeave={cancel}
-      onPointerCancel={cancel}
-      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); start(); } }}
-      onKeyUp={(e) => { if (e.key === 'Enter' || e.key === ' ') cancel(); }}
-      onContextMenu={(e) => e.preventDefault()}
-      aria-label="Segure para excluir esta transação"
-    >
-      <span className="hold-fill" aria-hidden />
-      <span className="inline-flex items-center gap-2">
-        {pending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-        {pending ? 'Excluindo' : holding ? 'Continue segurando' : 'Segure para excluir'}
-      </span>
-    </button>
-  );
-}
 
 // ---------- Painel de criar / editar ----------
 
@@ -299,11 +222,20 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
 
 // ---------- Livro-caixa ----------
 
-function LedgerRow({ tx, isNew, onOpen }: { tx: Transaction; isNew: boolean; onOpen: () => void }) {
+/*
+ * Saída de uma linha excluída: some e a lista fecha o espaço (200ms ease-out).
+ * Frequência: ocasional. Propósito: evitar que as linhas de baixo "pulem".
+ * Entrada só para linhas trazidas por "Mostrar mais" (revealIndex definido).
+ */
+function LedgerRow({ tx, isNew, onOpen, revealIndex }: { tx: Transaction; isNew: boolean; onOpen: () => void; revealIndex?: number }) {
   const income = tx.tipo === 'receita';
   const inicial = (tx.categoria_nome || tx.descricao || '?').trim().charAt(0).toUpperCase();
   return (
-    <li>
+    <motion.li
+      exit={{ opacity: 0, height: 0, transition: { duration: 0.2, ease: [0.23, 1, 0.32, 1] } }}
+      className={cn("overflow-hidden", revealIndex !== undefined && "rise")}
+      style={revealIndex !== undefined ? ({ "--i": revealIndex } as React.CSSProperties) : undefined}
+    >
       <button
         type="button"
         onClick={onOpen}
@@ -328,7 +260,7 @@ function LedgerRow({ tx, isNew, onOpen }: { tx: Transaction; isNew: boolean; onO
           {income ? '+' : '-'}{formatCurrency(tx.valor)}
         </span>
       </button>
-    </li>
+    </motion.li>
   );
 }
 
@@ -391,6 +323,7 @@ function TransactionsContent() {
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const [search, setSearch] = useState('');
   const [visible, setVisible] = useState(PAGE_SIZE);
+  const [revealFrom, setRevealFrom] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editTx, setEditTx] = useState<Transaction | undefined>();
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
@@ -430,8 +363,9 @@ function TransactionsContent() {
   }, [all, filtro, search]);
 
   const groups = useMemo(() => {
-    const out: { dia: string; items: Transaction[]; total: number }[] = [];
-    for (const tx of filtered.slice(0, visible)) {
+    const out: { dia: string; items: (Transaction & { _idx: number })[]; total: number }[] = [];
+    for (const [idx, raw] of filtered.slice(0, visible).entries()) {
+      const tx = { ...raw, _idx: idx };
       const dia = diaDe(tx);
       const last = out[out.length - 1];
       if (last && last.dia === dia) { last.items.push(tx); last.total += sinal(tx); }
@@ -470,7 +404,7 @@ function TransactionsContent() {
             id="tx-filter"
             label="Filtrar por tipo"
             value={filtro}
-            onChange={(v) => { setFiltro(v); setVisible(PAGE_SIZE); }}
+            onChange={(v) => { setFiltro(v); setVisible(PAGE_SIZE); setRevealFrom(null); }}
             options={[{ value: 'todas', label: 'Todas' }, { value: 'receita', label: 'Entradas' }, { value: 'despesa', label: 'Saídas' }]}
           />
           <div className="relative sm:w-72">
@@ -478,7 +412,7 @@ function TransactionsContent() {
             <input
               type="search"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setVisible(PAGE_SIZE); }}
+              onChange={(e) => { setSearch(e.target.value); setVisible(PAGE_SIZE); setRevealFrom(null); }}
               placeholder="Buscar por descrição ou categoria"
               aria-label="Buscar transações"
               className="field w-full pl-10 pr-4 py-2.5 rounded-full border border-[var(--color-line)] bg-white text-sm"
@@ -521,7 +455,11 @@ function TransactionsContent() {
               <p className="text-xs text-[var(--color-ink-muted)] mb-4" data-num>
                 {count === 1 ? '1 transação' : `${count.toLocaleString('pt-BR')} transações`}
               </p>
-              <div className="space-y-7">
+              {/*
+                Troca de filtro: crossfade de 180ms com ponte de blur. Dezenas por dia,
+                então é curta. A busca não anima (digitar é ação de teclado).
+              */}
+              <div key={filtro} className="list-swap space-y-7">
                 {groups.map((g) => (
                   <section key={g.dia} aria-label={rotuloDoDia(g.dia)}>
                     <div className="sticky top-16 z-[1] -mx-1 px-1 py-2 flex items-baseline justify-between app-surface">
@@ -531,16 +469,24 @@ function TransactionsContent() {
                       </span>
                     </div>
                     <ul className="finance-card overflow-hidden divide-y divide-[var(--color-line)]">
-                      {g.items.map((tx) => (
-                        <LedgerRow key={tx.id} tx={tx} isNew={newIds.has(tx.id)} onOpen={() => openEdit(tx)} />
-                      ))}
+                      <AnimatePresence initial={false}>
+                        {g.items.map((tx) => (
+                          <LedgerRow
+                            key={tx.id}
+                            tx={tx}
+                            isNew={newIds.has(tx.id)}
+                            onOpen={() => openEdit(tx)}
+                            revealIndex={revealFrom !== null && tx._idx >= revealFrom ? Math.min(tx._idx - revealFrom, 8) : undefined}
+                          />
+                        ))}
+                      </AnimatePresence>
                     </ul>
                   </section>
                 ))}
               </div>
               {visible < count && (
                 <button
-                  onClick={() => setVisible((v) => v + PAGE_SIZE)}
+                  onClick={() => { setRevealFrom(visible); setVisible((v) => v + PAGE_SIZE); }}
                   className="pressable mt-8 mx-auto block rounded-full border border-[var(--color-line)] bg-white px-5 py-2.5 text-sm font-medium text-[var(--color-ink-soft)]"
                 >
                   Mostrar mais {Math.min(PAGE_SIZE, count - visible)}

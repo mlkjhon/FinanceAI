@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { motion, AnimatePresence } from 'motion/react';
+import { modal } from '../lib/motion-tokens';
 import { Plus, CreditCard, Building2, MoreHorizontal, Wallet, ShieldCheck, Trash2 } from '../components/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '../components/Navbar';
@@ -135,10 +136,10 @@ function BancosPage() {
                 </div>
               ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {data?.conexoes?.map(conexao => (
-                    <FinanceCard key={conexao.id} className="relative overflow-hidden group">
+                  {data?.conexoes?.map((conexao, i) => (
+                    <FinanceCard key={conexao.id} index={i} className="relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-4 flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-[var(--color-accent)] shadow-[0_0_8px_rgba(34,197,94,0.6)]" title="Sincronização Ativa" />
+                        <span className="live-dot" title="Sincronização ativa" />
                         <button
                           onClick={() => setDeleteConfirm({ id: conexao.id, nome: conexao.instituicao })}
                           className="text-gray-400 hover:text-loss transition-colors p-1"
@@ -196,8 +197,7 @@ function BancosPage() {
         {pendingConnection && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+              {...modal}
               className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6"
             >
               <div className="flex items-center gap-3 mb-3">
@@ -236,9 +236,7 @@ function BancosPage() {
         {deleteConfirm && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
+              {...modal}
               transition={{ duration: 0.2 }}
               className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden"
             >

@@ -1,4 +1,5 @@
-import { motion } from 'motion/react';
+import { useEffect } from 'react';
+import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
 import { cn } from '../lib/utils';
 
 /*
@@ -54,16 +55,31 @@ export function DonutRing({
   );
 }
 
+/*
+ * Anel de progresso que enche. Frequência: ao abrir a tela e depois de um
+ * depósito. Propósito: indicação de estado (mostra o quanto avançou), por isso
+ * parte do valor anterior, não do zero. 900ms ease-out; reduced motion pula direto.
+ */
 export function ProgressRing({ pct, className, children }: { pct: number; className?: string; children?: React.ReactNode }) {
   const clamped = Math.max(0, Math.min(100, pct));
+  const reduce = useReducedMotion();
+  const mv = useMotionValue(reduce ? clamped : 0);
+  const background = useTransform(mv, (p) => `conic-gradient(#047857 0% ${p}%, #E5E7EB ${p}% 100%)`);
+  const mask = ringMask(0.82);
+
+  useEffect(() => {
+    if (reduce) { mv.set(clamped); return; }
+    const c = animate(mv, clamped, { duration: 0.9, ease: [0.23, 1, 0.32, 1] });
+    return () => c.stop();
+  }, [clamped, reduce, mv]);
+
   return (
     <div className={cn('relative', className)}>
-      <DonutRing
-        className="h-full w-full"
-        hole={0.82}
-        track="#E5E7EB"
-        segments={[{ value: clamped, color: '#10B981' }, { value: 100 - clamped, color: '#E5E7EB' }]}
-        label={`${clamped.toFixed(0)}% concluído`}
+      <motion.div
+        role="img"
+        aria-label={`${clamped.toFixed(0)}% concluído`}
+        className="h-full w-full rounded-full"
+        style={{ background, WebkitMask: mask, mask }}
       />
       <div className="absolute inset-0 flex items-center justify-center">{children}</div>
     </div>

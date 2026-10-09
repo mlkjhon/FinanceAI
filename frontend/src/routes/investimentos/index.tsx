@@ -6,6 +6,7 @@ import { AnimatedCounter, SkeletonCard } from '../../components/ui';
 import { investimentosApi, Investment } from '../../lib/api';
 import { formatCurrency, descreverTaxa } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { modal, backdrop } from '../../lib/motion-tokens';
 import { Plus, ArrowRight, X } from '../../components/icons';
 
 
@@ -149,14 +150,12 @@ function InvestimentosPage() {
         {modalAberto && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              {...backdrop}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
               onClick={() => setModalAberto(false)}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              {...modal}
               className="bg-white rounded-3xl shadow-xl w-full max-w-md relative z-10 overflow-hidden"
             >
               <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">

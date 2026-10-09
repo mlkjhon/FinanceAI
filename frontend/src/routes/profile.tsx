@@ -1,7 +1,9 @@
 import React, { Suspense } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Collapse } from '../components/collapse';
+import { HoldToDelete } from '../components/hold-to-delete';
 import { User, Mail, LogOut, Loader2 } from '../components/icons';
 import { authApi, categoriesApi, type CreateCategory } from '../lib/api';
 import { Navbar } from '../components/Navbar';
@@ -75,14 +77,14 @@ function ProfileContent() {
           <h2 className="font-brand font-semibold text-gray-900">Categorias</h2>
           <button
             onClick={() => setShowCatForm(!showCatForm)}
+            aria-expanded={showCatForm}
             className="text-sm text-[var(--color-accent)] font-medium hover:underline"
           >
             + Adicionar
           </button>
         </div>
 
-        {showCatForm && (
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row gap-2 mb-4 p-3 rounded-xl bg-gray-50">
+        <Collapse open={showCatForm} className="flex flex-col sm:flex-row gap-2 mb-4 p-3 rounded-xl bg-[var(--color-surface)]">
             <input
               value={catForm.nome}
               onChange={(e) => setCatForm((p) => ({ ...p, nome: e.target.value }))}
@@ -104,27 +106,29 @@ function ProfileContent() {
             >
               {createCatMut.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Salvar'}
             </button>
-          </motion.div>
-        )}
+        </Collapse>
 
         {catsLoading ? (
           <SkeletonCard lines={3} className="border-0 shadow-none" />
         ) : (
           <div className="space-y-2">
-            {cats?.length ? cats.map((c) => (
-              <div key={c.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+            {cats?.length ? <AnimatePresence initial={false}>{cats.map((c) => (
+              <motion.div
+                key={c.id}
+                layout="position"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="overflow-hidden flex items-center justify-between py-2 border-b border-[var(--color-line)] last:border-0"
+              >
                 <div className="flex items-center gap-2">
                   <Badge label={c.tipo === 'receita' ? 'Receita' : 'Despesa'} variant={c.tipo === 'receita' ? 'success' : 'error'} />
                   <span className="text-sm text-gray-700">{c.nome}</span>
                 </div>
-                <button
-                  onClick={() => deleteCatMut.mutate(c.id)}
-                  className="text-xs text-[var(--color-finance-error)] hover:underline"
-                >
-                  Remover
-                </button>
-              </div>
-            )) : (
+                <HoldToDelete compact label="Segure para remover" pending={deleteCatMut.isPending && deleteCatMut.variables === c.id} onConfirm={() => deleteCatMut.mutate(c.id)} />
+              </motion.div>
+            ))}</AnimatePresence> : (
               <p className="text-sm text-gray-400 text-center py-4">Nenhuma categoria criada</p>
             )}
           </div>

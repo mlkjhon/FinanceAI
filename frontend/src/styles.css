@@ -268,6 +268,76 @@
 
 /* ---------- Primitivas de motion em CSS ---------- */
 
+/*
+ * Press em todo botão do site (emil: "buttons must feel responsive").
+ * :where() deixa a especificidade zero, então qualquer transform próprio vence.
+ * Linhas de lista e colunas de gráfico dão feedback pelo fundo, não por escala.
+ */
+:where(button, [role="button"], a.btn-primary):not(:disabled):not(.ledger-row):not(.flow-col) {
+  transition-property: transform, color, background-color, border-color, opacity;
+  transition-duration: var(--dur-press), 150ms, 150ms, 150ms, 150ms;
+  transition-timing-function: var(--ease-out), ease, ease, ease, ease;
+}
+:where(button, [role="button"], a.btn-primary):not(:disabled):not(.ledger-row):not(.flow-col):active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(button, [role="button"], a.btn-primary):active { transform: none; }
+}
+
+/*
+ * Bolha de chat: nasce do lado de quem falou (origem no canto da bolha).
+ * Frequência: algumas por conversa. 220ms ease-out, de scale(0.96).
+ */
+.bubble {
+  animation: bubble-in 220ms var(--ease-out) both;
+}
+.bubble[data-side="user"] { transform-origin: bottom right; }
+.bubble[data-side="ai"] { transform-origin: bottom left; }
+@keyframes bubble-in {
+  from { opacity: 0; transform: scale(0.96) translateY(4px); }
+}
+
+/* "Digitando": três pontos em onda, enquanto a IA responde (estado, não decoração) */
+.typing span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-ink-muted);
+  animation: typing 1s var(--ease-in-out) infinite;
+}
+.typing span:nth-child(2) { animation-delay: 150ms; }
+.typing span:nth-child(3) { animation-delay: 300ms; }
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Erro de formulário: tremida curta (feedback de que a ação falhou) */
+.shake { animation: shake 320ms var(--ease-out); }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+/* Selo de conquista (meta concluída): aparece com um leve quique. Raro, então pode ter delight */
+.pop-in { animation: pop-in 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: 700ms; }
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble { animation: route-fade 150ms ease both; }
+  .typing span { animation: typing-fade 1s ease infinite; }
+  .shake { animation: none; }
+  .pop-in { animation: route-fade 200ms ease both; animation-delay: 0ms; }
+}
+@keyframes typing-fade { 50% { opacity: 1; } 0%, 100% { opacity: 0.4; } }
+
 /* M10: press feedback universal */
 .pressable {
   transition: transform var(--dur-press) var(--ease-out);
@@ -615,6 +685,43 @@
   .hold-btn[data-holding] { transform: none; }
 }
 
+/* Troca de filtro da lista: 180ms, ponte de blur de 2px para não ver duas listas sobrepostas */
+.list-swap { animation: list-swap 180ms var(--ease-out) both; }
+@keyframes list-swap {
+  from { opacity: 0; filter: blur(2px); }
+}
+
+/* Barras horizontais (categorias, mês a mês): crescem da esquerda com scaleX, em cascata */
+.bar-x {
+  transform-origin: left;
+  animation: bar-x 700ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 50ms + 150ms);
+}
+@keyframes bar-x {
+  from { transform: scaleX(0.02); }
+}
+
+/* Saídas crescem para baixo, a partir da linha central */
+.bar-down { transform-origin: top; }
+
+/* Gráfico interativo: colunas fora de foco recuam (opacity, 150ms) */
+.flow-bar { transition: opacity 150ms ease; }
+.flow-chart[data-active] .flow-col:not([data-active]) .flow-bar { opacity: 0.4; }
+
+@media (prefers-reduced-motion: reduce) {
+  .list-swap { animation: none; }
+  .bar-x { animation: none; }
+}
+
+/* Seta de voltar recua no hover */
+.arrow-back {
+  display: inline-flex;
+  transition: transform var(--dur-hover) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .group:hover .arrow-back { transform: translateX(-3px); }
+}
+
 /* Seta que avança no hover de um card clicável: diz "isso abre algo" */
 .arrow-nudge {
   display: inline-flex;
@@ -656,4 +763,29 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .route-fade { animation-duration: 150ms; }
+}
+
+/* Conexão bancária ativa: anel que se expande e some (estado "ao vivo"). 2s, discreto */
+.live-dot {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--color-accent);
+  animation: live-ring 2s var(--ease-out) infinite;
+}
+@keyframes live-ring {
+  from { transform: scale(1); opacity: 0.5; }
+  to { transform: scale(2.6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot::after { animation: none; }
 }

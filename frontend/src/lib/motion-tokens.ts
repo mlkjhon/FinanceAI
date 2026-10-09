@@ -44,3 +44,20 @@ export function project(velocity: number, deceleration = 0.998) {
 }
 
 export const finePointerQuery = '(hover: hover) and (pointer: fine)';
+
+/*
+ * Modal centralizado (receita "Modal" do animate): fica no centro, entra de
+ * scale(0.96) + opacity em 250ms ease-out e sai mais rápido (150ms).
+ * Com MotionConfig reducedMotion o transform é ignorado e sobra o fade.
+ */
+export const modal = {
+  initial: { opacity: 0, transform: 'scale(0.96)' },
+  animate: { opacity: 1, transform: 'scale(1)', transition: { duration: 0.25, ease: ease.out } },
+  exit: { opacity: 0, transform: 'scale(0.98)', transition: { duration: 0.15, ease: ease.out } },
+} as const;
+
+export const backdrop = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.25, ease: ease.out } },
+  exit: { opacity: 0, transition: { duration: 0.15, ease: ease.out } },
+} as const;

@@ -1,8 +1,7 @@
 import React, { Suspense, useState, useRef, useEffect } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'motion/react';
-import { Brain, Lightbulb, TrendingDown, PiggyBank, Send, Loader2, Sparkles, RefreshCw } from '../components/icons';
+import { Brain, Lightbulb, TrendingDown, PiggyBank, Send, Loader2, RefreshCw } from '../components/icons';
 import { insightsApi } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { FinanceCard, SkeletonCard } from '../components/ui';
@@ -108,37 +107,25 @@ function InsightsContent() {
         {/* Área de mensagens */}
         <div ref={chatRef} className="h-72 overflow-y-auto p-4 space-y-3">
           {chat.map((msg, i) => (
-            <motion.div
+            <div
               key={i}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+              <div data-side={msg.role} className={`bubble max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === 'user'
                   ? 'bg-[var(--color-accent)] text-white rounded-br-sm'
                   : 'bg-gray-100 text-gray-900 rounded-bl-sm'
               }`}>
                 {msg.content}
               </div>
-            </motion.div>
+            </div>
           ))}
 
           {/* Animação enquanto a IA processa */}
           {isAiLoading && (
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl gradient-hero flex items-center justify-center">
-                <Sparkles size={14} className="text-white animate-spin" />
-              </div>
-              <div className="flex gap-1">
-                {[0, 1, 2].map(i => (
-                  <motion.div
-                    key={i}
-                    className="w-2 h-2 rounded-full bg-[var(--color-accent)]"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
-                  />
-                ))}
+            <div className="flex justify-start" role="status" aria-label="O assistente está escrevendo">
+              <div data-side="ai" className="bubble typing flex items-center gap-1.5 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-3.5">
+                <span /><span /><span />
               </div>
             </div>
           )}
@@ -184,12 +171,10 @@ function InsightsContent() {
         ) : insights?.length ? (
           <div className="grid sm:grid-cols-2 gap-4">
             {insights.map((ins, i) => (
-              <motion.div
+              <div
                 key={ins.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 }}
-                className="finance-card p-5"
+                style={{ "--i": i } as React.CSSProperties}
+                className="rise finance-card p-5"
               >
                 <div className="flex items-start gap-3 mb-3">
                   <div className="w-10 h-10 rounded-xl bg-gain-soft flex items-center justify-center text-gain shrink-0">
@@ -205,7 +190,7 @@ function InsightsContent() {
                   </div>
                 </div>
                 <p className="text-sm text-gray-500 leading-relaxed">{ins.descricao}</p>
-              </motion.div>
+              </div>
             ))}
           </div>
         ) : (

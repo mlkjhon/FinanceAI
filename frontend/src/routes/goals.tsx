@@ -5,7 +5,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Target, Plus, Calendar, PiggyBank, X, Check } from '../components/icons';
 import { goalsApi } from '../lib/api';
 import { Navbar } from '../components/Navbar';
-import { FinanceCard, SkeletonCard } from '../components/ui';
+import { AnimatedCounter, SkeletonCard } from '../components/ui';
+import { Collapse } from '../components/collapse';
+import { HoldToDelete } from '../components/hold-to-delete';
+import { modal, backdrop } from '../lib/motion-tokens';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { ProgressRing } from '../components/ConicChart';
 
@@ -21,8 +24,8 @@ function CircularProgress({ value, max }: { value: number; max: number }) {
   const pct = Math.min(max > 0 ? (value / max) * 100 : 0, 100);
 
   return (
-    <ProgressRing pct={pct} className="w-24 h-24 mx-auto">
-      <span className="font-bold text-sm text-gain">{pct.toFixed(0)}%</span>
+    <ProgressRing pct={pct} className="w-28 h-28 mx-auto">
+      <span className="font-brand font-bold text-lg text-[var(--color-ink)]"><AnimatedCounter value={pct} className="text-inherit" />%</span>
     </ProgressRing>
   );
 }
@@ -49,12 +52,14 @@ function ModalDeposito({
 
   return (
     // Fundo escurecido ao redor do modal
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center p-4">
+      <motion.div {...backdrop} className="absolute inset-0 bg-[var(--color-ink)]/30" onClick={onClose} />
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5"
+        {...modal}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Depositar em ${meta.nome}`}
+        className="relative bg-white rounded-[20px] shadow-xl w-full max-w-sm p-6 space-y-5"
       >
         {/* Cabeçalho do modal */}
         <div className="flex items-center justify-between">
@@ -94,7 +99,7 @@ function ModalDeposito({
               autoFocus
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/15 transition-[color,background-color,border-color,box-shadow,opacity]"
             />
-            <p className="text-xs text-gray-400">⚠️ Esse valor será descontado automaticamente do seu saldo total.</p>
+            <p className="text-xs text-[var(--color-ink-muted)]">O valor sai do seu saldo e entra na meta.</p>
           </div>
           <div className="flex gap-3">
             <button
@@ -177,20 +182,20 @@ function GoalsContent() {
       {/* Cabeçalho */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-bold text-2xl text-gray-900">Metas financeiras</h1>
-          <p className="text-sm text-gray-500">Defina e acompanhe seus objetivos</p>
+          <h1 className="font-brand font-bold text-3xl tracking-tight text-[var(--color-ink)]">Metas</h1>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--color-accent)] text-white text-sm font-semibold hover:bg-[#065f46] transition-colors shadow"
+          aria-expanded={showForm}
+          className="btn-primary px-5 py-2.5 text-sm"
         >
           <Plus size={16} /> Nova meta
         </button>
       </div>
 
       {/* Formulário de criação de meta */}
-      {showForm && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="finance-card p-5">
+      <Collapse open={showForm}>
+        <div className="finance-card p-5">
           <h3 className="font-semibold text-gray-900 mb-4">Criar nova meta</h3>
           <form onSubmit={onSubmit} className="grid sm:grid-cols-2 gap-3">
             {[
@@ -227,8 +232,8 @@ function GoalsContent() {
               </button>
             </div>
           </form>
-        </motion.div>
-      )}
+        </div>
+      </Collapse>
 
       {/* Lista de metas */}
       {isLoading ? (
@@ -238,12 +243,10 @@ function GoalsContent() {
       ) : goals?.length ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {goals.map((g, i) => (
-            <motion.div
+            <div
               key={g.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.08 }}
-              className="finance-card p-5 space-y-4"
+              style={{ "--i": i } as React.CSSProperties}
+              className="rise finance-card p-5 space-y-4"
             >
               {/* Título e ícone */}
               <div className="flex items-start justify-between">
@@ -251,7 +254,11 @@ function GoalsContent() {
                   <p className="font-semibold text-gray-900">{g.nome}</p>
                   {g.descricao && <p className="text-xs text-gray-400 mt-0.5">{g.descricao}</p>}
                 </div>
-                <Target size={18} className="text-gain shrink-0" />
+                {g.valor_atual >= g.valor_meta ? (
+                  <span className="pop-in shrink-0 rounded-md bg-gain-soft px-2 py-0.5 text-xs font-semibold text-gain">Concluída</span>
+                ) : (
+                  <Target size={18} className="text-[var(--color-ink-muted)] shrink-0" />
+                )}
               </div>
 
               {/* Progresso circular */}
@@ -279,20 +286,15 @@ function GoalsContent() {
               <div className="flex gap-2 pt-1">
                 {/* Botão: adicionar dinheiro à meta */}
                 <button
-                  onClick={() => setMetaDeposito({ id: g.id, nome: g.nome, valor_meta: g.valor_atual, valor_atual: g.valor_atual })}
-                  className="flex-1 py-2 rounded-xl bg-gain-soft text-gain text-xs font-semibold hover:bg-gain-soft transition-colors flex items-center justify-center gap-1"
+                  onClick={() => setMetaDeposito({ id: g.id, nome: g.nome, valor_meta: g.valor_meta, valor_atual: g.valor_atual })}
+                  className="flex-1 py-2 rounded-full bg-gain-soft text-gain text-xs font-semibold flex items-center justify-center gap-1"
                 >
                   <PiggyBank size={13} /> Depositar
                 </button>
                 {/* Botão: remover meta */}
-                <button
-                  onClick={() => deleteMut.mutate(g.id)}
-                  className="flex-1 py-2 rounded-xl bg-loss-soft text-loss text-xs font-semibold hover:bg-loss-soft transition-colors"
-                >
-                  Remover
-                </button>
+                <HoldToDelete compact label="Segure para remover" pending={deleteMut.isPending && deleteMut.variables === g.id} onConfirm={() => deleteMut.mutate(g.id)} />
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       ) : (

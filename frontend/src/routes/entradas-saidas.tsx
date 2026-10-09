@@ -1,315 +1,193 @@
-import { createFileRoute } from '@tanstack/react-router';
+import React, { useState } from 'react';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from '../lib/api';
-import { FinanceCard, SkeletonCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
-import { formatCurrency, formatCompactCurrency } from '../lib/utils';
-import { ArrowLeft, TrendingUp, TrendingDown, Scale, CalendarDays } from '../components/icons';
-import { Link } from '@tanstack/react-router';
-import { motion } from 'motion/react';
-import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend, ReferenceLine,
-} from 'recharts';
+import { formatCurrency, cn } from '../lib/utils';
+import { DetailHeader, Headline, Strong, MetricStrip, EmptyDetail, detailSkeleton, nomeMes } from '../components/detail';
 
 export const Route = createFileRoute('/entradas-saidas')({
+  beforeLoad: () => {
+    if (!localStorage.getItem('finance_token') && !sessionStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
+  },
   component: EntradasSaidasPage,
 });
 
-/* ─── Tooltip customizado ─────────────────────────────────────── */
-function CustomTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
+interface Mes {
+  mes: string;
+  entradas: number;
+  saidas: number;
+  resultado: number;
+}
+
+const chave = (mes: string) => {
+  const [m, y] = mes.split('/');
+  return Number(y) * 100 + Number(m);
+};
+
+/*
+ * Gráfico divergente: entradas sobem, saídas descem a partir da mesma linha.
+ * Interação: passar o mouse, focar ou tocar um mês destaca a coluna e atualiza
+ * o painel acima (troca instantânea: é leitura de dados, não decoração).
+ * As outras colunas recuam com opacity 150ms. Barras crescem uma vez ao entrar.
+ */
+function FlowChart({ meses, ativo, onAtivo }: { meses: Mes[]; ativo: number; onAtivo: (i: number) => void }) {
+  const max = Math.max(...meses.map((m) => Math.max(m.entradas, m.saidas)), 1);
+  const m = meses[ativo];
+  const taxa = m.entradas > 0 ? (m.resultado / m.entradas) * 100 : 0;
+
   return (
-    <div className="bg-white border border-gray-100 shadow-xl rounded-2xl p-4 min-w-[180px]">
-      <p className="text-xs text-gray-400 mb-3 font-medium">{label}</p>
-      {payload.map((p: any) => {
-        const isSaida = p.dataKey === 'saidasNegativas';
-        const name = isSaida ? 'Saídas' : p.name;
-        const value = isSaida ? Math.abs(p.value) : p.value;
-        const prefix = p.dataKey === 'resultado' ? (value >= 0 ? '+' : '') : (isSaida ? '-' : '+');
-        return (
-          <div key={p.dataKey} className="flex items-center gap-2 text-sm mt-1.5">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-            <span className="text-gray-600 font-medium">{name}</span>
-            <span className={`font-bold ml-auto ${p.dataKey === 'resultado' ? (value >= 0 ? 'text-gain' : 'text-loss') : 'text-gray-900'}`}>
-              {prefix}{formatCurrency(value)}
-            </span>
+    <section className="finance-card p-5 sm:p-6" aria-label="Entradas e saídas por mês">
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 min-h-14" aria-live="polite">
+        <div>
+          <p className="text-sm font-medium text-[var(--color-ink)] first-letter:uppercase">{nomeMes(m.mes, 'long')} {m.mes.split('/')[1]}</p>
+          <p className={cn('text-xs mt-0.5', m.resultado >= 0 ? 'text-gain' : 'text-loss')} data-num>
+            {m.entradas > 0
+              ? m.resultado >= 0 ? `Guardou ${taxa.toFixed(0)}% do que entrou` : `Gastou ${formatCurrency(Math.abs(m.resultado))} além do que entrou`
+              : 'Sem entradas no mês'}
+          </p>
+        </div>
+        <dl className="flex gap-6 text-right">
+          <div>
+            <dt className="text-xs text-[var(--color-ink-muted)]">Entrou</dt>
+            <dd className="text-sm font-semibold text-gain" data-num>{formatCurrency(m.entradas)}</dd>
           </div>
-        );
-      })}
-    </div>
+          <div>
+            <dt className="text-xs text-[var(--color-ink-muted)]">Saiu</dt>
+            <dd className="text-sm font-semibold text-[var(--color-ink)]" data-num>{formatCurrency(m.saidas)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-[var(--color-ink-muted)]">Resultado</dt>
+            <dd className={cn('text-sm font-semibold', m.resultado >= 0 ? 'text-gain' : 'text-loss')} data-num>
+              {m.resultado >= 0 ? '+' : '-'}{formatCurrency(Math.abs(m.resultado))}
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <div className="flow-chart mt-6 flex gap-2 sm:gap-4" data-active="" role="group" aria-label="Escolha um mês">
+        {meses.map((mm, i) => (
+          <button
+            key={mm.mes}
+            type="button"
+            className="flow-col flex-1 min-w-0 flex flex-col items-center rounded-lg focus-visible:outline-offset-2"
+            data-active={i === ativo ? '' : undefined}
+            aria-pressed={i === ativo}
+            aria-label={`${nomeMes(mm.mes, 'long')}: entrou ${formatCurrency(mm.entradas)}, saiu ${formatCurrency(mm.saidas)}`}
+            onMouseEnter={() => onAtivo(i)}
+            onFocus={() => onAtivo(i)}
+            onClick={() => onAtivo(i)}
+          >
+            {/* metade de cima: entradas */}
+            <span className="w-full max-w-12 h-28 flex items-end">
+              <span
+                className="bar-grow flow-bar w-full rounded-t-[5px] bg-[var(--color-accent)]"
+                style={{ height: `${Math.max((mm.entradas / max) * 100, 1.5)}%`, '--i': i } as React.CSSProperties}
+              />
+            </span>
+            <span className="w-full h-px bg-[var(--color-ink)]/25" />
+            {/* metade de baixo: saídas */}
+            <span className="w-full max-w-12 h-28 flex items-start">
+              <span
+                className="bar-grow bar-down flow-bar w-full rounded-b-[5px] bg-[var(--color-ink)]/18"
+                style={{ height: `${Math.max((mm.saidas / max) * 100, 1.5)}%`, '--i': i } as React.CSSProperties}
+              />
+            </span>
+            <span className={cn('mt-2 text-xs', i === ativo ? 'text-[var(--color-ink)] font-medium' : 'text-[var(--color-ink-muted)]')}>
+              {nomeMes(mm.mes).split(' ')[0]}
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="mt-4 flex items-center gap-5 text-xs text-[var(--color-ink-soft)]">
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-[3px] bg-[var(--color-accent)]" /> Entradas (para cima)</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-[3px] bg-[var(--color-ink)]/18" /> Saídas (para baixo)</span>
+      </div>
+    </section>
   );
 }
 
-/* ─── Gráfico Divergente de Fluxo de Caixa ────────────────────── */
-function FluxoCaixaChart({ data }: { data: any[] }) {
-  if (!data?.length) return <p className="text-sm text-gray-400 text-center pt-12">Nenhum dado disponível</p>;
-  return (
-    <ResponsiveContainer width="100%" height={360}>
-      <ComposedChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} stackOffset="sign">
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-        <XAxis dataKey="mes" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} dy={10} />
-        <YAxis
-          axisLine={false} tickLine={false}
-          tick={{ fontSize: 11, fill: '#9CA3AF' }}
-          tickFormatter={(v) => formatCompactCurrency(v)}
-          width={60}
-        />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
-        <Legend 
-          iconType="circle" 
-          iconSize={8} 
-          wrapperStyle={{ paddingBottom: '16px' }}
-          verticalAlign="top"
-          formatter={(value) => (
-            <span className="text-xs text-gray-500 mr-4 font-medium">{value === 'saidasNegativas' ? 'Saídas' : value}</span>
-          )}
-        />
-        <ReferenceLine y={0} stroke="#e5e7eb" strokeWidth={1.5} />
-        <Bar dataKey="entradas" name="Entradas" fill="#10B981" radius={[4, 4, 0, 0]} stackId="a" maxBarSize={50} />
-        <Bar dataKey="saidasNegativas" name="Saídas" fill="#F87171" radius={[0, 0, 4, 4]} stackId="a" maxBarSize={50} />
-        <Line 
-          type="monotone" 
-          dataKey="resultado" 
-          name="Resultado Líquido" 
-          stroke="#6366F1" 
-          strokeWidth={3} 
-          dot={{ r: 5, fill: '#6366F1', stroke: '#fff', strokeWidth: 2 }} 
-          activeDot={{ r: 7, fill: '#6366F1', stroke: '#fff', strokeWidth: 2 }}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
-  );
-}
-
-/* ─── Tabela Mensal ─────────────────────────────────────────────── */
-function TabelaMensal({ dados }: { dados: any[] }) {
-  if (!dados?.length) return <p className="text-sm text-gray-500 text-center py-8">Nenhum dado registrado ainda.</p>;
-  
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse min-w-[600px]">
-        <thead>
-          <tr className="border-b border-gray-100">
-            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Mês</th>
-            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Entradas</th>
-            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Saídas</th>
-            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Economia</th>
-            <th className="pb-4 pt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right pr-2">Resultado</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {dados.map((item, i) => {
-            const positivo = item.resultado >= 0;
-            const taxa = item.entradas > 0 ? (item.resultado / item.entradas) * 100 : 0;
-            return (
-              <motion.tr 
-                key={item.mes}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: i * 0.05 }}
-                className="hover:bg-gray-50/50 transition-colors group"
-              >
-                <td className="py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${positivo ? 'bg-gain-soft group-hover:bg-gain-soft' : 'bg-loss-soft group-hover:bg-loss-soft'}`}>
-                      <CalendarDays size={15} className={positivo ? 'text-gain' : 'text-loss'} />
-                    </div>
-                    <span className="font-semibold text-gray-800 text-sm">{item.mes}</span>
-                  </div>
-                </td>
-                <td className="py-4 text-right text-sm font-semibold text-gain">
-                  +{formatCurrency(item.entradas)}
-                </td>
-                <td className="py-4 text-right text-sm font-semibold text-loss">
-                  -{formatCurrency(item.saidas)}
-                </td>
-                <td className="py-4 text-right text-sm">
-                   <div className="flex items-center justify-end gap-3">
-                     <span className={`font-semibold ${taxa >= 0 ? 'text-gain' : 'text-loss'}`}>
-                       {taxa >= 0 ? '+' : ''}{taxa.toFixed(1)}%
-                     </span>
-                     <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden flex justify-start">
-                       <motion.div 
-                          className={`h-full rounded-full ${taxa >= 0 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-ink)]/15'}`} 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${Math.min(Math.abs(taxa), 100)}%` }}
-                          transition={{ duration: 0.6, delay: i * 0.05 + 0.2 }}
-                       />
-                     </div>
-                   </div>
-                </td>
-                <td className="py-4 text-right pr-2">
-                  <span className={`inline-flex justify-center min-w-[90px] text-xs font-semibold px-2.5 py-1.5 rounded-full ${positivo ? 'bg-gain-soft text-gain' : 'bg-loss-soft text-loss'}`}>
-                    {positivo ? '+' : ''}{formatCurrency(item.resultado)}
-                  </span>
-                </td>
-              </motion.tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/* ─── Page ─────────────────────────────────────────────────────── */
-function EntradasSaidasPage() {
+function FluxoContent() {
   const { data: summary, isLoading } = useQuery({
-    queryKey: ['dashboard-summary'],
-    queryFn: () => dashboardApi.summary(),
+    queryKey: ['dashboard-summary', 'all'],
+    queryFn: () => dashboardApi.summary('all'),
   });
 
-  const evolucao: { mes: string; saldo: number; entradas?: number; saidas?: number }[] =
-    summary?.evolucao_saldo || [];
+  const meses: Mes[] = [...(summary?.evolucao_saldo ?? [])]
+    .sort((a, b) => chave(a.mes) - chave(b.mes))
+    .map((e) => ({ mes: e.mes, entradas: e.entradas ?? 0, saidas: e.saidas ?? 0, resultado: (e.entradas ?? 0) - (e.saidas ?? 0) }));
 
-  const meses = evolucao.map((e) => ({
-    mes: e.mes,
-    entradas: e.entradas ?? 0,
-    saidas: e.saidas ?? 0,
-    saidasNegativas: -(e.saidas ?? 0),
-    resultado: (e.entradas ?? 0) - (e.saidas ?? 0),
-  }));
+  const [ativo, setAtivo] = useState<number | null>(null);
 
-  const totalEntradas = meses.reduce((acc, m) => acc + m.entradas, 0);
-  const totalSaidas = meses.reduce((acc, m) => acc + m.saidas, 0);
-  const totalResultado = totalEntradas - totalSaidas;
-  const melhorMes = [...meses].sort((a, b) => b.resultado - a.resultado)[0];
-  const taxaMediaEconomia = totalEntradas > 0 ? (totalResultado / totalEntradas) * 100 : 0;
+  if (isLoading) return detailSkeleton;
+  if (!meses.length) return <EmptyDetail text="Ainda não há meses com movimentações." />;
 
-  const statItems = [
-    {
-      label: 'Total Entradas',
-      value: `+${formatCurrency(totalEntradas)}`,
-      icon: <TrendingUp size={18} />,
-      color: '#10B981',
-      bg: '#10B98115',
-    },
-    {
-      label: 'Total Saídas',
-      value: `-${formatCurrency(totalSaidas)}`,
-      icon: <TrendingDown size={18} />,
-      color: '#F87171',
-      bg: '#F8717115',
-    },
-    {
-      label: 'Resultado Líquido',
-      value: (totalResultado >= 0 ? '+' : '') + formatCurrency(totalResultado),
-      icon: <Scale size={18} />,
-      color: totalResultado >= 0 ? '#6366F1' : '#F87171',
-      bg: totalResultado >= 0 ? '#6366F115' : '#F8717115',
-    },
-    {
-      label: 'Melhor Mês',
-      value: melhorMes?.mes ?? '-',
-      icon: <CalendarDays size={18} />,
-      color: '#F59E0B',
-      bg: '#F59E0B15',
-    },
-  ];
+  const entrou = meses.reduce((s, m) => s + m.entradas, 0);
+  const saiu = meses.reduce((s, m) => s + m.saidas, 0);
+  const guardou = entrou - saiu;
+  const taxa = entrou > 0 ? (guardou / entrou) * 100 : 0;
+  const n = meses.length;
 
   return (
-    <div className="min-h-[100dvh] app-surface font-sans text-gray-900 pb-20">
-      <Navbar />
-      <div className="stagger max-w-6xl mx-auto px-4 sm:px-6 py-8">
-
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link
-            to="/dashboard"
-            className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors border border-gray-100"
-          >
-            <ArrowLeft size={20} className="text-gray-600" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Análise de fluxo</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Visão detalhada e comparativa entre receitas e despesas.</p>
-          </div>
-        </div>
-
-        {/* Stat cards */}
-        {isLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} lines={2} />)}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {statItems.map((s, i) => (
-              <motion.div
-                key={s.label}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.08 }}
-                className="finance-card p-5"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: s.bg, color: s.color }}>
-                    {s.icon}
-                  </div>
-                  <p className="text-xs text-gray-500 font-medium leading-tight">{s.label}</p>
-                </div>
-                <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
-              </motion.div>
-            ))}
-          </div>
-        )}
-
-        {/* Taxa de economia geral */}
-        {!isLoading && meses.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.35 }}
-            className="finance-card p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-          >
-            <div>
-              <p className="text-sm font-semibold text-gray-700">Taxa Média de Economia</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Percentual médio de receita que se converte em saldo positivo no período
-              </p>
-            </div>
-            <div className="flex items-center gap-4 w-full sm:w-auto">
-              <div className="flex-1 sm:w-48 h-2.5 rounded-full bg-gray-100 overflow-hidden">
-                <motion.div
-                  className={`h-full rounded-full ${taxaMediaEconomia >= 0 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-ink)]/15'}`}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min(Math.abs(taxaMediaEconomia), 100)}%` }}
-                  transition={{ duration: 0.9, ease: 'easeOut', delay: 0.5 }}
-                />
-              </div>
-              <span className={`text-xl font-bold whitespace-nowrap ${taxaMediaEconomia >= 0 ? 'text-gain' : 'text-loss'}`}>
-                {taxaMediaEconomia >= 0 ? '+' : ''}{taxaMediaEconomia.toFixed(1)}%
-              </span>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Gráfico Principal */}
-        <FinanceCard className="mb-6">
-          <div className="mb-6">
-            <h2 className="font-semibold text-gray-900 mb-1">Fluxo de caixa mensal</h2>
-            <p className="text-xs text-gray-400">Entradas e saídas convergindo para o resultado líquido</p>
-          </div>
-          {isLoading
-            ? <SkeletonCard lines={1} className="border-0 shadow-none h-[340px]" />
-            : <FluxoCaixaChart data={meses} />
-          }
-        </FinanceCard>
-
-        {/* Detalhamento por mês em Tabela */}
-        <FinanceCard>
-          <div className="mb-4">
-            <h2 className="font-semibold text-gray-900 mb-1">Histórico detalhado</h2>
-            <p className="text-xs text-gray-400">Tabela de desempenho financeiro mês a mês</p>
-          </div>
-          {isLoading ? (
-            <SkeletonCard lines={4} className="border-0 shadow-none" />
+    <div className="stagger space-y-8">
+      <DetailHeader title="Entradas e saídas">
+        <Headline>
+          {guardou >= 0 ? (
+            <>Nos últimos {n} {n === 1 ? 'mês' : 'meses'} você guardou <Strong tone="gain">{taxa.toFixed(0)}%</Strong> de tudo que entrou.</>
           ) : (
-            <TabelaMensal dados={meses} />
+            <>Nos últimos {n} {n === 1 ? 'mês' : 'meses'} saiu <Strong tone="loss">{formatCurrency(Math.abs(guardou))}</Strong> a mais do que entrou.</>
           )}
-        </FinanceCard>
+        </Headline>
+      </DetailHeader>
 
-      </div>
+      <MetricStrip
+        items={[
+          { label: 'Entrou', value: entrou, currency: true, tone: 'gain' },
+          { label: 'Saiu', value: saiu, currency: true },
+          { label: 'Sobrou', value: guardou, currency: true, signed: true, tone: guardou >= 0 ? 'gain' : 'loss' },
+        ]}
+      />
+
+      <FlowChart meses={meses} ativo={ativo ?? meses.length - 1} onAtivo={setAtivo} />
+
+      <section aria-label="Quanto sobrou em cada mês">
+        <h2 className="font-semibold text-base text-[var(--color-ink)] mb-3">Quanto sobrou em cada mês</h2>
+        <ol className="finance-card divide-y divide-[var(--color-line)]">
+          {[...meses].reverse().map((m, ri) => {
+            const t = m.entradas > 0 ? (m.resultado / m.entradas) * 100 : 0;
+            return (
+              <li key={m.mes} className="grid grid-cols-[1fr_auto] sm:grid-cols-[15rem_1fr_auto] items-center gap-x-6 gap-y-2 px-5 py-4">
+                <div>
+                  <p className="text-sm font-medium text-[var(--color-ink)] first-letter:uppercase">{nomeMes(m.mes, 'long')}</p>
+                  <p className="text-xs text-[var(--color-ink-muted)]" data-num>
+                    {formatCurrency(m.entradas)} entrou · {formatCurrency(m.saidas)} saiu
+                  </p>
+                </div>
+                <div className="order-3 col-span-2 sm:order-none sm:col-span-1 h-1.5 rounded-full bg-[var(--color-line)]/60 overflow-hidden">
+                  <div
+                    className={cn('bar-x h-full rounded-full', t >= 0 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-finance-error)]/60')}
+                    style={{ width: `${Math.max(Math.min(Math.abs(t), 100), 2)}%`, '--i': ri } as React.CSSProperties}
+                  />
+                </div>
+                <p className={cn('text-sm font-semibold text-right', m.resultado >= 0 ? 'text-gain' : 'text-loss')} data-num>
+                  {m.resultado >= 0 ? `${t.toFixed(0)}%` : `-${formatCurrency(Math.abs(m.resultado))}`}
+                </p>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    </div>
+  );
+}
+
+function EntradasSaidasPage() {
+  return (
+    <div className="min-h-[100dvh] app-surface pb-20">
+      <Navbar />
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        <FluxoContent />
+      </main>
     </div>
   );
 }

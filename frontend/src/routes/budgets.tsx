@@ -1,11 +1,12 @@
 import React, { Suspense } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'motion/react';
 import { Wallet, Plus, AlertCircle } from '../components/icons';
 import { budgetsApi, categoriesApi } from '../lib/api';
 import { Navbar } from '../components/Navbar';
-import { FinanceCard, SkeletonCard, ProgressBar } from '../components/ui';
+import { AnimatedCounter, SkeletonCard, ProgressBar } from '../components/ui';
+import { Collapse } from '../components/collapse';
+import { HoldToDelete } from '../components/hold-to-delete';
 import { formatCurrency } from '../lib/utils';
 
 export const Route = createFileRoute('/budgets')({
@@ -61,6 +62,7 @@ function BudgetsContent() {
           </select>
           <button
             onClick={() => setShowForm(!showForm)}
+            aria-expanded={showForm}
             className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
           >
             <Plus size={16} /> Novo
@@ -68,8 +70,8 @@ function BudgetsContent() {
         </div>
       </div>
 
-      {showForm && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="finance-card p-5">
+      <Collapse open={showForm}>
+        <div className="finance-card p-5">
           <h3 className="font-brand font-semibold text-gray-900 mb-4">Criar orçamento</h3>
           <div className="flex flex-col sm:flex-row gap-3">
             <select value={catId} onChange={(e) => setCatId(e.target.value)} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm">
@@ -89,8 +91,8 @@ function BudgetsContent() {
               Salvar
             </button>
           </div>
-        </motion.div>
-      )}
+        </div>
+      </Collapse>
 
       {isLoading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -102,18 +104,13 @@ function BudgetsContent() {
             const gasto = b.valor_gasto ?? 0;
             const pct = (gasto / b.valor_limite) * 100;
             return (
-              <motion.div
+              <div
                 key={b.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 }}
-                className="finance-card p-5 space-y-4"
+                style={{ "--i": i } as React.CSSProperties}
+                className="rise finance-card p-5 space-y-4"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[var(--color-finance-primary)]/10 flex items-center justify-center">
-                      <Wallet size={18} className="text-[var(--color-accent)]" />
-                    </div>
                     <div>
                       <p className="font-semibold text-sm text-gray-900">{b.categoria_nome || 'Categoria'}</p>
                       <p className="text-xs text-gray-400">{MONTHS[b.mes - 1]} {b.ano}</p>
@@ -123,16 +120,11 @@ function BudgetsContent() {
                 </div>
                 <ProgressBar value={gasto} max={b.valor_limite} />
                 <div className="flex justify-between text-xs text-gray-500">
-                  <span>Gasto: <strong className="text-gray-900">{formatCurrency(gasto)}</strong></span>
+                  <span>Gasto: <AnimatedCounter value={gasto} isCurrency className="text-sm text-[var(--color-ink)]" /></span>
                   <span>Limite: <strong className="text-gray-900">{formatCurrency(b.valor_limite)}</strong></span>
                 </div>
-                <button
-                  onClick={() => deleteMut.mutate(b.id)}
-                  className="text-xs text-[var(--color-finance-error)] hover:underline"
-                >
-                  Remover
-                </button>
-              </motion.div>
+                <HoldToDelete compact label="Segure para remover" pending={deleteMut.isPending && deleteMut.variables === b.id} onConfirm={() => deleteMut.mutate(b.id)} />
+              </div>
             );
           })}
         </div>

@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useParams, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { AnimatedCounter, FinanceCard, SkeletonCard } from '../../components/ui';
 import { investimentosApi } from '../../lib/api';
 import { formatCurrency, formatCompactCurrency, formatDate, descreverTaxa } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { modal, backdrop } from '../../lib/motion-tokens';
 import { ArrowLeft, TrendingUp, TrendingDown, PiggyBank, X, History, Trash2, Edit2 } from '../../components/icons';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -325,8 +326,8 @@ function InvestimentoDetailsPage() {
             <p className="text-sm text-gray-400 text-center py-6">Nenhum histórico disponível.</p>
           ) : (
             <div className="divide-y divide-gray-50">
-              {historicoInvertido.map(t => (
-                <div key={t.id_transacao_inv} className="py-4 flex items-center justify-between">
+              {historicoInvertido.map((t, i) => (
+                <div key={t.id_transacao_inv} style={{ '--i': Math.min(i, 8) } as React.CSSProperties} className={i < 12 ? 'rise py-4 flex items-center justify-between' : 'py-4 flex items-center justify-between'}>
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center 
                       ${t.tipo === 'aporte' ? 'bg-gain-soft text-gain' 
@@ -376,14 +377,12 @@ function InvestimentoDetailsPage() {
         {modalAberto && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              {...backdrop}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
               onClick={() => setModalAberto(false)}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              {...modal}
               className="bg-white rounded-3xl shadow-xl w-full max-w-sm relative z-10 overflow-hidden"
             >
               <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
@@ -447,14 +446,12 @@ function InvestimentoDetailsPage() {
         {modalEditAberto && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              {...backdrop}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
               onClick={() => setModalEditAberto(false)}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              {...modal}
               className="bg-white rounded-3xl shadow-xl w-full max-w-sm relative z-10 overflow-hidden"
             >
               <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">

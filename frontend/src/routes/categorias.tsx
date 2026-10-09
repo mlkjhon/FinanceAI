@@ -1,117 +1,195 @@
-import { createFileRoute } from '@tanstack/react-router';
+import React, { useMemo, useState } from 'react';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { dashboardApi, getUserData } from '../lib/api';
-import { FinanceCard } from '../components/ui';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { transactionsApi, type Transaction } from '../lib/api';
 import { Navbar } from '../components/Navbar';
-import { formatCurrency } from '../lib/utils';
-import { ArrowLeft } from '../components/icons';
-import { Link } from '@tanstack/react-router';
-import { DonutRing } from '../components/ConicChart';
+import { Segmented } from '../components/segmented';
+import { formatCurrency, formatDate, cn } from '../lib/utils';
+import { DetailHeader, Headline, Strong, MetricStrip, EmptyDetail, detailSkeleton } from '../components/detail';
 
 export const Route = createFileRoute('/categorias')({
+  beforeLoad: () => {
+    if (!localStorage.getItem('finance_token') && !sessionStorage.getItem('finance_token')) throw redirect({ to: '/auth' });
+  },
   component: CategoriasPage,
 });
 
-function DonutChart({ data }: { data: { categoria: string; valor: number }[] }) {
-  const total = data.reduce((s, d) => s + d.valor, 0);
-  if (!data.length || total === 0) {
-    return <p className="text-sm text-gray-400 text-center pt-8">Sem dados disponíveis</p>;
-  }
+type Periodo = 'mes' | 'tudo';
 
-  const colors = ['#10B981', '#34D399', '#6EE7B7', '#059669', '#047857'];
+interface Grupo {
+  nome: string;
+  total: number;
+  itens: Transaction[];
+}
+
+const mesAtual = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/*
+ * Linha de categoria: abre os últimos lançamentos. Frequência: ocasional.
+ * Propósito: indicação de estado (o que abriu e de onde). Altura + opacidade
+ * em 200ms, que é a exceção aceita para acordeões; instantâneo com reduced motion.
+ */
+function CategoriaRow({ g, index, total, aberto, onToggle }: { g: Grupo; index: number; total: number; aberto: boolean; onToggle: () => void }) {
+  const reduce = useReducedMotion();
+  const pct = total > 0 ? (g.total / total) * 100 : 0;
+  const id = `cat-${index}`;
+  const recentes = [...g.itens].sort((a, b) => (b.data || '').localeCompare(a.data || '')).slice(0, 5);
 
   return (
-    <div className="flex flex-col md:flex-row items-center gap-8 justify-center">
-      <DonutRing
-        className="w-48 h-48"
-        hole={0.667}
-        segments={data.map((d, i) => ({ value: d.valor, color: colors[i % colors.length] }))}
-        label={'Gastos por categoria: ' + data.map((d) => d.categoria + ' ' + Math.round((d.valor / total) * 100) + '%').join(', ')}
+    <li>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={aberto}
+        aria-controls={id}
+        className="ledger-row w-full px-5 py-4 text-left"
+      >
+        <span className="flex items-baseline justify-between gap-4">
+          <span className="min-w-0 flex items-baseline gap-2.5">
+            <span className="text-sm font-medium text-[var(--color-ink)] truncate">{g.nome}</span>
+            <span className="hidden sm:inline text-xs text-[var(--color-ink-muted)] shrink-0" data-num>
+              {g.itens.length === 1 ? '1 lançamento' : `${g.itens.length} lançamentos`}
+            </span>
+          </span>
+          <span className="flex items-baseline gap-3 shrink-0">
+            <span className="text-sm font-semibold text-[var(--color-ink)]" data-num>{formatCurrency(g.total)}</span>
+            <span className="w-11 text-right text-xs text-[var(--color-ink-muted)]" data-num>{pct.toLocaleString('pt-BR', { maximumFractionDigits: pct < 10 ? 1 : 0 })}%</span>
+            <span className="plus-x text-[var(--color-ink-muted)]" aria-hidden />
+          </span>
+        </span>
+        <span className="mt-3 block h-1.5 rounded-full bg-[var(--color-line)]/60 overflow-hidden">
+          <span
+            className={cn('bar-x block h-full rounded-full', index === 0 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-accent)]/45')}
+            style={{ width: `${Math.max(pct, 1.5)}%`, '--i': index } as React.CSSProperties}
+          />
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {aberto && (
+          <motion.div
+            id={id}
+            initial={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            animate={reduce ? { opacity: 1 } : { height: 'auto', opacity: 1 }}
+            exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden"
+          >
+            <ul className="px-5 pb-4 space-y-2.5">
+              {recentes.map((t) => (
+                <li key={t.id} className="flex items-baseline justify-between gap-4 text-sm pl-3 border-l-2 border-[var(--color-line)]">
+                  <span className="min-w-0 truncate text-[var(--color-ink-soft)]">{t.descricao}</span>
+                  <span className="shrink-0 flex items-baseline gap-3">
+                    <span className="text-xs text-[var(--color-ink-muted)]" data-num>{formatDate(t.data)}</span>
+                    <span className="font-medium text-[var(--color-ink)]" data-num>{formatCurrency(t.valor)}</span>
+                  </span>
+                </li>
+              ))}
+              {g.itens.length > recentes.length && (
+                <li className="text-xs text-[var(--color-ink-muted)] pl-3" data-num>
+                  e mais {g.itens.length - recentes.length}
+                </li>
+              )}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </li>
+  );
+}
+
+function CategoriasContent() {
+  const [periodo, setPeriodo] = useState<Periodo>('mes');
+  const [aberta, setAberta] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['transactions', 'all'],
+    queryFn: () => transactionsApi.list({ limit: '100000' }),
+  });
+
+  const { grupos, total, maior } = useMemo(() => {
+    const mes = mesAtual();
+    const gastos = (data?.data ?? []).filter(
+      (t) => t.tipo === 'despesa' && (periodo === 'tudo' || (t.data || '').slice(0, 7) === mes)
+    );
+    const map = new Map<string, Grupo>();
+    for (const t of gastos) {
+      const nome = t.categoria_nome || 'Sem categoria';
+      const g = map.get(nome) ?? { nome, total: 0, itens: [] };
+      g.total += t.valor;
+      g.itens.push(t);
+      map.set(nome, g);
+    }
+    const grupos = [...map.values()].sort((a, b) => b.total - a.total);
+    const total = grupos.reduce((s, g) => s + g.total, 0);
+    const maior = gastos.reduce<Transaction | null>((m, t) => (!m || t.valor > m.valor ? t : m), null);
+    return { grupos, total, maior };
+  }, [data, periodo]);
+
+  if (isLoading) return detailSkeleton;
+
+  const top = grupos[0];
+  const pctTop = top && total > 0 ? Math.round((top.total / total) * 100) : 0;
+  const quando = periodo === 'mes' ? 'neste mês' : 'desde o começo';
+
+  return (
+    <div className="stagger space-y-8">
+      <DetailHeader title="Para onde foi o dinheiro">
+        {top ? (
+          <Headline>
+            <Strong>{top.nome}</Strong> levou <Strong>{pctTop}%</Strong> do que você gastou {quando}.
+          </Headline>
+        ) : null}
+      </DetailHeader>
+
+      <Segmented
+        id="cat-periodo"
+        label="Período"
+        value={periodo}
+        onChange={(v) => { setPeriodo(v); setAberta(null); }}
+        options={[{ value: 'mes', label: 'Este mês' }, { value: 'tudo', label: 'Tudo' }]}
       />
-      <div className="space-y-3 w-full md:w-auto">
-        {data.map((d, i) => (
-          <div key={d.categoria} className="flex items-center justify-between gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[i % colors.length] }} />
-              <span className="text-gray-600 font-medium">{d.categoria}</span>
-            </div>
-            <span className="font-semibold text-gray-900">{Math.round((d.valor / total) * 100)}%</span>
-          </div>
-        ))}
-      </div>
+
+      {!grupos.length ? (
+        <EmptyDetail text={periodo === 'mes' ? 'Nenhum gasto registrado neste mês.' : 'Nenhum gasto registrado ainda.'} />
+      ) : (
+        <div key={periodo} className="list-swap space-y-8">
+          <MetricStrip
+            items={[
+              { label: 'Total gasto', value: total, currency: true },
+              { label: 'Categorias', value: grupos.length },
+              { label: maior ? `Maior gasto: ${maior.descricao}` : 'Maior gasto', value: maior?.valor ?? 0, currency: true },
+            ]}
+          />
+          <ol className="finance-card overflow-hidden divide-y divide-[var(--color-line)]">
+            {grupos.map((g, i) => (
+              <CategoriaRow
+                key={g.nome}
+                g={g}
+                index={i}
+                total={total}
+                aberto={aberta === g.nome}
+                onToggle={() => setAberta((a) => (a === g.nome ? null : g.nome))}
+              />
+            ))}
+          </ol>
+        </div>
+      )}
     </div>
   );
 }
 
 function CategoriasPage() {
-  const user = getUserData();
-
-  const { data: summary, isLoading } = useQuery({
-    queryKey: ['dashboard-categorias', user?.id],
-    queryFn: () => dashboardApi.summary(),
-    enabled: !!user?.id,
-  });
-
-  const gastos: { categoria: string; valor: number }[] = summary?.gastos_por_categoria || [];
-  const total = gastos.reduce((acc, curr) => acc + curr.valor, 0);
-
   return (
-    <div className="min-h-[100dvh] app-surface font-sans text-gray-900 pb-20">
+    <div className="min-h-[100dvh] app-surface pb-20">
       <Navbar />
-      <div className="stagger max-w-5xl mx-auto px-4 sm:px-6 py-8">
-
-        <div className="flex items-center gap-4 mb-8">
-          <Link to="/dashboard" className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors">
-            <ArrowLeft size={20} className="text-gray-600" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Análise de categorias</h1>
-            <p className="text-gray-500">Detalhamento completo de seus gastos por categoria.</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <FinanceCard>
-            <h2 className="font-semibold text-gray-900 mb-6">Visão geral</h2>
-            <div className="min-h-[250px] flex items-center justify-center">
-              {isLoading ? (
-                <div className="text-gray-400">Carregando gráfico...</div>
-              ) : (
-                <DonutChart data={gastos} />
-              )}
-            </div>
-          </FinanceCard>
-
-          <FinanceCard>
-            <h2 className="font-semibold text-gray-900 mb-6">Detalhamento</h2>
-            {isLoading ? (
-              <div className="text-gray-400">Carregando detalhes...</div>
-            ) : (
-              <div className="space-y-4">
-                {gastos.length === 0 && <p className="text-sm text-gray-500">Nenhum gasto registrado.</p>}
-                {gastos.map((gasto, i) => {
-                  const colors = ['#10B981', '#34D399', '#6EE7B7', '#059669', '#047857'];
-                  const percent = total > 0 ? ((gasto.valor / total) * 100).toFixed(1) : '0';
-                  return (
-                    <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 border border-gray-100 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${colors[i % colors.length]}20` }}>
-                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[i % colors.length] }} />
-                        </div>
-                        <span className="font-medium text-gray-800">{gasto.categoria}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-gray-900">{formatCurrency(gasto.valor)}</div>
-                        <div className="text-xs font-medium text-gray-500 mt-0.5">{percent}% do total</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </FinanceCard>
-        </div>
-      </div>
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        <CategoriasContent />
+      </main>
     </div>
   );
 }
