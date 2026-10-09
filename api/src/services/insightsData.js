@@ -18,7 +18,7 @@ const ehTransferencia = (descricao = '') =>
 
 export async function carregarContexto(idUsuario, hoje = new Date()) {
     const desde = new Date(hoje.getFullYear(), hoje.getMonth() - 12, 1);
-    const [lanc, metas, orc, inv] = await Promise.all([
+    const [lanc, metas, orc, inv, cats] = await Promise.all([
         BD.query(
             `SELECT t.descricao, t.valor::float AS valor, t.tipo,
                     to_char(t.data_registro, 'YYYY-MM-DD') AS dia,
@@ -30,7 +30,7 @@ export async function carregarContexto(idUsuario, hoje = new Date()) {
             [idUsuario, iso(desde)]
         ),
         BD.query(
-            `SELECT titulo, valor_meta::float AS valor_meta, valor_atual::float AS valor_atual,
+            `SELECT id_meta, titulo, valor_meta::float AS valor_meta, valor_atual::float AS valor_atual,
                     to_char(data_objetivo, 'YYYY-MM-DD') AS data_objetivo
              FROM metas_financeiras WHERE id_usuario = $1`,
             [idUsuario]
@@ -42,18 +42,20 @@ export async function carregarContexto(idUsuario, hoje = new Date()) {
             [idUsuario]
         ),
         BD.query(
-            `SELECT i.nome, i.tipo,
+            `SELECT i.id_investimento, i.nome, i.tipo,
                     COALESCE((SELECT SUM(CASE WHEN tipo IN ('aporte','rendimento') THEN valor ELSE -valor END)
                               FROM transacoes_investimentos ti WHERE ti.id_investimento = i.id_investimento), 0)::float AS saldo
              FROM investimentos i WHERE i.id_usuario = $1`,
             [idUsuario]
         ).catch(() => ({ rows: [] })),
+        // categorias existem para todos; os blocos de ação usam para criar orçamento
+        BD.query(`SELECT id_categoria, nome, tipo FROM categorias`).catch(() => ({ rows: [] })),
     ]);
-    return criarContexto({ lancamentos: lanc.rows, metas: metas.rows, orcamentos: orc.rows, investimentos: inv.rows, hoje });
+    return criarContexto({ lancamentos: lanc.rows, metas: metas.rows, orcamentos: orc.rows, investimentos: inv.rows, categorias: cats.rows, hoje });
 }
 
 // Separado de carregarContexto para poder testar com dados de exemplo
-export function criarContexto({ lancamentos, metas = [], orcamentos = [], investimentos = [], hoje = new Date() }) {
+export function criarContexto({ lancamentos, metas = [], orcamentos = [], investimentos = [], categorias = [], hoje = new Date() }) {
     return {
         hoje: iso(hoje),
         lancamentos: lancamentos.map((l) => ({
@@ -64,6 +66,7 @@ export function criarContexto({ lancamentos, metas = [], orcamentos = [], invest
         metas,
         orcamentos,
         investimentos,
+        categorias,
     };
 }
 
@@ -265,6 +268,21 @@ export const funcoes = {
         },
     },
 
+    mediaPorCategoria: {
+        descricao: 'Média mensal de gasto de cada categoria nos últimos meses completos (base para sugerir orçamento)',
+        args: '{ meses?: number }',
+        run(ctx, { meses = 3 } = {}) {
+            const n = Math.min(Math.max(meses, 1), 12);
+            const lista = mesesAte(ctx.hoje, n + 1).slice(0, n); // meses completos, sem o atual
+            const mapa = new Map();
+            for (const l of gastos(ctx.lancamentos)) {
+                if (!lista.includes(mesDe(l.dia))) continue;
+                mapa.set(l.categoria, (mapa.get(l.categoria) || 0) + l.valor);
+            }
+            return [...mapa.entries()].map(([categoria, total]) => ({ categoria, media: arred(total / n) })).sort((a, b) => b.media - a.media);
+        },
+    },
+
     recorrencias: {
         descricao: 'Gastos que se repetem em pelo menos 3 dos últimos 6 meses (assinaturas, contas fixas), com média mensal',
         args: '{}',
@@ -429,5 +447,9 @@ export function snapshot(ctx, base) {
         metas: run('metas'),
         orcamentos: run('orcamentos'),
         investimentos: run('investimentos'),
+        mediaPorCategoria: run('mediaPorCategoria').slice(0, 8),
+        // nomes exatos para os alvos dos blocos de ação
+        nomesInvestimentos: ctx.investimentos.map((i) => i.nome),
+        categoriasDespesa: ctx.categorias.filter((c) => ['S', 'despesa'].includes(c.tipo)).map((c) => c.nome),
     };
 }

@@ -7,6 +7,7 @@ import { cn } from '../../lib/utils';
 import { ease } from '../../lib/motion-tokens';
 import type { Bloco, BlocoDe } from '../../lib/insights/types';
 import { ChartView } from './charts';
+import { ActionBlock } from './action-block';
 import { StreamText } from './primitives';
 import { fmt, diaCurto } from '../../lib/insights/format';
 
@@ -364,5 +365,6 @@ export function BlocoConteudo({ bloco }: { bloco: Bloco }) {
     case 'forecast': return <Projecao b={bloco} />;
     case 'goal': return <Meta b={bloco} />;
     case 'comparison': return <Comparativo b={bloco} />;
+    case 'action': return <ActionBlock b={bloco} />;
   }
 }

@@ -8,7 +8,11 @@ import { funcoes, resolverPeriodo, descricoesQueCasam } from './insightsData.js'
  * (função vazia, item inexistente, número escrito à mão no texto) é descartado.
  */
 
-export const TIPOS = ['kpi', 'chart', 'table', 'tip', 'story', 'anomaly', 'forecast', 'goal', 'comparison', 'challenge'];
+// tip e challenge ficam no schema só para análises antigas salvas (e são descartados)
+export const TIPOS = ['kpi', 'chart', 'table', 'tip', 'story', 'anomaly', 'forecast', 'goal', 'comparison', 'challenge', 'action'];
+export const ACOES = ['criar_meta', 'depositar_meta', 'criar_orcamento', 'aportar', 'criar_investimento'];
+const TIPOS_INVESTIMENTO = ['CDB', 'LCI / LCA', 'Tesouro Direto', 'Poupança', 'Fundos de Investimento', 'Previdência Privada'];
+const INDEXADORES = ['CDI', 'SELIC', 'IPCA', 'POUPANCA', 'PREFIXADO'];
 const FNS = Object.keys(funcoes);
 
 const Fonte = z.object({ fn: z.enum(FNS), args: z.record(z.any()).optional().default({}) });
@@ -35,6 +39,17 @@ export const BlocoPedido = z.object({
     kpis: z.array(z.object({ rotulo: z.string().max(40), valor: z.string() })).max(3).optional(),
     nivel: z.enum(['info', 'atencao', 'oportunidade']).optional(),
     economia: z.string().optional(),
+    // blocos de ação
+    acao: z.enum(ACOES).optional(),
+    alvo: z.string().max(80).optional(),
+    // nome de um valor declarado em "valores" OU a referência direto (fn + campo)
+    valorBase: z.union([z.string(), Ref]).optional(),
+    fator: z.number().min(0.01).max(24).optional(),
+    nomeSugerido: z.string().max(60).optional(),
+    dataObjetivo: z.string().regex(/^d{4}-d{2}-d{2}$/).optional(),
+    tipoInvestimento: z.enum(TIPOS_INVESTIMENTO).optional(),
+    indexador: z.enum(INDEXADORES).optional(),
+    taxa: z.number().min(0.1).max(200).optional(),
     duracaoDias: z.number().int().min(1).max(90).optional(),
 });
 
@@ -188,6 +203,64 @@ function transparencia(ctx, p, base) {
     return { inclui, nota };
 }
 
+// Valor redondo para uma sugestão (R$ 437,18 vira R$ 440): é uma proposta, não um extrato
+function arredondarSugestao(v) {
+    const passo = v < 100 ? 5 : v < 1000 ? 10 : v < 10000 ? 50 : 100;
+    return Math.max(passo, Math.round(v / passo) * passo);
+}
+
+const igual = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+
+/*
+ * Bloco de ação: a IA propõe, o servidor confere tudo contra os dados reais.
+ * O valor é sempre uma função de dados (valorBase) vezes um fator escolhido
+ * pela IA (ex.: 6x o gasto mensal para a reserva de emergência). Ação que
+ * aponta para meta, categoria ou investimento inexistente é descartada.
+ */
+function montarAcao(ctx, p, valores, periodoBase) {
+    if (!p.acao || !p.texto) return null;
+    const texto = preencher(p.texto, valores);
+    const base = !p.valorBase ? null : typeof p.valorBase === 'string' ? valores[p.valorBase] : resolverRef(ctx, p.valorBase, periodoBase);
+    const valor = base && base.valor > 0 ? arredondarSugestao(base.valor * (p.fator ?? 1)) : null;
+    const hoje = ctx.hoje;
+
+    switch (p.acao) {
+        case 'criar_meta': {
+            if (!p.nomeSugerido || !valor) return null;
+            if (ctx.metas.some((m) => igual(m.titulo, p.nomeSugerido))) return null;
+            const data = p.dataObjetivo && p.dataObjetivo > hoje ? p.dataObjetivo : null;
+            return { acao: p.acao, texto, titulo: p.nomeSugerido, valor, dataObjetivo: data };
+        }
+        case 'depositar_meta': {
+            const meta = ctx.metas.find((m) => igual(m.titulo, p.alvo));
+            if (!meta || !valor) return null;
+            const falta = Math.max(meta.valor_meta - meta.valor_atual, 0);
+            if (falta <= 0) return null;
+            return { acao: p.acao, texto, alvoId: String(meta.id_meta), titulo: meta.titulo, valor: Math.min(valor, Math.ceil(falta)), falta };
+        }
+        case 'criar_orcamento': {
+            const cat = ctx.categorias.find((c) => igual(c.nome, p.alvo) && ['S', 'despesa'].includes(c.tipo));
+            if (!cat || !valor) return null;
+            const [y, m] = hoje.split('-').map(Number);
+            const jaTem = ctx.orcamentos.some((o) => igual(o.categoria, cat.nome) && Number(o.mes) === m && Number(o.ano) === y);
+            if (jaTem) return null;
+            return { acao: p.acao, texto, alvoId: String(cat.id_categoria), titulo: cat.nome, valor, mes: m, ano: y };
+        }
+        case 'aportar': {
+            const inv = ctx.investimentos.find((i) => igual(i.nome, p.alvo));
+            if (!inv || !valor) return null;
+            return { acao: p.acao, texto, alvoId: String(inv.id_investimento), titulo: inv.nome, valor };
+        }
+        case 'criar_investimento': {
+            if (!p.nomeSugerido || !p.tipoInvestimento || !p.indexador || !p.taxa) return null;
+            if (ctx.investimentos.some((i) => igual(i.nome, p.nomeSugerido))) return null;
+            return { acao: p.acao, texto, titulo: p.nomeSugerido, tipoInvestimento: p.tipoInvestimento, indexador: p.indexador, taxa: p.taxa, valor: null };
+        }
+        default:
+            return null;
+    }
+}
+
 function montarDados(ctx, p, base, valores) {
     const principal = p.fonte ? executar(ctx, p.fonte, base) : null;
 
@@ -232,18 +305,13 @@ function montarDados(ctx, p, base, valores) {
             return { colunas, linhas: linhas.map((l) => Object.fromEntries(colunas.map((c) => [c.chave, l[c.chave] ?? null]))), destaque: destaque >= 0 ? [destaque] : [] };
         }
 
+        // Dicas e desafios em texto foram substituídos por blocos de ação
         case 'tip':
-        case 'challenge': {
-            if (!p.texto) return null;
-            const economia = p.economia ? valores[p.economia] : null;
-            if (p.economia && !economia) return null;
-            return {
-                texto: preencher(p.texto, valores),
-                nivel: p.nivel || 'info',
-                economia: economia ? economia.valor : null,
-                duracaoDias: p.type === 'challenge' ? p.duracaoDias || 7 : undefined,
-            };
-        }
+        case 'challenge':
+            return null;
+
+        case 'action':
+            return montarAcao(ctx, p, valores, base);
 
         case 'story': {
             const slides = (p.slides || []).map((s) => preencher(s, valores)).filter(Boolean);
@@ -259,13 +327,16 @@ function montarDados(ctx, p, base, valores) {
             if (vazio(lista)) return null;
             const alvo = selecionar(lista, p.item);
             if (!alvo) return null;
-            return { ...alvo, texto: p.texto ? preencher(p.texto, valores) : null };
+            // os números do próprio bloco podem aparecer no texto ({{atual}}, {{media}}, {{variacaoPct}})
+            const proprios = { atual: { valor: alvo.atual, formato: 'moeda' }, media: { valor: alvo.media, formato: 'moeda' }, variacaoPct: { valor: alvo.variacaoPct, formato: 'pct' } };
+            return { ...alvo, texto: p.texto ? preencher(p.texto, { ...proprios, ...valores }) : null };
         }
 
         case 'forecast': {
             const proj = executar(ctx, { fn: 'projecaoFimMes', args: {} }, base);
             if (!proj) return null;
-            return { ...proj, texto: p.texto ? preencher(p.texto, valores) : null };
+            const proprios = Object.fromEntries(['projecao', 'gastoAteHoje', 'mediaAnteriores', 'diferenca'].map((k) => [k, { valor: Math.abs(proj[k]), formato: 'moeda' }]));
+            return { ...proj, texto: p.texto ? preencher(p.texto, { ...proprios, ...valores }) : null };
         }
 
         case 'goal': {

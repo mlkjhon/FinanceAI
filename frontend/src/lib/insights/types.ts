@@ -80,6 +80,21 @@ const ComparisonData = z.object({
   texto: z.string().nullable().optional(),
 });
 
+const ActionData = z.object({
+  acao: z.enum(['criar_meta', 'depositar_meta', 'criar_orcamento', 'aportar', 'criar_investimento']),
+  texto: z.string(),
+  titulo: z.string(),
+  valor: z.number().nullable(),
+  alvoId: z.string().optional(),
+  dataObjetivo: z.string().nullable().optional(),
+  falta: z.number().optional(),
+  mes: z.number().optional(),
+  ano: z.number().optional(),
+  tipoInvestimento: z.string().optional(),
+  indexador: z.string().optional(),
+  taxa: z.number().optional(),
+});
+
 const Base = {
   id: z.string(),
   title: z.string(),
@@ -105,6 +120,7 @@ export const Bloco = z.discriminatedUnion('type', [
   z.object({ ...Base, type: z.literal('forecast'), data: ForecastData }),
   z.object({ ...Base, type: z.literal('goal'), data: GoalData }),
   z.object({ ...Base, type: z.literal('comparison'), data: ComparisonData }),
+  z.object({ ...Base, type: z.literal('action'), data: ActionData }),
 ]);
 export type Bloco = z.infer<typeof Bloco>;
 export type BlocoDe<T extends Bloco['type']> = Extract<Bloco, { type: T }>;
