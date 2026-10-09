@@ -7,7 +7,8 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { txSchema, type TxForm } from '../lib/schemas/transaction';
 import { Plus, Search, X, Loader2 } from '../components/icons';
-import { transactionsApi, categoriesApi, subcategoriasApi, type Transaction, type CreateTransaction } from '../lib/api';
+import { transactionsApi, categoriesApi, subcategoriasApi, type Category, type Transaction, type CreateTransaction } from '../lib/api';
+import { Collapse } from '../components/collapse';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter } from '../components/ui';
 import { formatCurrency, cn } from '../lib/utils';
@@ -61,6 +62,58 @@ const sinal = (tx: Transaction) => (tx.tipo === 'receita' ? tx.valor : -tx.valor
 const fieldCls =
   'field w-full px-4 py-3 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm text-[var(--color-ink)]';
 
+/*
+ * Criar categoria sem sair da transação. A categoria é só do usuário (não aparece
+ * para mais ninguém) e já nasce com a subcategoria "Geral", que fica selecionada.
+ */
+function NovaCategoria({ tipo, onCriada }: { tipo: 'receita' | 'despesa'; onCriada: (id: string) => void }) {
+  const qc = useQueryClient();
+  const [nome, setNome] = useState('');
+  const criar = useMutation({
+    mutationFn: () => categoriesApi.create({ nome: nome.trim(), tipo }),
+    onSuccess: (c) => {
+      const id = String(c.id_categoria);
+      // entra na lista na hora (sem esperar o recarregamento) para o select já mostrar
+      qc.setQueryData<Category[]>(['categories'], (antes) => [...(antes ?? []), { id, nome: c.nome, tipo, propria: true }]);
+      qc.invalidateQueries({ queryKey: ['categories'] });
+      setNome('');
+      onCriada(id);
+    },
+  });
+  const enviar = () => {
+    if (nome.trim().length >= 2 && !criar.isPending) criar.mutate();
+  };
+
+  return (
+    <div id="tx-nova-cat" className="rounded-xl bg-[var(--color-surface)] p-3 space-y-2">
+      <label htmlFor="tx-nova-cat-nome" className="text-xs font-medium text-[var(--color-ink-soft)]">
+        Nova categoria de {tipo === 'receita' ? 'receita' : 'despesa'} <span className="text-[var(--color-ink-muted)] font-normal">(só você vê)</span>
+      </label>
+      <div className="flex gap-2">
+        <input
+          id="tx-nova-cat-nome"
+          value={nome}
+          maxLength={60}
+          onChange={(e) => setNome(e.target.value)}
+          // Enter cria a categoria, não envia a transação
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); enviar(); } }}
+          placeholder={tipo === 'receita' ? 'Ex.: Freelas' : 'Ex.: Pets'}
+          className={cn(fieldCls, 'py-2.5')}
+        />
+        <button
+          type="button"
+          onClick={enviar}
+          disabled={nome.trim().length < 2 || criar.isPending}
+          className="btn-primary shrink-0 px-4 text-sm disabled:opacity-50"
+        >
+          {criar.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Criar'}
+        </button>
+      </div>
+      {criar.isError && <p role="alert" className="text-xs text-loss">{(criar.error as Error).message || 'Não deu para criar a categoria.'}</p>}
+    </div>
+  );
+}
+
 function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose: () => void; onSaved: () => void }) {
   const qc = useQueryClient();
   const { register, handleSubmit, formState: { errors, isSubmitting, isSubmitted }, control, getValues, setValue } = useForm<TxForm>({
@@ -102,6 +155,7 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
   }, [subcats, tx?.id_subcategoria, getValues, setValue]);
 
   const filteredCats = cats?.filter((c) => c.tipo === tipo) ?? [];
+  const [criandoCat, setCriandoCat] = useState(false);
 
   const handleTipoChange = (t: 'receita' | 'despesa') => {
     setValue('tipo', t);
@@ -180,10 +234,21 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
           <input id="tx-data" {...register('data')} type="date" className={fieldCls} />
         </div>
 
-        {filteredCats.length > 0 && (
+        <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="tx-cat" className="text-sm font-medium text-[var(--color-ink-soft)]">Categoria</label>
+              <div className="flex h-6 items-center justify-between gap-2">
+                <label htmlFor="tx-cat" className="text-sm font-medium text-[var(--color-ink-soft)]">Categoria</label>
+                <button
+                  type="button"
+                  onClick={() => setCriandoCat((v) => !v)}
+                  aria-expanded={criandoCat}
+                  aria-controls="tx-nova-cat"
+                  className="pressable inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold text-[var(--color-accent)] hover:bg-gain-soft"
+                >
+                  <Plus size={12} /> Nova
+                </button>
+              </div>
               <select
                 id="tx-cat"
                 {...register('id_categoria')}
@@ -195,14 +260,24 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
               </select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="tx-sub" className="text-sm font-medium text-[var(--color-ink-soft)]">Subcategoria</label>
+              <label htmlFor="tx-sub" className="flex h-6 items-center text-sm font-medium text-[var(--color-ink-soft)]">Subcategoria</label>
               <select id="tx-sub" {...register('id_subcategoria')} disabled={!id_categoria} className={cn(fieldCls, 'disabled:opacity-50')}>
                 <option value="">Nenhuma</option>
                 {subcats?.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
               </select>
             </div>
           </div>
-        )}
+          <Collapse open={criandoCat}>
+            <NovaCategoria
+              tipo={tipo}
+              onCriada={(id) => {
+                setCriandoCat(false);
+                setValue('id_categoria', id);
+                setValue('id_subcategoria', '');
+              }}
+            />
+          </Collapse>
+        </div>
 
         {saveError && (
           <p role="alert" className="text-sm text-loss">

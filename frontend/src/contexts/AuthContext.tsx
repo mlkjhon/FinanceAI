@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { authApi, setUserData, removeUserData, getUserData, type User } from '../lib/api';
+import { authApi, setUserData, removeUserData, getUserData, atualizarUsuarioLocal, type User } from '../lib/api';
 
 interface AuthContextType {
   user: User | null;
@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (email: string, password: string, remember?: boolean) => Promise<void>;
   register: (nome: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  atualizarUsuario: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -37,8 +38,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = '/auth';
   }, []);
 
+  // Depois de editar nome/e-mail nas configurações
+  const atualizarUsuario = useCallback((novo: User) => {
+    atualizarUsuarioLocal(novo);
+    setUser(novo);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, login, register, logout, atualizarUsuario }}>
       {children}
     </AuthContext.Provider>
   );

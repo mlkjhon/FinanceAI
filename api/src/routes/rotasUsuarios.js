@@ -6,13 +6,22 @@ import { autenticar } from "../middlewares/autenticar.js";
 
 const router = Router();
 
-//Criando o endpoint para listar todos os usuários
+// Um usuário só pode ler/alterar/excluir a própria conta
+const ehOProprio = (req, res) => {
+    if (Number(req.params.id_usuario) !== Number(req.usuario.id)) {
+        res.status(403).json({ error: 'Você só pode alterar a sua própria conta.' });
+        return false;
+    }
+    return true;
+};
+
+// Lista apenas o próprio usuário (antes devolvia todos os usuários do sistema)
 router.get('/usuarios', autenticar, async (req, res) => {
     try {
-        const query = `SELECT id_usuario, nome, email FROM usuarios ORDER BY id_usuario`;
+        const query = `SELECT id_usuario, nome, email FROM usuarios WHERE id_usuario = $1`;
 
         //Cria uma variável para receber o retorno do SQL
-        const usuarios = await BD.query(query);
+        const usuarios = await BD.query(query, [req.usuario.id]);
 
         res.status(200).json(usuarios.rows);
     }
@@ -51,6 +60,7 @@ router.put('/usuarios/:id_usuario', autenticar, async (req, res) => {
 
     const { id_usuario } = req.params;
     const { nome, email, senha} = req.body
+    if (!ehOProprio(req, res)) return;
 
     try {
 
@@ -101,6 +111,7 @@ router.put('/usuarios/:id_usuario', autenticar, async (req, res) => {
 router.delete('/usuarios/:id_usuario', autenticar, async (req, res) => {
 
     const { id_usuario } = req.params;
+    if (!ehOProprio(req, res)) return;
 
     try {
         const comando = `DELETE FROM usuarios WHERE id_usuario = $1`;
@@ -157,6 +168,105 @@ router.post('/login', async (req, res) => {
     } catch (error) {
         console.error('Erro ao atualizar Usuário', error.message);
         return res.status(500).json({ message: 'Erro interno no servidor' + error.message });
+    }
+});
+
+/*
+ * Configurações da conta (perfil). Sempre do usuário do token, nunca por id na URL.
+ */
+const emailValido = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+
+async function conferirSenha(id_usuario, senha) {
+    const r = await BD.query('SELECT senha FROM usuarios WHERE id_usuario = $1', [id_usuario]);
+    if (!r.rows.length || !senha) return false;
+    return bcrypt.compare(String(senha), r.rows[0].senha);
+}
+
+router.get('/perfil', autenticar, async (req, res) => {
+    try {
+        const r = await BD.query('SELECT id_usuario AS id, nome, email FROM usuarios WHERE id_usuario = $1', [req.usuario.id]);
+        if (!r.rows.length) return res.status(404).json({ error: 'Conta não encontrada.' });
+        return res.status(200).json(r.rows[0]);
+    } catch (error) {
+        return res.status(500).json({ error: 'Não foi possível carregar a conta.' });
+    }
+});
+
+router.put('/perfil', autenticar, async (req, res) => {
+    const nome = String(req.body?.nome ?? '').trim().slice(0, 80);
+    const email = String(req.body?.email ?? '').trim().toLowerCase().slice(0, 254);
+    if (nome.length < 2) return res.status(400).json({ error: 'Informe seu nome.' });
+    if (!emailValido(email)) return res.status(400).json({ error: 'Informe um e-mail válido.' });
+    try {
+        const r = await BD.query(
+            'UPDATE usuarios SET nome = $1, email = $2 WHERE id_usuario = $3 RETURNING id_usuario AS id, nome, email',
+            [nome, email, req.usuario.id]
+        );
+        return res.status(200).json(r.rows[0]);
+    } catch (error) {
+        if (error.code === '23505') return res.status(400).json({ error: 'Esse e-mail já está em uso por outra conta.' });
+        return res.status(500).json({ error: 'Não foi possível salvar os dados.' });
+    }
+});
+
+router.put('/perfil/senha', autenticar, async (req, res) => {
+    const { senhaAtual, novaSenha } = req.body || {};
+    if (!novaSenha || String(novaSenha).length < 6) return res.status(400).json({ error: 'A nova senha precisa ter pelo menos 6 caracteres.' });
+    try {
+        if (!(await conferirSenha(req.usuario.id, senhaAtual))) return res.status(400).json({ error: 'A senha atual está incorreta.' });
+        const hash = await bcrypt.hash(String(novaSenha), 10);
+        await BD.query('UPDATE usuarios SET senha = $1 WHERE id_usuario = $2', [hash, req.usuario.id]);
+        return res.status(200).json({ ok: true });
+    } catch (error) {
+        return res.status(500).json({ error: 'Não foi possível trocar a senha.' });
+    }
+});
+
+/*
+ * DELETE /perfil  { senha }
+ * Apaga a conta e todos os dados dela, numa transação só.
+ * Tabelas que ainda não existem no banco são puladas (savepoint por comando).
+ */
+router.delete('/perfil', autenticar, async (req, res) => {
+    const id = req.usuario.id;
+    const cliente = await BD.connect();
+    try {
+        if (!(await conferirSenha(id, req.body?.senha))) return res.status(400).json({ error: 'Senha incorreta.' });
+
+        const comandos = [
+            'DELETE FROM transacoes_investimentos WHERE id_investimento IN (SELECT id_investimento FROM investimentos WHERE id_usuario = $1)',
+            'DELETE FROM investimentos WHERE id_usuario = $1',
+            'DELETE FROM metas_movimentos WHERE id_usuario = $1',
+            'DELETE FROM metas_financeiras WHERE id_usuario = $1',
+            'DELETE FROM orcamentos WHERE id_usuario = $1',
+            'DELETE FROM transacoes WHERE id_usuario = $1',
+            'DELETE FROM contas_cartoes WHERE id_usuario = $1',
+            'DELETE FROM conexoes_bancarias WHERE id_usuario = $1',
+            'DELETE FROM insights_analises WHERE id_usuario = $1',
+            'DELETE FROM insights_fixados WHERE id_usuario = $1',
+            'DELETE FROM subcategorias WHERE id_usuario = $1',
+            'DELETE FROM categorias WHERE id_usuario = $1',
+        ];
+        await cliente.query('BEGIN');
+        for (const sql of comandos) {
+            await cliente.query('SAVEPOINT passo');
+            try {
+                await cliente.query(sql, [id]);
+            } catch (e) {
+                // 42P01 = tabela não existe, 42703 = coluna não existe: nada para apagar ali
+                if (e.code !== '42P01' && e.code !== '42703') throw e;
+                await cliente.query('ROLLBACK TO SAVEPOINT passo');
+            }
+        }
+        await cliente.query('DELETE FROM usuarios WHERE id_usuario = $1', [id]);
+        await cliente.query('COMMIT');
+        return res.status(200).json({ ok: true });
+    } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => {});
+        console.error('Erro ao excluir conta:', error.message);
+        return res.status(500).json({ error: 'Não foi possível excluir a conta.' });
+    } finally {
+        cliente.release();
     }
 });
 

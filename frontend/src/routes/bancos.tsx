@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatCurrency as formatarMoeda } from '../lib/utils';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { modal } from '../lib/motion-tokens';
@@ -19,7 +20,7 @@ export const Route = createFileRoute('/bancos')({
 
 function formatCurrency(val: number | string | null) {
   if (val === null || val === undefined) return 'N/D';
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val));
+  return formatarMoeda(Number(val));
 }
 
 // Item que o widget da Pluggy devolve ao conectar

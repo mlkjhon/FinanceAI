@@ -5,7 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// "Ocultar valores" (configurações): os valores em dinheiro viram bolinhas
+const valoresOcultos = () => typeof document !== 'undefined' && document.documentElement.hasAttribute('data-ocultar-valores');
+const OCULTO = 'R$ ••••';
+
 export function formatCurrency(value: number, locale = 'pt-BR', currency = 'BRL') {
+  if (valoresOcultos()) return OCULTO;
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
 }
 
@@ -41,6 +46,7 @@ export function getInitials(name: string) {
 }
 
 export function formatCompactCurrency(value: number, withPrefix = true) {
+  if (valoresOcultos()) return withPrefix ? 'R$ ••' : '••';
   if (value === 0) return withPrefix ? 'R$0' : '0';
   const abs = Math.abs(value);
   const sign = value < 0 ? '-' : '';

@@ -1,4 +1,5 @@
 import { BD } from '../../db.js';
+import { garantirCategoriasPorUsuario } from './categoriasUsuario.js';
 
 /*
  * Funções de dados dos Insights. A IA nunca calcula nada: ela escolhe qual
@@ -48,8 +49,10 @@ export async function carregarContexto(idUsuario, hoje = new Date()) {
              FROM investimentos i WHERE i.id_usuario = $1`,
             [idUsuario]
         ).catch(() => ({ rows: [] })),
-        // categorias existem para todos; os blocos de ação usam para criar orçamento
-        BD.query(`SELECT id_categoria, nome, tipo FROM categorias`).catch(() => ({ rows: [] })),
+        // categorias padrão + as do usuário; os blocos de ação usam para criar orçamento
+        garantirCategoriasPorUsuario()
+            .then(() => BD.query(`SELECT id_categoria, nome, tipo FROM categorias WHERE id_usuario IS NULL OR id_usuario = $1`, [idUsuario]))
+            .catch(() => ({ rows: [] })),
     ]);
     return criarContexto({ lancamentos: lanc.rows, metas: metas.rows, orcamentos: orc.rows, investimentos: inv.rows, categorias: cats.rows, hoje });
 }

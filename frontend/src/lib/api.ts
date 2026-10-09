@@ -21,7 +21,7 @@ interface TransacaoApi {
   data_pagamento?: string;
   created_at?: string;
 }
-interface CategoriaApi { id_categoria: number; nome: string; tipo: string }
+interface CategoriaApi { id_categoria: number; nome: string; tipo: string; propria?: boolean }
 interface SubcategoriaApi { id_subcategoria: number; id_categoria: number; nome: string }
 interface OrcamentoApi { id_orcamento: number; id_categoria: number; categoria_nome: string; valor_limite: Num; valor_gasto?: Num | null; mes: number; ano: number }
 interface MetaApi { id_meta: number; titulo: string; valor_meta: Num; valor_atual?: Num | null; data_objetivo?: string; descricao?: string }
@@ -184,14 +184,36 @@ export const categoriesApi = {
     return res.map(c => ({
       id: String(c.id_categoria),
       nome: c.nome,
-      tipo: c.tipo === 'E' || c.tipo === 'receita' ? 'receita' : 'despesa',
+      tipo: (c.tipo === 'E' || c.tipo === 'receita' ? 'receita' : 'despesa') as Category['tipo'],
+      // false = categoria padrão do app (não dá para editar nem excluir)
+      propria: !!c.propria,
     }));
   },
+  // Categoria só do usuário; já vem com a subcategoria "Geral" para usar nas transações
   create: (data: CreateCategory) =>
-    request<RespostaSimples>('/categorias', { method: 'POST', body: JSON.stringify(data) }),
+    request<CategoriaApi & { id_subcategoria: number }>('/categorias', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: CreateCategory) =>
+    request<CategoriaApi>(`/categorias/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/categorias/${id}`, { method: 'DELETE' }),
 };
+
+// Configurações da conta (sempre do usuário logado)
+export const perfilApi = {
+  get: () => request<User>('/perfil'),
+  update: (data: { nome: string; email: string }) =>
+    request<User>('/perfil', { method: 'PUT', body: JSON.stringify(data) }),
+  trocarSenha: (senhaAtual: string, novaSenha: string) =>
+    request<{ ok: boolean }>('/perfil/senha', { method: 'PUT', body: JSON.stringify({ senhaAtual, novaSenha }) }),
+  excluirConta: (senha: string) =>
+    request<{ ok: boolean }>('/perfil', { method: 'DELETE', body: JSON.stringify({ senha }) }),
+};
+
+// Atualiza o usuário guardado sem mexer no token nem em onde ele está (local/sessão)
+export function atualizarUsuarioLocal(user: User) {
+  const storage = localStorage.getItem('finance_user') ? localStorage : sessionStorage;
+  storage.setItem('finance_user', JSON.stringify(user));
+}
 
 // Subcategories
 export const subcategoriasApi = {
@@ -406,6 +428,7 @@ export interface Category {
   id: string;
   nome: string;
   tipo: 'receita' | 'despesa';
+  propria?: boolean;
   cor?: string;
   icone?: string;
 }

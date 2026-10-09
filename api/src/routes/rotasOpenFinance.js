@@ -1,6 +1,7 @@
 import express from 'express';
 import { BD } from '../../db.js';
 import {autenticar} from '../middlewares/autenticar.js';
+import { garantirCategoriasPorUsuario } from '../services/categoriasUsuario.js';
 
 const router = express.Router();
 
@@ -194,7 +195,8 @@ router.post('/conexoes', autenticar, async (req, res) => {
         }
 
         // 4. Buscar subcategorias para mapeamento
-        const subCatQuery = await BD.query(`SELECT id_subcategoria, nome FROM subcategorias`);
+        await garantirCategoriasPorUsuario().catch(() => {});
+        const subCatQuery = await BD.query(`SELECT id_subcategoria, nome FROM subcategorias WHERE id_usuario IS NULL OR id_usuario = $1`, [id_usuario]);
         const subcategorias = subCatQuery.rows;
 
         const mapearCategoria = (pluggyCat) => {
