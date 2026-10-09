@@ -10,6 +10,8 @@ const router = Router();
 
 const ROTULOS = { mes: 'mês atual', '3m': 'últimos 3 meses', ano: 'ano atual' };
 const rotuloPeriodo = (p) => (typeof p === 'object' && p?.inicio ? `de ${p.inicio} a ${p.fim}` : ROTULOS[p] || 'mês atual');
+// Chave do período para guardar a análise ("mes", "3m", "ano" ou "custom:inicio:fim")
+const chavePeriodo = (p) => (typeof p === 'object' ? `custom:${p.inicio}:${p.fim}` : p);
 const normalizarPeriodo = (p) => (p && typeof p === 'object' && p.inicio ? { inicio: String(p.inicio), fim: String(p.fim || p.inicio) } : ['mes', '3m', 'ano'].includes(p) ? p : 'mes');
 
 /*
@@ -38,6 +40,7 @@ router.post('/insights/analise', autenticar, async (req, res) => {
 
         // Fixados primeiro, recalculados no período escolhido
         let total = 0;
+        const gerados = []; // vão para o banco no fim, para não chamar a IA de novo ao reabrir
         for (const f of fixados) {
             const bloco = f?.pedido ? resolverBloco(ctx, f.pedido, periodo, { id: f.id }) : null;
             if (bloco) {
@@ -67,6 +70,7 @@ router.post('/insights/analise', autenticar, async (req, res) => {
             const bloco = resolverBloco(ctx, pedido, periodo);
             if (bloco) {
                 enviar({ evento: 'bloco', bloco });
+                gerados.push({ id: bloco.id, pedido: bloco.pedido });
                 total++;
             }
         };
@@ -77,6 +81,9 @@ router.post('/insights/analise', autenticar, async (req, res) => {
             console.warn('[INSIGHTS] streaming falhou, usando chamada normal:', e.message);
             const resposta = await gerarJSON(prompt, { temperatura: 0.4, timeoutMs: 45000 });
             (Array.isArray(resposta?.blocos) ? resposta.blocos : []).forEach(aoPedido);
+        }
+        if (gerados.length) {
+            await salvarAnalise(req.usuario.id, periodo, gerados, true).catch((e) => console.error('❌ [INSIGHTS] salvar análise:', e.message));
         }
         enviar({ evento: 'fim', total });
         res.end();
@@ -175,6 +182,72 @@ router.put('/insights/fixados', autenticar, async (req, res) => {
     } catch (error) {
         console.error('❌ [INSIGHTS] fixados (salvar):', error.message);
         res.status(500).json({ error: 'Não foi possível salvar os blocos fixados.' });
+    }
+});
+
+/*
+ * Análise salva: a página abre com a última análise do período, sem gastar IA.
+ * Guardamos só os "pedidos" de cada bloco; ao abrir, eles são recalculados com
+ * os dados de hoje pelas funções do servidor (de graça, sem chamar a IA).
+ */
+let tabelaAnalisesPronta = null;
+const garantirTabelaAnalises = () =>
+    (tabelaAnalisesPronta ??= BD.query(`CREATE TABLE IF NOT EXISTS insights_analises (
+        id_usuario INTEGER NOT NULL,
+        periodo TEXT NOT NULL,
+        blocos JSONB NOT NULL DEFAULT '[]'::jsonb,
+        gerado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+        atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (id_usuario, periodo)
+    )`).catch((e) => { tabelaAnalisesPronta = null; throw e; }));
+
+const limparBlocos = (blocos) =>
+    (Array.isArray(blocos) ? blocos : []).slice(0, 30).filter((b) => b?.id && b?.pedido).map((b) => ({ id: String(b.id), pedido: b.pedido }));
+
+async function salvarAnalise(idUsuario, periodo, blocos, novaGeracao) {
+    await garantirTabelaAnalises();
+    const lista = JSON.stringify(limparBlocos(blocos));
+    if (lista.length > 300000) throw new Error('análise grande demais');
+    await BD.query(
+        `INSERT INTO insights_analises (id_usuario, periodo, blocos, gerado_em, atualizado_em)
+         VALUES ($1, $2, $3::jsonb, now(), now())
+         ON CONFLICT (id_usuario, periodo) DO UPDATE SET
+            blocos = EXCLUDED.blocos,
+            atualizado_em = now(),
+            gerado_em = CASE WHEN $4 THEN now() ELSE insights_analises.gerado_em END`,
+        [idUsuario, chavePeriodo(periodo), lista, novaGeracao]
+    );
+}
+
+// POST (e não GET) porque o período personalizado e os fixados vão no corpo
+router.post('/insights/salva/ler', autenticar, async (req, res) => {
+    const periodo = normalizarPeriodo(req.body?.periodo);
+    const fixados = limparBlocos(req.body?.fixados).slice(0, 20);
+    try {
+        await garantirTabelaAnalises();
+        const r = await BD.query('SELECT blocos, gerado_em FROM insights_analises WHERE id_usuario = $1 AND periodo = $2', [req.usuario.id, chavePeriodo(periodo)]);
+        const salva = r.rows[0];
+        const ctx = await carregarContexto(req.usuario.id);
+        const fixos = fixados.map((f) => resolverBloco(ctx, f.pedido, periodo, { id: f.id })).filter(Boolean).map((b) => ({ ...b, fixado: true }));
+        const idsFixos = new Set(fixos.map((b) => b.id));
+        const blocos = salva
+            ? salva.blocos.filter((b) => !idsFixos.has(b.id)).map((b) => resolverBloco(ctx, b.pedido, periodo, { id: b.id })).filter(Boolean)
+            : [];
+        res.status(200).json({ existe: !!salva, geradoEm: salva?.gerado_em ?? null, blocos: [...fixos, ...blocos] });
+    } catch (error) {
+        console.error('❌ [INSIGHTS] ler análise salva:', error.message);
+        res.status(500).json({ error: 'Não foi possível carregar a análise salva.' });
+    }
+});
+
+// Guarda o estado atual da página (depois de comandos, remoções, reordenação)
+router.put('/insights/salva', autenticar, async (req, res) => {
+    try {
+        await salvarAnalise(req.usuario.id, normalizarPeriodo(req.body?.periodo), req.body?.blocos, false);
+        res.status(200).json({ ok: true });
+    } catch (error) {
+        console.error('❌ [INSIGHTS] salvar análise:', error.message);
+        res.status(500).json({ error: 'Não foi possível salvar a análise.' });
     }
 });
 

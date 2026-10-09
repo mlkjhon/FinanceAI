@@ -136,3 +136,35 @@ export async function salvarFixadosServidor(blocos: Bloco[]) {
     /* sem rede: fica só a cópia local até a próxima mudança */
   }
 }
+
+/*
+ * Análise salva no servidor: abrir a página não gasta IA. Os blocos voltam
+ * recalculados com os dados de hoje (os números ficam atuais, o texto da IA é
+ * o da última geração).
+ */
+export async function lerAnaliseSalva(periodo: Periodo, fixados: Bloco[]) {
+  const res = await fetch(`${API_BASE}/insights/salva/ler`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ periodo, fixados: fixados.map((b) => ({ id: b.id, pedido: b.pedido })) }),
+  });
+  if (!res.ok) await falhou(res);
+  const data = await res.json();
+  const blocos: Bloco[] = (Array.isArray(data.blocos) ? data.blocos : []).flatMap((b: unknown) => {
+    const r = Bloco.safeParse(b);
+    return r.success ? [r.data] : [];
+  });
+  return { existe: !!data.existe, geradoEm: (data.geradoEm as string | null) ?? null, blocos };
+}
+
+export async function salvarAnaliseAtual(periodo: Periodo, blocos: Bloco[]) {
+  try {
+    await fetch(`${API_BASE}/insights/salva`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify({ periodo, blocos: blocos.filter((b) => !b.fixado).map((b) => ({ id: b.id, pedido: b.pedido })) }),
+    });
+  } catch {
+    /* sem rede: a página continua; salva na próxima mudança */
+  }
+}

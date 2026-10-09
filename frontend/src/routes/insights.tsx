@@ -8,7 +8,7 @@ import { Icon } from '../components/icons';
 import { BlocoFrame, BlocoSkeleton } from '../components/insights/frame';
 import { CommandBar } from '../components/insights/command-bar';
 import { AiStatus } from '../components/insights/primitives';
-import { analisar, buscarFixadosServidor, executarComando, lerFixados, salvarFixados, salvarFixadosServidor } from '../lib/insights/client';
+import { analisar, buscarFixadosServidor, executarComando, lerAnaliseSalva, lerFixados, salvarAnaliseAtual, salvarFixados, salvarFixadosServidor } from '../lib/insights/client';
 import type { Bloco, EstadoIA, Operacao, Periodo } from '../lib/insights/types';
 
 export const Route = createFileRoute('/insights')({
@@ -35,6 +35,12 @@ function InsightsPage() {
   const [ocupados, setOcupados] = useState<Set<string>>(new Set());
   const [resposta, setResposta] = useState<{ texto: string; id: number } | null>(null);
   const [erroComando, setErroComando] = useState<string | null>(null);
+  // Análise salva: quando foi gerada, se ainda está carregando e se este período não tem nenhuma
+  const [geradoEm, setGeradoEm] = useState<string | null>(null);
+  const [carregandoSalva, setCarregandoSalva] = useState(true);
+  const [semAnalise, setSemAnalise] = useState(false);
+  // Marca mudanças feitas pelo usuário (comando, remover, fixar) para salvar no servidor
+  const sujo = useRef(false);
 
   const abort = useRef<AbortController | null>(null);
   const fila = useRef<Bloco[]>([]);
@@ -97,6 +103,7 @@ function InsightsPage() {
     streamAcabou.current = false;
     setErro(null);
     setVazio(false);
+    setSemAnalise(false);
     setEstado('analisando');
     setBlocos(fixados); // os não fixados saem com animação; os fixados ficam e são recalculados
 
@@ -112,6 +119,7 @@ function InsightsPage() {
         },
         ctrl.signal
       );
+      if (abort.current === ctrl) setGeradoEm(new Date().toISOString());
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setErro((e as Error).message || 'Não foi possível falar com a IA.');
     } finally {
@@ -119,13 +127,61 @@ function InsightsPage() {
     }
   }, []);
 
-  // A página se monta sozinha ao abrir e quando o período muda
+  /*
+   * Ao abrir (ou trocar de período) a página mostra a ANÁLISE SALVA, recalculada
+   * com os dados de hoje, sem chamar a IA. A IA só roda no botão "Gerar nova
+   * análise", ou sozinha uma única vez: no mês atual, quando ainda não há nada salvo.
+   */
   useEffect(() => {
     if (!fixadosProntos) return;
-    gerar(periodo);
-    return () => abort.current?.abort();
+    let vivo = true;
+    abort.current?.abort();
+    fila.current = [];
+    setErro(null);
+    setVazio(false);
+    setSemAnalise(false);
+    setCarregandoSalva(true);
+    const fixos = blocosRef.current.filter((b) => b.fixado);
+    lerAnaliseSalva(periodo, fixos)
+      .then((r) => {
+        if (!vivo) return;
+        setCarregandoSalva(false);
+        sujo.current = false;
+        if (r.existe) {
+          setGeradoEm(r.geradoEm);
+          // entram em cascata pela mesma fila do streaming
+          setBlocos(fixos.filter((f) => !r.blocos.some((b) => b.id === f.id)));
+          fila.current = comStoryNoTopo(r.blocos);
+        } else if (chave === 'mes') {
+          gerar(periodo); // primeira vez: gera uma única análise
+        } else {
+          setGeradoEm(null);
+          setBlocos(comStoryNoTopo(r.blocos));
+          setSemAnalise(true);
+        }
+      })
+      .catch((e) => {
+        if (!vivo) return;
+        setCarregandoSalva(false);
+        setErro((e as Error).message || 'Não foi possível carregar a análise.');
+      });
+    return () => {
+      vivo = false;
+      abort.current?.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fixadosProntos, chave, chave === 'custom' ? `${custom.inicio}|${custom.fim}` : '']);
+
+  // Edições do usuário vão para o servidor (sem IA), para reabrir igual
+  useEffect(() => {
+    if (!sujo.current || estado !== 'ocioso') return;
+    const t = setTimeout(() => {
+      sujo.current = false;
+      salvarAnaliseAtual(periodo, blocosRef.current);
+    }, 800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocos, estado]);
 
   const marcarNovos = (ids: string[]) => {
     if (!ids.length) return;
@@ -137,6 +193,7 @@ function InsightsPage() {
 
   const aplicar = (ops: Operacao[]) => {
     const tocados: string[] = [];
+    if (ops.length) sujo.current = true;
     setBlocos((atual) => {
       let lista = [...atual];
       for (const op of ops) {
@@ -185,11 +242,11 @@ function InsightsPage() {
   const acoes = {
     onRefazer: (b: Bloco) =>
       comando(`Refaça o bloco ${b.id} ("${b.title}") com outro ângulo ou outra visualização, mantendo o assunto. Use a operação update nesse id.`, b.id),
-    onFixar: (b: Bloco) => setBlocos((l) => l.map((x) => (x.id === b.id ? { ...x, fixado: !x.fixado } : x))),
-    onRemover: (b: Bloco) => setBlocos((l) => l.filter((x) => x.id !== b.id)),
+    onFixar: (b: Bloco) => { sujo.current = true; setBlocos((l) => l.map((x) => (x.id === b.id ? { ...x, fixado: !x.fixado } : x))); },
+    onRemover: (b: Bloco) => { sujo.current = true; setBlocos((l) => l.filter((x) => x.id !== b.id)); },
   };
 
-  const carregando = estado === 'analisando' || estado === 'gerando';
+  const carregando = estado === 'analisando' || estado === 'gerando' || carregandoSalva;
   const semStory = !blocos.some((b) => b.type === 'story');
 
   return (
@@ -200,7 +257,14 @@ function InsightsPage() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h1 className="font-brand text-3xl font-bold tracking-tight text-[var(--color-ink)]">Insights</h1>
-              <div className="mt-2"><AiStatus estado={estado} /></div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <AiStatus estado={estado} />
+                {geradoEm && estado === 'ocioso' && (
+                  <span className="text-xs text-[var(--color-ink-muted)]" data-num>
+                    Análise de {new Date(geradoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · números atualizados agora
+                  </span>
+                )}
+              </div>
             </div>
             <button
               type="button"
@@ -253,6 +317,18 @@ function InsightsPage() {
             <Link to="/transactions" className="btn-primary px-5 py-2.5 text-sm mt-5">Registrar transações</Link>
           </div>
         ) : (
+          <>
+          {semAnalise && !carregando && (
+            <div className="rise finance-card px-6 py-8 mb-5 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="font-semibold text-[var(--color-ink)]">Ainda não há análise para este período.</p>
+                <p className="text-sm text-[var(--color-ink-muted)] mt-1">A IA só roda quando você pedir, para não gastar à toa.</p>
+              </div>
+              <button type="button" onClick={() => gerar(periodo)} className="btn-primary px-5 py-2.5 text-sm">
+                <Icon name="sparkle" size={16} /> Gerar análise
+              </button>
+            </div>
+          )}
           <LayoutGroup>
             <div className="grid grid-cols-12 gap-4 sm:gap-5 grid-flow-row-dense">
               {carregando && semStory && <BlocoSkeleton size="full" alto />}
@@ -277,6 +353,7 @@ function InsightsPage() {
               )}
             </div>
           </LayoutGroup>
+          </>
         )}
       </main>
       <CommandBar estado={estado} resposta={resposta} erro={erroComando} onEnviar={(t) => comando(t)} />
