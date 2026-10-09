@@ -1,7 +1,7 @@
 // Chamada única à IA (OpenAI), usada pelos Insights e pelo /test-ia.
 // O modelo e o esforço de raciocínio ficam em variáveis de ambiente para dar
 // para trocar sem mexer no código.
-export const MODELO_IA = process.env.OPENAI_MODEL || 'gpt-5.5';
+export const MODELO_IA = process.env.OPENAI_MODEL || 'gpt-5.4-mini';
 // "low" mantém a página rápida; "medium" pensa mais e demora mais
 const ESFORCO = process.env.OPENAI_REASONING || 'low';
 const URL_OPENAI = 'https://api.openai.com/v1/chat/completions';

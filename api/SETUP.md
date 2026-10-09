@@ -23,7 +23,7 @@ A IA dos Insights usa a OpenAI.
 ```env
 OPENAI_API_KEY=sua_chave_aqui
 # opcionais
-OPENAI_MODEL=gpt-5.5
+OPENAI_MODEL=gpt-5.4-mini
 OPENAI_REASONING=low
 ```
 
