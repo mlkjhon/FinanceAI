@@ -252,9 +252,19 @@ export const goalsApi = {
       descricao: d.descricao,
     }));
   },
-  create: async (data: CreateGoal) => {
+  // A meta com o histórico de criação e depósitos (data e hora)
+  get: async (id: string): Promise<MetaDetalhe> => {
+    const d = await request<MetaDetalhe>(`/metas/${id}`);
+    return {
+      ...d,
+      valor_meta: Number(d.valor_meta) || 0,
+      valor_atual: Number(d.valor_atual) || 0,
+      historico: (d.historico || []).map((m) => ({ ...m, valor: Number(m.valor) || 0, saldo_apos: m.saldo_apos == null ? null : Number(m.saldo_apos) })),
+    };
+  },
+  create: async (data: CreateGoal, origem: OrigemMeta = 'manual') => {
     const user = getUserData();
-    return request<RespostaSimples>('/metas', {
+    return request<MetaApi>('/metas', {
       method: 'POST',
       body: JSON.stringify({
         id_usuario: user?.id,
@@ -262,21 +272,44 @@ export const goalsApi = {
         valor_meta: data.valor_meta,
         valor_atual: data.valor_atual,
         data_objetivo: data.data_alvo,
-        descricao: data.descricao
+        descricao: data.descricao,
+        origem,
       })
     });
   },
   update: async () => ({}) as Goal,
   delete: async (id: string) => request<void>(`/metas/${id}`, { method: 'DELETE' }),
   // Deposita dinheiro na meta E desconta automaticamente do saldo geral
-  adicionarDinheiro: async (id: string, valor: number) => {
+  adicionarDinheiro: async (id: string, valor: number, origem: OrigemMeta = 'manual') => {
     const user = getUserData();
     return request<RespostaSimples>(`/metas/${id}/adicionar`, {
       method: 'PATCH',
-      body: JSON.stringify({ id_usuario: user?.id, valor }),
+      body: JSON.stringify({ id_usuario: user?.id, valor, origem }),
     });
   },
 };
+
+export type OrigemMeta = 'manual' | 'insights';
+export interface MovimentoMeta {
+  id: string;
+  tipo: 'criacao' | 'deposito';
+  valor: number;
+  saldo_apos: number | null;
+  origem: OrigemMeta | null;
+  criado_em: string;
+  // false = depósito antigo, só com o dia (sem hora registrada)
+  hora: boolean;
+}
+export interface MetaDetalhe {
+  id_meta: number;
+  titulo: string;
+  descricao?: string | null;
+  valor_meta: number;
+  valor_atual: number;
+  data_objetivo?: string | null;
+  criado_em: string | null;
+  historico: MovimentoMeta[];
+}
 
 // Dashboard
 export const dashboardApi = {

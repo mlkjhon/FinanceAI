@@ -204,9 +204,31 @@ const garantirTabelaAnalises = () =>
 const limparBlocos = (blocos) =>
     (Array.isArray(blocos) ? blocos : []).slice(0, 30).filter((b) => b?.id && b?.pedido).map((b) => ({ id: String(b.id), pedido: b.pedido }));
 
+/*
+ * Ação concluída: o bloco guarda quando foi feita, o valor e a "foto" do bloco
+ * naquele momento. Ao reabrir, ele aparece como feito (e não volta a sugerir
+ * a mesma coisa como se nada tivesse acontecido).
+ */
+const limparFeito = (f) => (f && typeof f.em === 'string'
+    ? { em: f.em, valor: Number.isFinite(Number(f.valor)) ? Number(f.valor) : null, alvoId: f.alvoId != null ? String(f.alvoId).slice(0, 40) : null }
+    : null);
+
+async function feitosSalvos(idUsuario) {
+    const r = await BD.query('SELECT blocos FROM insights_analises WHERE id_usuario = $1', [idUsuario]);
+    const mapa = new Map();
+    for (const row of r.rows) for (const b of row.blocos || []) if (b?.feito) mapa.set(b.id, { feito: b.feito, foto: b.foto });
+    return mapa;
+}
+
 async function salvarAnalise(idUsuario, periodo, blocos, novaGeracao) {
     await garantirTabelaAnalises();
-    const lista = JSON.stringify(limparBlocos(blocos));
+    let limpos = limparBlocos(blocos);
+    // Edições da página (comandos, reordenar) não apagam as ações já concluídas
+    if (!novaGeracao) {
+        const feitos = await feitosSalvos(idUsuario);
+        limpos = limpos.map((b) => (feitos.has(b.id) ? { ...b, ...feitos.get(b.id) } : b));
+    }
+    const lista = JSON.stringify(limpos);
     if (lista.length > 300000) throw new Error('análise grande demais');
     await BD.query(
         `INSERT INTO insights_analises (id_usuario, periodo, blocos, gerado_em, atualizado_em)
@@ -231,12 +253,48 @@ router.post('/insights/salva/ler', autenticar, async (req, res) => {
         const fixos = fixados.map((f) => resolverBloco(ctx, f.pedido, periodo, { id: f.id })).filter(Boolean).map((b) => ({ ...b, fixado: true }));
         const idsFixos = new Set(fixos.map((b) => b.id));
         const blocos = salva
-            ? salva.blocos.filter((b) => !idsFixos.has(b.id)).map((b) => resolverBloco(ctx, b.pedido, periodo, { id: b.id })).filter(Boolean)
+            ? salva.blocos.filter((b) => !idsFixos.has(b.id)).map((b) => (b.feito && b.foto
+                ? { ...b.foto, id: b.id, pedido: b.pedido, feito: b.feito }
+                : resolverBloco(ctx, b.pedido, periodo, { id: b.id }))).filter(Boolean)
             : [];
         res.status(200).json({ existe: !!salva, geradoEm: salva?.gerado_em ?? null, blocos: [...fixos, ...blocos] });
     } catch (error) {
         console.error('❌ [INSIGHTS] ler análise salva:', error.message);
         res.status(500).json({ error: 'Não foi possível carregar a análise salva.' });
+    }
+});
+
+/*
+ * POST /insights/acao-feita
+ * Corpo: { id, bloco, valor, alvoId }. Marca o bloco de ação como concluído na
+ * análise salva em que ele estiver (o id do bloco é único).
+ */
+router.post('/insights/acao-feita', autenticar, async (req, res) => {
+    const id = String(req.body?.id || '');
+    const bloco = req.body?.bloco;
+    if (!id || bloco?.type !== 'action' || JSON.stringify(bloco).length > 10000) {
+        return res.status(400).json({ error: 'Bloco inválido.' });
+    }
+    const feito = limparFeito({ em: new Date().toISOString(), valor: req.body?.valor, alvoId: req.body?.alvoId });
+    const { pedido: _p, fixado: _f, feito: _x, ...foto } = bloco;
+    try {
+        await garantirTabelaAnalises();
+        const r = await BD.query('SELECT periodo, blocos FROM insights_analises WHERE id_usuario = $1', [req.usuario.id]);
+        let achou = false;
+        for (const row of r.rows) {
+            const blocos = row.blocos || [];
+            if (!blocos.some((b) => b.id === id)) continue;
+            achou = true;
+            const novos = blocos.map((b) => (b.id === id ? { ...b, feito, foto } : b));
+            await BD.query(
+                'UPDATE insights_analises SET blocos = $3::jsonb, atualizado_em = now() WHERE id_usuario = $1 AND periodo = $2',
+                [req.usuario.id, row.periodo, JSON.stringify(novos)]
+            );
+        }
+        res.status(200).json({ ok: true, feito, salvo: achou });
+    } catch (error) {
+        console.error('❌ [INSIGHTS] marcar ação feita:', error.message);
+        res.status(500).json({ error: 'Não foi possível registrar a ação.' });
     }
 });
 

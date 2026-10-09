@@ -1,8 +1,8 @@
 import React, { Suspense } from 'react';
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Target, Plus, Calendar, PiggyBank } from '../components/icons';
-import { goalsApi } from '../lib/api';
+import { Target, Plus, Calendar, PiggyBank, ArrowRight } from '../components/icons';
+import { goalsApi, type CreateGoal } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter, SkeletonCard } from '../components/ui';
 import { Sheet, AmountField, Campo } from '../components/sheet';
@@ -53,7 +53,7 @@ function GoalsContent() {
 
   // Mutation para criar nova meta
   const createMut = useMutation({
-    mutationFn: goalsApi.create,
+    mutationFn: (d: CreateGoal) => goalsApi.create(d),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['goals'] });
       setShowForm(false);
@@ -184,8 +184,10 @@ function GoalsContent() {
             >
               {/* Título e ícone */}
               <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900">{g.nome}</p>
+                <div className="min-w-0">
+                  <Link to="/goals/$id" params={{ id: g.id }} className="font-semibold text-gray-900 hover:text-[var(--color-accent)] transition-colors duration-150">
+                    {g.nome}
+                  </Link>
                   {g.descricao && <p className="text-xs text-gray-400 mt-0.5">{g.descricao}</p>}
                 </div>
                 {g.valor_atual >= g.valor_meta ? (
@@ -215,6 +217,15 @@ function GoalsContent() {
                   <span>Meta para {formatDate(g.data_alvo)}</span>
                 </div>
               )}
+
+              <Link
+                to="/goals/$id"
+                params={{ id: g.id }}
+                className="group flex items-center justify-center gap-1 text-xs font-medium text-[var(--color-accent)]"
+              >
+                <span className="link-line">Ver detalhes e histórico</span>
+                <span className="arrow-nudge"><ArrowRight size={12} /></span>
+              </Link>
 
               {/* Botões de ação */}
               <div className="flex gap-2 pt-1">

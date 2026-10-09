@@ -104,6 +104,8 @@ const Base = {
   createdAt: z.string(),
   pedido: z.record(z.any()),
   fixado: z.boolean().optional(),
+  // ação já executada: quando, com qual valor e o que foi criado/alterado
+  feito: z.object({ em: z.string(), valor: z.number().nullable().optional(), alvoId: z.string().nullable().optional() }).optional(),
   // o que o bloco considerou (busca por termos) e avisos sobre a conta
   inclui: z.array(z.string()).optional(),
   nota: z.string().optional(),

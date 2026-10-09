@@ -157,6 +157,22 @@ export async function lerAnaliseSalva(periodo: Periodo, fixados: Bloco[]) {
   return { existe: !!data.existe, geradoEm: (data.geradoEm as string | null) ?? null, blocos };
 }
 
+// Ação concluída: fica registrada na análise salva para aparecer como feita ao reabrir
+export async function marcarAcaoFeita(bloco: Bloco, valor: number | null, alvoId: string | null) {
+  try {
+    const res = await fetch(`${API_BASE}/insights/acao-feita`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ id: bloco.id, bloco, valor, alvoId }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.feito as Bloco['feito']) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function salvarAnaliseAtual(periodo: Periodo, blocos: Bloco[]) {
   try {
     await fetch(`${API_BASE}/insights/salva`, {

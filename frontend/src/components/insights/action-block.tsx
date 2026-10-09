@@ -10,6 +10,7 @@ import { fmt, diaCurto } from '../../lib/insights/format';
 import { nomeIndexador } from '../../lib/investimentos';
 import type { BlocoDe } from '../../lib/insights/types';
 import { StreamText } from './primitives';
+import { marcarAcaoFeita } from '../../lib/insights/client';
 import { MoneyInput } from '../money-input';
 import { deNumero, paraNumero } from '../../lib/dinheiro';
 
@@ -33,6 +34,47 @@ function textoBotao(d: Acao, valor: number) {
   }
 }
 
+function textoFeito(d: Acao) {
+  switch (d.acao) {
+    case 'criar_meta': return 'Meta criada';
+    case 'depositar_meta': return 'Depósito feito';
+    case 'criar_orcamento': return 'Orçamento criado';
+    case 'aportar': return 'Aporte feito';
+    case 'criar_investimento': return 'Investimento cadastrado';
+  }
+}
+
+// "hoje às 14:32", "ontem às 09:10" ou "9 de out às 14:32"
+function quando(iso: string) {
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return '';
+  const hora = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const dia = (x: Date) => x.toDateString();
+  const ontem = new Date();
+  ontem.setDate(ontem.getDate() - 1);
+  if (dia(dt) === dia(new Date())) return `Hoje às ${hora}`;
+  if (dia(dt) === dia(ontem)) return `Ontem às ${hora}`;
+  return `${dt.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '')} às ${hora}`;
+}
+
+// Leva direto ao que foi criado/alterado (meta ou investimento); senão, à lista
+function LinkDestino({ d, alvoId, nome, destino }: { d: Acao; alvoId: string | null; nome: string; destino: '/goals' | '/budgets' | '/investimentos' }) {
+  const conteudo = (texto: string) => (
+    <>
+      <span className="link-line">{texto}</span>
+      <span className="arrow-nudge"><Icon name="arrow-right" size={14} /></span>
+    </>
+  );
+  const classe = 'group shrink-0 inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)]';
+  if (alvoId && (d.acao === 'criar_meta' || d.acao === 'depositar_meta')) {
+    return <Link to="/goals/$id" params={{ id: alvoId }} className={classe}>{conteudo('Ver meta')}</Link>;
+  }
+  if (alvoId && (d.acao === 'aportar' || d.acao === 'criar_investimento')) {
+    return <Link to="/investimentos/$id" params={{ id: alvoId }} className={classe}>{conteudo('Ver investimento')}</Link>;
+  }
+  return <Link to={destino} className={classe}>{conteudo(`Ver em ${nome}`)}</Link>;
+}
+
 /*
  * Bloco de ação: a proposta da IA (com números calculados dos dados reais),
  * o valor editável e um botão que faz a ação de verdade no app.
@@ -43,8 +85,9 @@ export function ActionBlock({ b }: { b: BlocoDe<'action'> }) {
   const d = b.data;
   const cfg = CONFIG[d.acao];
   const qc = useQueryClient();
-  const [valorTexto, setValorTexto] = useState(() => deNumero(d.valor));
-  const [estado, setEstado] = useState<'pronto' | 'executando' | 'feito' | 'erro'>('pronto');
+  const [feito, setFeito] = useState(b.feito ?? null);
+  const [valorTexto, setValorTexto] = useState(() => deNumero(b.feito?.valor ?? d.valor));
+  const [estado, setEstado] = useState<'pronto' | 'executando' | 'feito' | 'erro'>(b.feito ? 'feito' : 'pronto');
   const [erro, setErro] = useState('');
   const valor = paraNumero(valorTexto) ?? 0;
   const precisaValor = d.acao !== 'criar_investimento';
@@ -55,19 +98,27 @@ export function ActionBlock({ b }: { b: BlocoDe<'action'> }) {
     setEstado('executando');
     setErro('');
     try {
+      // o que foi criado/alterado, para o link "ver" levar direto ao detalhe
+      let alvo: string | null = d.alvoId ?? null;
       if (d.acao === 'criar_meta') {
-        await goalsApi.create({ nome: d.titulo, valor_meta: valor, valor_atual: 0, data_alvo: d.dataObjetivo ?? undefined, descricao: 'Criada a partir dos Insights' });
+        const meta = await goalsApi.create({ nome: d.titulo, valor_meta: valor, valor_atual: 0, data_alvo: d.dataObjetivo ?? undefined, descricao: 'Criada a partir dos Insights' }, 'insights');
+        alvo = meta?.id_meta != null ? String(meta.id_meta) : null;
       } else if (d.acao === 'depositar_meta') {
-        await goalsApi.adicionarDinheiro(d.alvoId!, valor);
+        await goalsApi.adicionarDinheiro(d.alvoId!, valor, 'insights');
       } else if (d.acao === 'criar_orcamento') {
         await budgetsApi.create({ categoria_id: d.alvoId!, valor_limite: valor, mes: d.mes!, ano: d.ano! });
       } else if (d.acao === 'aportar') {
         await investimentosApi.addTransaction(d.alvoId!, { tipo: 'aporte', valor });
       } else {
-        await investimentosApi.create({ nome: d.titulo, tipo: d.tipoInvestimento!, taxa_rendimento: d.taxa!, indexador: d.indexador! });
+        const r = await investimentosApi.create({ nome: d.titulo, tipo: d.tipoInvestimento!, taxa_rendimento: d.taxa!, indexador: d.indexador! });
+        alvo = r?.investimento?.id_investimento != null ? String(r.investimento.id_investimento) : null;
       }
       ['goals', 'budgets', 'investimentos', 'dashboard-summary', 'transactions'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      const registro = { em: new Date().toISOString(), valor: precisaValor ? valor : null, alvoId: alvo };
+      setFeito(registro);
       setEstado('feito');
+      // guarda na análise salva (se falhar, o bloco segue como feito nesta visita)
+      marcarAcaoFeita(b, registro.valor, alvo).then((doServidor) => doServidor && setFeito(doServidor));
     } catch (e) {
       setErro((e as Error).message || 'Não deu para concluir agora.');
       setEstado('erro');
@@ -105,7 +156,7 @@ export function ActionBlock({ b }: { b: BlocoDe<'action'> }) {
             <dd className="font-medium text-[var(--color-ink)]" data-num>{diaCurto(d.dataObjetivo)} {d.dataObjetivo.slice(0, 4)}</dd>
           </div>
         )}
-        {d.acao === 'depositar_meta' && d.falta != null && (
+        {d.acao === 'depositar_meta' && d.falta != null && estado !== 'feito' && (
           <div className="flex justify-between gap-3">
             <dt className="text-[var(--color-ink-muted)]">Falta para a meta</dt>
             <dd className="font-medium text-[var(--color-ink)]" data-num>{fmt(d.falta)}</dd>
@@ -142,13 +193,17 @@ export function ActionBlock({ b }: { b: BlocoDe<'action'> }) {
               initial={{ opacity: 0, filter: 'blur(4px)' }}
               animate={{ opacity: 1, filter: 'blur(0px)', transition: { duration: 0.25, ease: ease.out } }}
             >
-              <span className="pop-in inline-flex items-center gap-2 text-sm font-semibold text-gain" style={{ animationDelay: '0ms' }}>
-                <Icon name="check" size={16} /> Feito
+              <span className="min-w-0">
+                <span className="pop-in inline-flex items-center gap-2 text-sm font-semibold text-gain" style={{ animationDelay: '0ms' }}>
+                  <Icon name="check" size={16} /> {textoFeito(d)}
+                </span>
+                {feito && (
+                  <span className="block text-xs text-[var(--color-ink-muted)]" data-num>
+                    {quando(feito.em)}{feito.valor ? ` · ${fmt(feito.valor)}` : ''}
+                  </span>
+                )}
               </span>
-              <Link to={cfg.destino} className="group inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)]">
-                <span className="link-line">Ver em {cfg.destinoNome}</span>
-                <span className="arrow-nudge"><Icon name="arrow-right" size={14} /></span>
-              </Link>
+              <LinkDestino d={d} alvoId={feito?.alvoId ?? d.alvoId ?? null} nome={cfg.destinoNome} destino={cfg.destino} />
             </motion.div>
           ) : (
             <motion.button

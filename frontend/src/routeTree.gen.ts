@@ -22,6 +22,7 @@ import { Route as GoalsRouteImport } from './routes/goals'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as GoalsIdRouteImport } from './routes/goals_.$id'
 import { Route as InvestimentosIndexRouteImport } from './routes/investimentos/index'
 import { Route as InvestimentosIdRouteImport } from './routes/investimentos/$id'
 
@@ -90,6 +91,11 @@ const TransactionsRoute = TransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GoalsIdRoute = GoalsIdRouteImport.update({
+  id: '/goals_/$id',
+  path: '/goals/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InvestimentosIndexRoute = InvestimentosIndexRouteImport.update({
   id: '/investimentos/',
   path: '/investimentos/',
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/insights': typeof InsightsRoute
   '/profile': typeof ProfileRoute
   '/transactions': typeof TransactionsRoute
+  '/goals/$id': typeof GoalsIdRoute
   '/investimentos/$id': typeof InvestimentosIdRoute
   '/investimentos/': typeof InvestimentosIndexRoute
 }
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/insights': typeof InsightsRoute
   '/profile': typeof ProfileRoute
   '/transactions': typeof TransactionsRoute
+  '/goals/$id': typeof GoalsIdRoute
   '/investimentos/$id': typeof InvestimentosIdRoute
   '/investimentos': typeof InvestimentosIndexRoute
 }
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/insights': typeof InsightsRoute
   '/profile': typeof ProfileRoute
   '/transactions': typeof TransactionsRoute
+  '/goals_/$id': typeof GoalsIdRoute
   '/investimentos/$id': typeof InvestimentosIdRoute
   '/investimentos/': typeof InvestimentosIndexRoute
 }
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/insights'
     | '/profile'
     | '/transactions'
+    | '/goals/$id'
     | '/investimentos/$id'
     | '/investimentos/'
   fileRoutesByTo: FileRoutesByTo
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/insights'
     | '/profile'
     | '/transactions'
+    | '/goals/$id'
     | '/investimentos/$id'
     | '/investimentos'
   id:
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/insights'
     | '/profile'
     | '/transactions'
+    | '/goals_/$id'
     | '/investimentos/$id'
     | '/investimentos/'
   fileRoutesById: FileRoutesById
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   InsightsRoute: typeof InsightsRoute
   ProfileRoute: typeof ProfileRoute
   TransactionsRoute: typeof TransactionsRoute
+  GoalsIdRoute: typeof GoalsIdRoute
   InvestimentosIdRoute: typeof InvestimentosIdRoute
   InvestimentosIndexRoute: typeof InvestimentosIndexRoute
 }
@@ -318,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/goals_/$id': {
+      id: '/goals_/$id'
+      path: '/goals/$id'
+      fullPath: '/goals/$id'
+      preLoaderRoute: typeof GoalsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/investimentos/': {
       id: '/investimentos/'
       path: '/investimentos'
@@ -349,6 +369,7 @@ const rootRouteChildren: RootRouteChildren = {
   InsightsRoute: InsightsRoute,
   ProfileRoute: ProfileRoute,
   TransactionsRoute: TransactionsRoute,
+  GoalsIdRoute: GoalsIdRoute,
   InvestimentosIdRoute: InvestimentosIdRoute,
   InvestimentosIndexRoute: InvestimentosIndexRoute,
 }
