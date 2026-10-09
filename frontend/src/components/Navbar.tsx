@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { ChevronRight, Menu, X } from './icons';
+import { Menu, X } from './icons';
+import { AccountMenu } from './account-menu';
 import { Wordmark } from './landing/wordmark';
 import { useAuth } from '../contexts/AuthContext';
 import { spring } from '../lib/motion-tokens';
@@ -65,24 +66,8 @@ export function Navbar() {
           <div className="flex items-center gap-2">
             {isAuthenticated ? (
               <>
-                {/* Atalho para o perfil (o "Sair" fica lá dentro) */}
                 <div className="hidden lg:flex items-center pl-3 border-l border-[var(--color-line)]">
-                  <Link
-                    to="/profile"
-                    aria-label="Meu perfil e configurações"
-                    aria-current={pathname === '/profile' ? 'page' : undefined}
-                    className={`group pressable flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2 transition-colors duration-200 hover:bg-[var(--color-surface)] ${
-                      pathname === '/profile' ? 'bg-[var(--color-accent)]/8' : ''
-                    }`}
-                  >
-                    <span className="w-8 h-8 rounded-[10px] bg-[var(--color-accent)]/10 text-[var(--color-accent)] flex items-center justify-center text-xs font-bold">
-                      {user?.nome?.charAt(0).toUpperCase()}
-                    </span>
-                    <ChevronRight
-                      size={14}
-                      className="text-[var(--color-ink-muted)] transition-transform duration-200 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] group-hover:translate-x-0.5 group-hover:text-[var(--color-ink)]"
-                    />
-                  </Link>
+                  <AccountMenu />
                 </div>
                 <button
                   onClick={() => setMenuOpen(!menuOpen)}
