@@ -86,6 +86,7 @@ function InvestimentoDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investimentos'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
       navigate({ to: '/investimentos' });
     }
   });
@@ -182,7 +183,7 @@ function InvestimentoDetailsPage() {
               </button>
               <button
                 onClick={() => {
-                  if (confirm('Tem certeza que deseja excluir este investimento e todo o seu histórico? Isso não pode ser desfeito.')) {
+                  if (confirm('Excluir este investimento? O valor atual dele (com os rendimentos) volta para o seu saldo, e o histórico é apagado. Isso não pode ser desfeito.')) {
                     deleteInvMutation.mutate();
                   }
                 }}

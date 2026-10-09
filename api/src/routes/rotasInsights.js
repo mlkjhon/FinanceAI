@@ -109,6 +109,8 @@ router.post('/insights/comando', autenticar, async (req, res) => {
     try {
         const ctx = await carregarContexto(req.usuario.id);
         const snap = snapshot(ctx, resolverPeriodo(periodo, ctx.hoje));
+        // na barra de comando o usuário PEDIU a ação: ela não passa pelo filtro de necessidade
+        ctx.acoesLivres = true;
         const resumoBlocos = blocos.map((b) => ({ id: b.id, type: b.type, title: b.title, fonte: b.pedido?.fonte, item: b.pedido?.item }));
 
         const resposta = await gerarJSON(promptComando(comando, resumoBlocos, snap, rotuloPeriodo(periodo)), { temperatura: 0.3, timeoutMs: 40000 });

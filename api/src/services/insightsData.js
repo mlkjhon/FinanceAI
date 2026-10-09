@@ -19,7 +19,7 @@ const ehTransferencia = (descricao = '') =>
 
 export async function carregarContexto(idUsuario, hoje = new Date()) {
     const desde = new Date(hoje.getFullYear(), hoje.getMonth() - 12, 1);
-    const [lanc, metas, orc, inv, cats] = await Promise.all([
+    const [lanc, metas, orc, inv, cats, analises] = await Promise.all([
         BD.query(
             `SELECT t.descricao, t.valor::float AS valor, t.tipo,
                     to_char(t.data_registro, 'YYYY-MM-DD') AS dia,
@@ -45,7 +45,9 @@ export async function carregarContexto(idUsuario, hoje = new Date()) {
         BD.query(
             `SELECT i.id_investimento, i.nome, i.tipo,
                     COALESCE((SELECT SUM(CASE WHEN tipo IN ('aporte','rendimento') THEN valor ELSE -valor END)
-                              FROM transacoes_investimentos ti WHERE ti.id_investimento = i.id_investimento), 0)::float AS saldo
+                              FROM transacoes_investimentos ti WHERE ti.id_investimento = i.id_investimento), 0)::float AS saldo,
+                    (SELECT to_char(MAX(ti.data_registro), 'YYYY-MM-DD') FROM transacoes_investimentos ti
+                      WHERE ti.id_investimento = i.id_investimento AND ti.tipo = 'aporte') AS ultimo_aporte
              FROM investimentos i WHERE i.id_usuario = $1`,
             [idUsuario]
         ).catch(() => ({ rows: [] })),
@@ -53,12 +55,17 @@ export async function carregarContexto(idUsuario, hoje = new Date()) {
         garantirCategoriasPorUsuario()
             .then(() => BD.query(`SELECT id_categoria, nome, tipo FROM categorias WHERE id_usuario IS NULL OR id_usuario = $1`, [idUsuario]))
             .catch(() => ({ rows: [] })),
+        BD.query('SELECT blocos FROM insights_analises WHERE id_usuario = $1', [idUsuario]).catch(() => ({ rows: [] })),
     ]);
-    return criarContexto({ lancamentos: lanc.rows, metas: metas.rows, orcamentos: orc.rows, investimentos: inv.rows, categorias: cats.rows, hoje });
+    const feitos = analises.rows
+        .flatMap((r) => r.blocos || [])
+        .filter((b) => b?.feito?.em && b.foto?.data?.acao)
+        .map((b) => ({ acao: b.foto.data.acao, alvo: b.foto.data.titulo, em: b.feito.em.slice(0, 10) }));
+    return criarContexto({ lancamentos: lanc.rows, metas: metas.rows, orcamentos: orc.rows, investimentos: inv.rows, categorias: cats.rows, feitos, hoje });
 }
 
 // Separado de carregarContexto para poder testar com dados de exemplo
-export function criarContexto({ lancamentos, metas = [], orcamentos = [], investimentos = [], categorias = [], hoje = new Date() }) {
+export function criarContexto({ lancamentos, metas = [], orcamentos = [], investimentos = [], categorias = [], feitos = [], hoje = new Date() }) {
     return {
         hoje: iso(hoje),
         lancamentos: lancamentos.map((l) => ({
@@ -70,7 +77,81 @@ export function criarContexto({ lancamentos, metas = [], orcamentos = [], invest
         orcamentos,
         investimentos,
         categorias,
+        feitos,
     };
+}
+
+/*
+ * Quais ações valem a pena AGORA. A IA só pode sugerir o que estiver liberado aqui,
+ * e o servidor confere de novo ao montar o bloco. A ideia: ação só quando é
+ * realmente necessária, nunca repetir o que o usuário acabou de fazer.
+ * - folgaMes: o que entrou no mês menos TUDO o que saiu (aportes e depósitos já
+ *   feitos contam como saída). Sem folga, nada de aportar/depositar/investir.
+ * - aporte ou depósito feito há menos de DIAS_SEM_REPETIR dias: não sugere de novo.
+ * - meta nova só se não houver nenhuma meta em andamento.
+ * - orçamento só para categoria sem orçamento cujo gasto está crescendo
+ *   (passou da média no mês ou subiu no último mês); conta fixa não entra.
+ * - investimento novo só para quem ainda não tem nenhum e costuma sobrar dinheiro.
+ */
+export const DIAS_SEM_REPETIR = 25;
+const mesmoNome = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+
+export function necessidades(ctx) {
+    const hoje = ctx.hoje;
+    const mesAtual = mesDe(hoje);
+    const diasAtras = (dia) => (Date.parse(`${hoje}T12:00:00Z`) - Date.parse(`${String(dia).slice(0, 10)}T12:00:00Z`)) / MS_DIA;
+    const recente = (dia) => dia && diasAtras(dia) <= DIAS_SEM_REPETIR;
+    const soma = (lista, tipo) => lista.filter((l) => l.tipo === tipo).reduce((s, l) => s + l.valor, 0);
+    const doMes = (mes) => ctx.lancamentos.filter((l) => mesDe(l.dia) === mes);
+
+    const folgaMes = arred(soma(doMes(mesAtual), 'E') - soma(doMes(mesAtual), 'S'));
+    const fechados = [1, 2, 3].map((k) => mesDe(deslocarMeses(hoje, -k)));
+    const sobraMedia = arred(fechados.reduce((t, m) => t + soma(doMes(m), 'E') - soma(doMes(m), 'S'), 0) / 3);
+
+    const feitoRecente = (acao, alvo) => (ctx.feitos || []).some((f) => f.acao === acao && (!alvo || mesmoNome(f.alvo, alvo)) && recente(f.em));
+
+    // Aporte: qualquer aporte recente (pelo app ou pela sugestão) já resolve
+    const aporteRecente = ctx.lancamentos.some((l) => /^\[INV:\d+\]\s*Aporte/i.test(l.descricao || '') && recente(l.dia))
+        || ctx.investimentos.some((i) => recente(i.ultimo_aporte))
+        || feitoRecente('aportar');
+    const aportar = folgaMes > 0 && ctx.investimentos.length > 0 && !aporteRecente;
+
+    const metasAbertas = ctx.metas.filter((m) => Number(m.valor_atual) < Number(m.valor_meta));
+    const depositoRecente = (titulo) =>
+        ctx.lancamentos.some((l) => l.descricao === `Investido na meta: ${titulo}` && recente(l.dia)) || feitoRecente('depositar_meta', titulo);
+    const depositarEm = folgaMes > 0 ? metasAbertas.filter((m) => !depositoRecente(m.titulo)).map((m) => m.titulo) : [];
+
+    const criarMeta = metasAbertas.length === 0 && sobraMedia > 0 && !feitoRecente('criar_meta');
+
+    // Orçamento: média dos 3 meses fechados x o que já foi gasto neste mês
+    const [ano, mes] = hoje.split('-').map(Number);
+    const comOrcamento = ctx.orcamentos.filter((o) => Number(o.mes) === mes && Number(o.ano) === ano).map((o) => o.categoria);
+    const media = {};
+    const atual = {};
+    const ultimo = {};
+    const antes = {};
+    for (const l of ctx.lancamentos) {
+        if (l.tipo !== 'S' || l.transferencia) continue;
+        const m = mesDe(l.dia);
+        if (fechados.includes(m)) media[l.categoria] = (media[l.categoria] || 0) + l.valor / 3;
+        if (m === fechados[0]) ultimo[l.categoria] = (ultimo[l.categoria] || 0) + l.valor;
+        if (m === fechados[1] || m === fechados[2]) antes[l.categoria] = (antes[l.categoria] || 0) + l.valor / 2;
+        if (m === mesAtual) atual[l.categoria] = (atual[l.categoria] || 0) + l.valor;
+    }
+    // Está crescendo: o mês atual já passou 10% da média, ou o último mês fechado
+    // veio 20% acima dos dois anteriores. Conta fixa (aluguel igual todo mês) não entra.
+    const crescendo = (c) => (atual[c] || 0) > media[c] * 1.1 || (antes[c] > 0 && (ultimo[c] || 0) > antes[c] * 1.2);
+    const orcamentoPara = Object.keys(media)
+        .filter((c) => c !== 'Sem categoria' && media[c] >= 50)
+        .filter((c) => ctx.categorias.some((k) => mesmoNome(k.nome, c) && ['S', 'despesa'].includes(k.tipo)))
+        .filter((c) => !comOrcamento.some((o) => mesmoNome(o, c)) && !feitoRecente('criar_orcamento', c))
+        .filter(crescendo)
+        .sort((a, b) => media[b] - media[a])
+        .slice(0, 3);
+
+    const criarInvestimento = ctx.investimentos.length === 0 && sobraMedia > 0 && folgaMes > 0 && !feitoRecente('criar_investimento');
+
+    return { folgaMes, sobraMedia, aportar, depositarEm, criarMeta, orcamentoPara, criarInvestimento };
 }
 
 // ---------- Períodos ----------
@@ -451,6 +532,8 @@ export function snapshot(ctx, base) {
         orcamentos: run('orcamentos'),
         investimentos: run('investimentos'),
         mediaPorCategoria: run('mediaPorCategoria').slice(0, 8),
+        // o que dá para sugerir como ação agora (o resto está bloqueado)
+        acoesNecessarias: necessidades(ctx),
         // nomes exatos para os alvos dos blocos de ação
         nomesInvestimentos: ctx.investimentos.map((i) => i.nome),
         categoriasDespesa: ctx.categorias.filter((c) => ['S', 'despesa'].includes(c.tipo)).map((c) => c.nome),

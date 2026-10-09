@@ -122,7 +122,8 @@ function MetaConteudo({ id }: { id: string }) {
   const deleteMut = useMutation({
     mutationFn: () => goalsApi.delete(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['goals'] });
+      // os depósitos da meta são desfeitos: o dinheiro volta para o saldo
+      ['goals', 'dashboard-summary', 'transactions'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
       navigate({ to: '/goals' });
     },
   });
@@ -182,7 +183,7 @@ function MetaConteudo({ id }: { id: string }) {
                 <PiggyBank size={16} /> Depositar
               </button>
             )}
-            <HoldToDelete compact label="Segure para remover a meta" pending={deleteMut.isPending} onConfirm={() => deleteMut.mutate()} />
+            <HoldToDelete compact label="Segure para remover (o dinheiro volta pro saldo)" pending={deleteMut.isPending} onConfirm={() => deleteMut.mutate()} />
           </div>
         </div>
       </header>

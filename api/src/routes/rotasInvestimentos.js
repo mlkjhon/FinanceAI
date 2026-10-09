@@ -233,7 +233,31 @@ router.delete('/investimentos/:id', autenticar, async (req, res) => {
         const invQuery = await BD.query(`SELECT id_investimento FROM investimentos WHERE id_investimento = $1 AND id_usuario = $2`, [id, id_usuario]);
         if (invQuery.rowCount === 0) return res.status(404).json({ message: 'Investimento não encontrado' });
 
+        let devolvido = 0;
         await emTransacao(async (cliente) => {
+            /*
+             * O dinheiro do investimento volta para o saldo:
+             * - apagar os aportes/resgates da conta principal devolve aportes - resgates;
+             * - os rendimentos nunca passaram pela conta principal, então entram agora
+             *   como uma entrada, para o saldo receber o valor atual inteiro do investimento.
+             */
+            const resumo = await cliente.query(
+                `SELECT i.nome,
+                        COALESCE(SUM(CASE WHEN ti.tipo = 'rendimento' THEN ti.valor ELSE 0 END), 0)::float AS rendimentos,
+                        COALESCE(SUM(CASE WHEN ti.tipo IN ('aporte','rendimento') THEN ti.valor ELSE -ti.valor END), 0)::float AS saldo
+                 FROM investimentos i LEFT JOIN transacoes_investimentos ti ON ti.id_investimento = i.id_investimento
+                 WHERE i.id_investimento = $1 GROUP BY i.nome`,
+                [id]
+            );
+            const { nome, rendimentos = 0, saldo = 0 } = resumo.rows[0] || {};
+            devolvido = Math.max(Math.round(saldo * 100) / 100, 0);
+            if (rendimentos > 0.004) {
+                await cliente.query(
+                    `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria, data_registro)
+                     VALUES ($1, $2, $3, 'E', NULL, CURRENT_DATE)`,
+                    [id_usuario, `Rendimentos de ${nome} (investimento encerrado)`, Math.round(rendimentos * 100) / 100]
+                );
+            }
             // Deletar da conta principal apenas os aportes/resgates DESTE investimento (marcados com [INV:id_transacao_inv])
             await cliente.query(
                 `DELETE FROM transacoes t
@@ -251,7 +275,7 @@ router.delete('/investimentos/:id', autenticar, async (req, res) => {
             await cliente.query(`DELETE FROM investimentos WHERE id_investimento = $1`, [id]);
         });
 
-        res.status(200).json({ message: 'Investimento excluído com sucesso' });
+        res.status(200).json({ message: 'Investimento excluído com sucesso', devolvido });
     } catch (error) {
         console.error('❌ ERRO AO DELETAR INVESTIMENTO ❌', error.message);
         return res.status(500).json({ error: 'Erro ao excluir investimento: ' + error.message });

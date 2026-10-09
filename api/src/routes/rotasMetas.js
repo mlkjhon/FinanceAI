@@ -166,18 +166,66 @@ router.get('/metas/:id_meta', autenticar, async (req, res) => {
 });
 
 
+/*
+ * Apagar a meta devolve o dinheiro: os depósitos (saídas "Investido na meta: …")
+ * são apagados, então o valor volta para o saldo. O "já tenho guardado" da criação
+ * nunca saiu do saldo, então não há nada a devolver dele. Tudo ou nada.
+ */
 router.delete('/metas/:id_meta', autenticar, async (req, res) => {
     const { id_meta } = req.params;
     const id_usuario = req.usuario.id;
+    if (!/^\d+$/.test(String(id_meta))) return res.status(400).json({ error: 'Meta inválida.' });
+    const cliente = await BD.connect();
 
     try {
-        const comando = `DELETE FROM metas_financeiras WHERE id_meta = $1 AND id_usuario = $2`;
-        await BD.query(comando, [id_meta, id_usuario]);
-        await BD.query('DELETE FROM metas_movimentos WHERE id_meta = $1 AND id_usuario = $2', [id_meta, id_usuario]).catch(() => {});
-        return res.status(200).json({ message: 'Meta deletada com sucesso.' });
+        await garantirHistorico().catch(semHistorico);
+        const busca = await cliente.query('SELECT titulo FROM metas_financeiras WHERE id_meta = $1 AND id_usuario = $2', [id_meta, id_usuario]);
+        if (!busca.rows.length) return res.status(404).json({ error: 'Meta não encontrada.' });
+        const { titulo } = busca.rows[0];
+
+        await cliente.query('BEGIN');
+        // Depósitos ligados a esta meta pelo histórico, e os ligados a OUTRAS metas
+        // (para não apagar depósito de outra meta com o mesmo nome)
+        let desta = [];
+        let deOutras = [];
+        await cliente.query('SAVEPOINT historico');
+        try {
+            const mov = await cliente.query(
+                'SELECT id_meta, id_transacao FROM metas_movimentos WHERE id_usuario = $1 AND id_transacao IS NOT NULL',
+                [id_usuario]
+            );
+            desta = mov.rows.filter((m) => String(m.id_meta) === String(id_meta)).map((m) => m.id_transacao);
+            deOutras = mov.rows.filter((m) => String(m.id_meta) !== String(id_meta)).map((m) => m.id_transacao);
+            await cliente.query('RELEASE SAVEPOINT historico');
+        } catch {
+            await cliente.query('ROLLBACK TO SAVEPOINT historico');
+        }
+
+        // Os ligados pelo histórico + os antigos (sem histórico) pelo título
+        const apagadas = await cliente.query(
+            `DELETE FROM transacoes
+             WHERE id_usuario = $1
+               AND (id_transacao = ANY($2::int[])
+                    OR (descricao = $3 AND NOT (id_transacao = ANY($4::int[]))))
+             RETURNING valor`,
+            [id_usuario, desta, `Investido na meta: ${titulo}`, deOutras]
+        );
+        const devolvido = apagadas.rows.reduce((s, t) => s + Number(t.valor || 0), 0);
+
+        await cliente.query('SAVEPOINT movs');
+        await cliente.query('DELETE FROM metas_movimentos WHERE id_meta = $1 AND id_usuario = $2', [id_meta, id_usuario])
+            .then(() => cliente.query('RELEASE SAVEPOINT movs'))
+            .catch(() => cliente.query('ROLLBACK TO SAVEPOINT movs'));
+        await cliente.query('DELETE FROM metas_financeiras WHERE id_meta = $1 AND id_usuario = $2', [id_meta, id_usuario]);
+        await cliente.query('COMMIT');
+
+        return res.status(200).json({ message: 'Meta deletada com sucesso.', devolvido: Math.round(devolvido * 100) / 100 });
     } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => {});
         console.error('Erro ao deletar meta:', error.message);
         return res.status(500).json({ error: 'Erro no servidor ao deletar meta.' });
+    } finally {
+        cliente.release();
     }
 });
 

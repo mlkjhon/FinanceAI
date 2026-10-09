@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { funcoes, resolverPeriodo, descricoesQueCasam } from './insightsData.js';
+import { funcoes, resolverPeriodo, descricoesQueCasam, necessidades } from './insightsData.js';
 
 /*
  * Blocos dos Insights. A IA devolve "pedidos de bloco" (BlocoPedido): tipo,
@@ -221,12 +221,18 @@ function montarAcao(ctx, p, valores, periodoBase) {
     if (!p.acao || !p.texto) return null;
     const texto = preencher(p.texto, valores);
     const base = !p.valorBase ? null : typeof p.valorBase === 'string' ? valores[p.valorBase] : resolverRef(ctx, p.valorBase, periodoBase);
-    const valor = base && base.valor > 0 ? arredondarSugestao(base.valor * (p.fator ?? 1)) : null;
+    let valor = base && base.valor > 0 ? arredondarSugestao(base.valor * (p.fator ?? 1)) : null;
     const hoje = ctx.hoje;
+    // Só o que é realmente necessário agora. Pedido explícito na barra de comando passa (ctx.acoesLivres).
+    const nec = (ctx.necessidadesCache ??= necessidades(ctx));
+    const livre = !!ctx.acoesLivres;
+    // dinheiro sugerido nunca passa do que sobrou no mês
+    const caberNaFolga = (v) => (livre || !v ? v : nec.folgaMes > 0 ? Math.min(v, arredondarSugestao(nec.folgaMes)) : null);
 
     switch (p.acao) {
         case 'criar_meta': {
             if (!p.nomeSugerido || !valor) return null;
+            if (!livre && !nec.criarMeta) return null;
             if (ctx.metas.some((m) => igual(m.titulo, p.nomeSugerido))) return null;
             const data = p.dataObjetivo && p.dataObjetivo > hoje ? p.dataObjetivo : null;
             return { acao: p.acao, texto, titulo: p.nomeSugerido, valor, dataObjetivo: data };
@@ -234,13 +240,17 @@ function montarAcao(ctx, p, valores, periodoBase) {
         case 'depositar_meta': {
             const meta = ctx.metas.find((m) => igual(m.titulo, p.alvo));
             if (!meta || !valor) return null;
+            if (!livre && !nec.depositarEm.some((t) => igual(t, meta.titulo))) return null;
             const falta = Math.max(meta.valor_meta - meta.valor_atual, 0);
             if (falta <= 0) return null;
+            valor = caberNaFolga(valor);
+            if (!valor) return null;
             return { acao: p.acao, texto, alvoId: String(meta.id_meta), titulo: meta.titulo, valor: Math.min(valor, Math.ceil(falta)), falta };
         }
         case 'criar_orcamento': {
             const cat = ctx.categorias.find((c) => igual(c.nome, p.alvo) && ['S', 'despesa'].includes(c.tipo));
             if (!cat || !valor) return null;
+            if (!livre && !nec.orcamentoPara.some((c) => igual(c, cat.nome))) return null;
             const [y, m] = hoje.split('-').map(Number);
             const jaTem = ctx.orcamentos.some((o) => igual(o.categoria, cat.nome) && Number(o.mes) === m && Number(o.ano) === y);
             if (jaTem) return null;
@@ -249,10 +259,14 @@ function montarAcao(ctx, p, valores, periodoBase) {
         case 'aportar': {
             const inv = ctx.investimentos.find((i) => igual(i.nome, p.alvo));
             if (!inv || !valor) return null;
+            if (!livre && !nec.aportar) return null;
+            valor = caberNaFolga(valor);
+            if (!valor) return null;
             return { acao: p.acao, texto, alvoId: String(inv.id_investimento), titulo: inv.nome, valor };
         }
         case 'criar_investimento': {
             if (!p.nomeSugerido || !p.tipoInvestimento || !p.indexador || !p.taxa) return null;
+            if (!livre && !nec.criarInvestimento) return null;
             if (ctx.investimentos.some((i) => igual(i.nome, p.nomeSugerido))) return null;
             return { acao: p.acao, texto, titulo: p.nomeSugerido, tipoInvestimento: p.tipoInvestimento, indexador: p.indexador, taxa: p.taxa, valor: null };
         }

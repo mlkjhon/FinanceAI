@@ -65,7 +65,8 @@ function GoalsContent() {
   // Mutation para deletar meta
   const deleteMut = useMutation({
     mutationFn: goalsApi.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['goals'] }),
+    // os depósitos da meta são desfeitos: o dinheiro volta para o saldo
+    onSuccess: () => ['goals', 'dashboard-summary', 'transactions'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
   });
 
   // Mutation para adicionar dinheiro à meta
