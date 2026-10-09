@@ -789,3 +789,81 @@
 @media (prefers-reduced-motion: reduce) {
   .live-dot::after { animation: none; }
 }
+
+/* ---------- Insights ---------- */
+
+/* Palavra do texto da IA entrando (o espaço já está reservado, então nada treme) */
+.word-in {
+  animation: word-in 260ms var(--ease-out) both;
+}
+@keyframes word-in {
+  from { opacity: 0; filter: blur(2px); }
+}
+
+/* Ponto de estado da IA: respira enquanto trabalha, parado quando ociosa */
+.ai-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-ink-muted);
+  transition: background-color 200ms ease;
+}
+.ai-dot.is-active {
+  background: var(--color-accent);
+  animation: ai-breathe 1.4s var(--ease-in-out) infinite;
+}
+@keyframes ai-breathe {
+  50% { transform: scale(0.6); opacity: 0.5; }
+}
+
+/* Rótulo "analisando": um brilho atravessa o texto (no lugar de spinner) */
+.ai-shimmer {
+  background: linear-gradient(90deg, var(--color-ink-soft) 0%, var(--color-ink-soft) 40%, var(--color-accent) 50%, var(--color-ink-soft) 60%, var(--color-ink-soft) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ai-shimmer 1.8s linear infinite;
+}
+@keyframes ai-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -150% 0; }
+}
+
+/* Barra de comando trabalhando: borda com brilho suave */
+.command-bar { transition: border-color 200ms ease, box-shadow 200ms ease; }
+.command-bar.is-busy { box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent) 12%, transparent), var(--shadow-xl); }
+
+/* Menu de ações do bloco: nasce do botão (origem no gatilho), 150ms */
+.menu-pop {
+  transform-origin: var(--transform-origin);
+  transition: transform 150ms var(--ease-out), opacity 150ms var(--ease-out);
+}
+.menu-pop[data-starting-style],
+.menu-pop[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.menu-pop[data-ending-style] { transition-duration: 100ms; }
+
+/* Bloco criado ou alterado pela IA: um anel acende e apaga (mostra o que mudou) */
+.block-flash { animation: block-flash 1.6s var(--ease-out) both; }
+@keyframes block-flash {
+  0%, 30% { box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 45%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+
+/* Progresso de cada parte do story */
+.story-fill { animation: story-fill linear both; transform-origin: left; }
+@keyframes story-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-in { animation: none; }
+  .ai-dot.is-active { animation: none; }
+  .ai-shimmer { animation: none; color: var(--color-accent); background: none; }
+  .menu-pop { transition-duration: 0ms; }
+  .story-fill { animation: none; transform: scaleX(1); }
+}

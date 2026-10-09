@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
+export const API_BASE = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -290,36 +290,7 @@ export const dashboardApi = {
   },
 };
 
-// Insights
-export const insightsApi = {
-  // Busca dicas personalizadas geradas pela IA com base nos dados do usuário
-  list: async () => {
-    const user = getUserData();
-    const data = await request<any[]>(`/insights?id_usuario=${user?.id}`);
-    return data.map(d => ({
-      id: String(d.id),
-      tipo: d.tipo || 'sugestao',
-      titulo: d.titulo,
-      descricao: d.descricao,
-      valor: d.valor,
-      created_at: new Date().toISOString(),
-    })) as Insight[];
-  },
-  // Carrega histórico de chat do banco de dados
-  historico: async () => {
-    const user = getUserData();
-    const data = await request<any[]>(`/chat/historico?id_usuario=${user?.id}`);
-    return data;
-  },
-  chat: async (message: string) => {
-    const user = getUserData();
-    const res = await request<any>('/chat', {
-      method: 'POST',
-      body: JSON.stringify({ id_usuario: user?.id, mensagem: message }),
-    });
-    return { reply: res.resposta || 'Sem resposta' };
-  },
-};
+
 
 // Types
 export interface User {

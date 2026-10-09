@@ -1,12 +1,15 @@
-import React, { Suspense, useState, useRef, useEffect } from 'react';
-import { createFileRoute, redirect } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
-import { Brain, Lightbulb, TrendingDown, PiggyBank, Send, Loader2, RefreshCw } from '../components/icons';
-import { insightsApi } from '../lib/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createFileRoute, redirect, Link } from '@tanstack/react-router';
+import { AnimatePresence, LayoutGroup } from 'motion/react';
 import { Navbar } from '../components/Navbar';
-import { FinanceCard, SkeletonCard } from '../components/ui';
-import { formatCurrency } from '../lib/utils';
-import { SplashScreen } from '../components/SplashScreen';
+import { Segmented } from '../components/segmented';
+import { Collapse } from '../components/collapse';
+import { Icon } from '../components/icons';
+import { BlocoFrame, BlocoSkeleton } from '../components/insights/frame';
+import { CommandBar } from '../components/insights/command-bar';
+import { AiStatus } from '../components/insights/primitives';
+import { analisar, executarComando, lerFixados, salvarFixados } from '../lib/insights/client';
+import type { Bloco, EstadoIA, Operacao, Periodo } from '../lib/insights/types';
 
 export const Route = createFileRoute('/insights')({
   beforeLoad: () => {
@@ -15,222 +18,245 @@ export const Route = createFileRoute('/insights')({
   component: InsightsPage,
 });
 
-const iconMap: Record<string, React.ReactNode> = {
-  economia: <PiggyBank size={22} />,
-  gasto: <TrendingDown size={22} />,
-  sugestao: <Lightbulb size={22} />,
-  padrao: <Brain size={22} />,
-};
+type ChavePeriodo = 'mes' | '3m' | 'ano' | 'custom';
+const hojeISO = () => new Date().toISOString().slice(0, 10);
 
-type ChatMsg = { role: 'user' | 'ai'; content: string };
+// O story fica sempre no topo; o resto segue a ordem em que a IA mandou (relevância)
+const comStoryNoTopo = (lista: Bloco[]) => [...lista.filter((b) => b.type === 'story'), ...lista.filter((b) => b.type !== 'story')];
 
-function InsightsContent() {
-  const { data: insights, isLoading: insightsLoading, refetch: refetchInsights, isFetching, error: insightsError, isFetched } = useQuery({
-    queryKey: ['insights'],
-    queryFn: insightsApi.list,
-    retry: false,
-    // Não busca automaticamente ao montar para evitar custo de API desnecessário
-    staleTime: 5 * 60 * 1000, // 5 minutos de cache
-  });
+function InsightsPage() {
+  const [blocos, setBlocos] = useState<Bloco[]>(() => lerFixados());
+  const [estado, setEstado] = useState<EstadoIA>('ocioso');
+  const [erro, setErro] = useState<string | null>(null);
+  const [vazio, setVazio] = useState(false);
+  const [chave, setChave] = useState<ChavePeriodo>('mes');
+  const [custom, setCustom] = useState({ inicio: hojeISO().slice(0, 8) + '01', fim: hojeISO() });
+  const [novos, setNovos] = useState<Set<string>>(new Set());
+  const [ocupados, setOcupados] = useState<Set<string>>(new Set());
+  const [resposta, setResposta] = useState<{ texto: string; id: number } | null>(null);
+  const [erroComando, setErroComando] = useState<string | null>(null);
 
-  // Estado do chat - começa com mensagem de boas-vindas
-  const [chat, setChat] = useState<ChatMsg[]>([
-    { role: 'ai', content: 'Oi, sou o assistente do FinanceAI. Pergunte sobre seus gastos, metas ou investimentos.' },
-  ]);
-  const [histLoaded, setHistLoaded] = useState(false);
-  const [input, setInput] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const chatRef = useRef<HTMLDivElement>(null);
+  const abort = useRef<AbortController | null>(null);
+  const fila = useRef<Bloco[]>([]);
+  const streamAcabou = useRef(true);
+  const blocosRef = useRef(blocos);
+  blocosRef.current = blocos;
 
-  // Carrega o histórico de chat do banco de dados ao abrir a página
+  const periodo: Periodo = chave === 'custom' ? custom : chave;
+
+  useEffect(() => salvarFixados(blocos), [blocos]);
+
+  /*
+   * Os blocos que chegam vão para uma fila e entram um a cada 110ms. Assim a
+   * cascata acontece mesmo quando a rede entrega vários de uma vez.
+   */
   useEffect(() => {
-    if (histLoaded) return;
-    insightsApi.historico().then((hist) => {
-      if (hist && hist.length > 0) {
-        // Monta o histórico: cada linha do banco vira dois balões (usuário + IA)
-        const msgs: ChatMsg[] = [
-          { role: 'ai', content: 'Oi, sou o assistente do FinanceAI. Pergunte sobre seus gastos, metas ou investimentos.' },
-        ];
-        hist.forEach((h: any) => {
-          msgs.push({ role: 'user', content: h.mensagem });
-          if (h.resposta) msgs.push({ role: 'ai', content: h.resposta });
+    const t = setInterval(() => {
+      const b = fila.current.shift();
+      if (b) {
+        setBlocos((atual) => {
+          const i = atual.findIndex((x) => x.id === b.id);
+          if (i >= 0) return atual.map((x) => (x.id === b.id ? b : x)); // fixado recalculado
+          return comStoryNoTopo([...atual, b]);
         });
-        setChat(msgs);
+      } else if (streamAcabou.current) {
+        setEstado((e) => (e === 'gerando' || e === 'analisando' ? 'ocioso' : e));
       }
-      setHistLoaded(true);
-    }).catch(() => setHistLoaded(true));
-  }, [histLoaded]);
+    }, 110);
+    return () => clearInterval(t);
+  }, []);
 
-  // Rola o chat para o final sempre que novas mensagens chegam
-  useEffect(() => {
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
-  }, [chat]);
+  const gerar = useCallback(async (p: Periodo) => {
+    abort.current?.abort();
+    const ctrl = new AbortController();
+    abort.current = ctrl;
+    const fixados = blocosRef.current.filter((b) => b.fixado);
+    fila.current = [];
+    streamAcabou.current = false;
+    setErro(null);
+    setVazio(false);
+    setEstado('analisando');
+    setBlocos(fixados); // os não fixados saem com animação; os fixados ficam e são recalculados
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    const userMsg = input.trim();
-    setInput('');
-    setChat((prev) => [...prev, { role: 'user', content: userMsg }]);
-    setIsAiLoading(true);
     try {
-      const res = await insightsApi.chat(userMsg);
-      setChat((prev) => [...prev, { role: 'ai', content: res.reply }]);
+      await analisar(
+        p,
+        fixados,
+        (e) => {
+          if (e.evento === 'estado') setEstado(e.estado);
+          else if (e.evento === 'bloco') fila.current.push(e.bloco);
+          else if (e.evento === 'vazio') setVazio(true);
+          else if (e.evento === 'erro') setErro(e.mensagem);
+        },
+        ctrl.signal
+      );
     } catch (e) {
-      const motivo = e instanceof Error && e.message ? e.message : 'Tente de novo em instantes.';
-      setChat((prev) => [...prev, { role: 'ai', content: `Não consegui responder agora. ${motivo}` }]);
+      if ((e as Error).name !== 'AbortError') setErro((e as Error).message || 'Não foi possível falar com a IA.');
     } finally {
-      setIsAiLoading(false);
+      if (abort.current === ctrl) streamAcabou.current = true;
+    }
+  }, []);
+
+  // A página se monta sozinha ao abrir e quando o período muda
+  useEffect(() => {
+    gerar(periodo);
+    return () => abort.current?.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chave, chave === 'custom' ? `${custom.inicio}|${custom.fim}` : '']);
+
+  const marcarNovos = (ids: string[]) => {
+    if (!ids.length) return;
+    setNovos(new Set(ids));
+    setTimeout(() => setNovos(new Set()), 1800);
+    // leva o primeiro bloco criado/alterado para a vista
+    requestAnimationFrame(() => document.getElementById(`bloco-${ids[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  };
+
+  const aplicar = (ops: Operacao[]) => {
+    const tocados: string[] = [];
+    setBlocos((atual) => {
+      let lista = [...atual];
+      for (const op of ops) {
+        if (op.op === 'create') {
+          const i = lista.findIndex((b) => b.type !== 'story');
+          lista.splice(i < 0 ? lista.length : i, 0, op.bloco);
+          tocados.push(op.bloco.id);
+        } else if (op.op === 'update') {
+          lista = lista.map((b) => (b.id === op.id ? { ...op.bloco, id: op.id, fixado: b.fixado } : b));
+          tocados.push(op.id);
+        } else if (op.op === 'remove') {
+          lista = lista.filter((b) => !op.ids.includes(b.id));
+        } else if (op.op === 'reorder') {
+          const pos = new Map(op.ids.map((id, i) => [id, i]));
+          lista = [...lista].sort((a, b) => (pos.get(a.id) ?? 999) - (pos.get(b.id) ?? 999));
+        }
+      }
+      return comStoryNoTopo(lista);
+    });
+    marcarNovos(tocados);
+  };
+
+  const comando = async (texto: string, alvo?: string) => {
+    setErroComando(null);
+    setEstado('executando');
+    if (alvo) setOcupados(new Set([alvo]));
+    try {
+      const { operacoes, resposta: r } = await executarComando(texto, periodo, blocosRef.current);
+      aplicar(operacoes);
+      if (r) setResposta({ texto: r, id: Date.now() });
+    } catch (e) {
+      setErroComando((e as Error).message || 'A IA não conseguiu executar o pedido.');
+      setTimeout(() => setErroComando(null), 6000);
+    } finally {
+      setOcupados(new Set());
+      setEstado('ocioso');
     }
   };
 
-  return (
-    <div className="stagger space-y-8 pb-16">
-      <div>
-        <h1 className="font-brand text-2xl font-bold text-gray-900">Insights com IA</h1>
-        <p className="text-sm text-gray-500">Análises personalizadas do seu perfil financeiro</p>
-      </div>
+  useEffect(() => {
+    if (!resposta) return;
+    const t = setTimeout(() => setResposta(null), 7000);
+    return () => clearTimeout(t);
+  }, [resposta]);
 
-      {/* Chat com a IA */}
-      <div className="finance-card overflow-hidden">
-        {/* Cabeçalho do chat */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
-          <div className="w-9 h-9 rounded-xl gradient-hero flex items-center justify-center">
-            <Brain size={18} className="text-white" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Assistente FinanceAI</p>
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
-              <p className="text-xs text-gray-400">Online</p>
-            </div>
-          </div>
-        </div>
+  const acoes = {
+    onRefazer: (b: Bloco) =>
+      comando(`Refaça o bloco ${b.id} ("${b.title}") com outro ângulo ou outra visualização, mantendo o assunto. Use a operação update nesse id.`, b.id),
+    onFixar: (b: Bloco) => setBlocos((l) => l.map((x) => (x.id === b.id ? { ...x, fixado: !x.fixado } : x))),
+    onRemover: (b: Bloco) => setBlocos((l) => l.filter((x) => x.id !== b.id)),
+  };
 
-        {/* Área de mensagens */}
-        <div ref={chatRef} className="h-72 overflow-y-auto p-4 space-y-3">
-          {chat.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div data-side={msg.role} className={`bubble max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === 'user'
-                  ? 'bg-[var(--color-accent)] text-white rounded-br-sm'
-                  : 'bg-gray-100 text-gray-900 rounded-bl-sm'
-              }`}>
-                {msg.content}
-              </div>
-            </div>
-          ))}
+  const carregando = estado === 'analisando' || estado === 'gerando';
+  const semStory = !blocos.some((b) => b.type === 'story');
 
-          {/* Animação enquanto a IA processa */}
-          {isAiLoading && (
-            <div className="flex justify-start" role="status" aria-label="O assistente está escrevendo">
-              <div data-side="ai" className="bubble typing flex items-center gap-1.5 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-3.5">
-                <span /><span /><span />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Campo de digitação */}
-        <div className="px-4 pb-4 flex gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Pergunte sobre suas finanças..."
-            className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/15 transition-[color,background-color,border-color,box-shadow,opacity]"
-          />
-          <button
-            onClick={sendMessage}
-            disabled={isAiLoading || !input.trim()}
-            className="btn-primary px-4 py-2.5 disabled:opacity-50"
-          >
-            {isAiLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-          </button>
-        </div>
-      </div>
-
-      {/* Seção de dicas personalizadas */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-brand font-semibold text-lg text-gray-900">Dicas personalizadas</h2>
-          <button
-            onClick={() => refetchInsights()}
-            disabled={isFetching}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-gain border border-[var(--color-accent)]/25 hover:bg-gain-soft transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
-            {isFetching ? 'Gerando...' : 'Gerar dicas'}
-          </button>
-        </div>
-
-        {insightsLoading || isFetching ? (
-          <div className="grid sm:grid-cols-2 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} lines={3} />)}
-          </div>
-        ) : insightsError ? (
-          <div role="alert" className="finance-card px-6 py-8 max-w-xl">
-            <p className="font-semibold text-[var(--color-ink)]">Não foi possível gerar as dicas.</p>
-            <p className="text-sm text-[var(--color-ink-muted)] mt-1">{(insightsError as Error).message}</p>
-          </div>
-        ) : isFetched && insights?.length === 0 ? (
-          <div className="finance-card px-6 py-8 max-w-xl">
-            <p className="font-semibold text-[var(--color-ink)]">Ainda não há gastos neste mês.</p>
-            <p className="text-sm text-[var(--color-ink-muted)] mt-1">As dicas usam as despesas do mês atual. Registre algumas e gere de novo.</p>
-          </div>
-        ) : insights?.length ? (
-          <div className="grid sm:grid-cols-2 gap-4">
-            {insights.map((ins, i) => (
-              <div
-                key={ins.id}
-                style={{ "--i": i } as React.CSSProperties}
-                className="rise finance-card p-5"
-              >
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-gain-soft flex items-center justify-center text-gain shrink-0">
-                    {iconMap[ins.tipo] ?? <Lightbulb size={22} />}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm text-gray-900">{ins.titulo}</p>
-                    {ins.valor && (
-                      <p className="text-xs text-gain font-medium mt-0.5">
-                        Potencial: {formatCurrency(ins.valor)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <p className="text-sm text-gray-500 leading-relaxed">{ins.descricao}</p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <FinanceCard className="text-center py-12">
-            <Brain size={40} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 text-sm mb-3">Clique em "Gerar dicas" para receber conselhos personalizados</p>
-            <button
-              onClick={() => refetchInsights()}
-              className="btn-primary px-4 py-2 text-sm"
-            >
-              Gerar minhas dicas
-            </button>
-          </FinanceCard>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function InsightsPage() {
   return (
     <div className="min-h-[100dvh] app-surface">
       <Navbar />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Suspense fallback={<SplashScreen type="ai" />}>
-          <InsightsContent />
-        </Suspense>
-      </div>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-44">
+        <header className="flex flex-col gap-5 mb-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="font-brand text-3xl font-bold tracking-tight text-[var(--color-ink)]">Insights</h1>
+              <div className="mt-2"><AiStatus estado={estado} /></div>
+            </div>
+            <button
+              type="button"
+              onClick={() => gerar(periodo)}
+              disabled={estado !== 'ocioso'}
+              className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50"
+            >
+              <Icon name="sparkle" size={16} />
+              Gerar nova análise
+            </button>
+          </div>
+          <Segmented
+            id="insights-periodo"
+            label="Período da análise"
+            value={chave}
+            onChange={(v) => setChave(v)}
+            options={[
+              { value: 'mes', label: 'Este mês' },
+              { value: '3m', label: '3 meses' },
+              { value: 'ano', label: 'Ano' },
+              { value: 'custom', label: 'Personalizado' },
+            ]}
+          />
+          <Collapse open={chave === 'custom'} className="flex flex-wrap items-end gap-3">
+            <label className="text-sm text-[var(--color-ink-soft)] space-y-1.5">
+              <span className="block">De</span>
+              <input type="date" value={custom.inicio} max={custom.fim} onChange={(e) => setCustom((c) => ({ ...c, inicio: e.target.value }))} className="field px-3 py-2 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white" />
+            </label>
+            <label className="text-sm text-[var(--color-ink-soft)] space-y-1.5">
+              <span className="block">Até</span>
+              <input type="date" value={custom.fim} min={custom.inicio} max={hojeISO()} onChange={(e) => setCustom((c) => ({ ...c, fim: e.target.value }))} className="field px-3 py-2 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white" />
+            </label>
+          </Collapse>
+        </header>
+
+        {erro ? (
+          <div role="alert" className="finance-card px-6 py-8 max-w-xl">
+            <p className="font-semibold text-[var(--color-ink)]">A análise não pôde ser gerada.</p>
+            <p className="text-sm text-[var(--color-ink-muted)] mt-1">{erro}</p>
+            <button type="button" onClick={() => gerar(periodo)} className="btn-primary px-5 py-2.5 text-sm mt-5">
+              <Icon name="arrows-clockwise" size={15} /> Tentar novamente
+            </button>
+          </div>
+        ) : vazio && !blocos.length ? (
+          <div className="finance-card px-6 py-10 max-w-xl">
+            <p className="font-semibold text-[var(--color-ink)]">Ainda não há lançamentos neste período.</p>
+            <p className="text-sm text-[var(--color-ink-muted)] mt-1 max-w-[46ch]">
+              A IA monta a análise a partir das suas transações. Registre algumas, ou escolha um período maior.
+            </p>
+            <Link to="/transactions" className="btn-primary px-5 py-2.5 text-sm mt-5">Registrar transações</Link>
+          </div>
+        ) : (
+          <LayoutGroup>
+            <div className="grid grid-cols-12 gap-4 sm:gap-5 grid-flow-row-dense">
+              {carregando && semStory && <BlocoSkeleton size="full" alto />}
+              <AnimatePresence mode="popLayout">
+                {blocos.map((b) => (
+                  <BlocoFrame
+                    key={b.id}
+                    ref={(el) => { if (el) el.id = `bloco-${b.id}`; }}
+                    bloco={b}
+                    novo={novos.has(b.id)}
+                    ocupado={ocupados.has(b.id)}
+                    {...acoes}
+                  />
+                ))}
+              </AnimatePresence>
+              {carregando && (
+                <>
+                  <BlocoSkeleton size="sm" />
+                  <BlocoSkeleton size="md" alto />
+                  {blocos.length < 3 && <BlocoSkeleton size="sm" />}
+                </>
+              )}
+            </div>
+          </LayoutGroup>
+        )}
+      </main>
+      <CommandBar estado={estado} resposta={resposta} erro={erroComando} onEnviar={(t) => comando(t)} />
     </div>
   );
 }

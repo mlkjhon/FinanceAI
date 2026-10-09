@@ -10,7 +10,8 @@ export class GeminiError extends Error {
     }
 }
 
-export const gerarTexto = async (prompt) => {
+// opcoes.json: pede ao Gemini uma resposta em JSON puro (sem markdown em volta)
+export const gerarTexto = async (prompt, opcoes = {}) => {
     const API_KEY = process.env.GEMINI_API_KEY;
     if (!API_KEY) throw new GeminiError('GEMINI_API_KEY não configurada no servidor', 500);
 
@@ -20,8 +21,14 @@ export const gerarTexto = async (prompt) => {
             method: 'POST',
             // A chave vai no header, e não na URL, para não aparecer em logs
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-            signal: AbortSignal.timeout(25000),
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    ...(opcoes.json ? { responseMimeType: 'application/json' } : {}),
+                    ...(opcoes.temperatura != null ? { temperature: opcoes.temperatura } : {}),
+                },
+            }),
+            signal: AbortSignal.timeout(opcoes.timeoutMs || 25000),
         }
     );
 
@@ -35,4 +42,18 @@ export const gerarTexto = async (prompt) => {
     const texto = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
     if (!texto) throw new GeminiError('O Gemini não devolveu texto (resposta vazia ou bloqueada)', 502);
     return texto;
+};
+
+// Gera e já faz o parse do JSON (tolerante a cercas de markdown que escapem)
+export const gerarJSON = async (prompt, opcoes = {}) => {
+    const texto = await gerarTexto(prompt, { ...opcoes, json: true });
+    const limpo = texto.replace(/```json|```/g, '').trim();
+    try {
+        return JSON.parse(limpo);
+    } catch {
+        const ini = limpo.search(/[[{]/);
+        const fim = Math.max(limpo.lastIndexOf('}'), limpo.lastIndexOf(']'));
+        if (ini >= 0 && fim > ini) return JSON.parse(limpo.slice(ini, fim + 1));
+        throw new GeminiError('A IA devolveu um JSON inválido', 502);
+    }
 };

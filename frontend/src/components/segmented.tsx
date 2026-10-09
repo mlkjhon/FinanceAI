@@ -11,7 +11,7 @@ export function Segmented<T extends string>({ id, value, options, onChange, labe
 }) {
   const reduce = useReducedMotion();
   return (
-    <div role="group" aria-label={label} className="inline-flex self-start rounded-full bg-[var(--color-ink)]/[0.05] p-1">
+    <div role="group" aria-label={label} className="inline-flex self-start max-w-full overflow-x-auto [scrollbar-width:none] rounded-full bg-[var(--color-ink)]/[0.05] p-1">
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -21,7 +21,7 @@ export function Segmented<T extends string>({ id, value, options, onChange, labe
             aria-pressed={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              'relative px-4 py-1.5 rounded-full text-sm font-medium transition-colors duration-150',
+              'relative px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors duration-150',
               active ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink-soft)]'
             )}
           >
