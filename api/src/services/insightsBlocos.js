@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { funcoes, resolverPeriodo } from './insightsData.js';
+import { funcoes, resolverPeriodo, descricoesQueCasam } from './insightsData.js';
 
 /*
  * Blocos dos Insights. A IA devolve "pedidos de bloco" (BlocoPedido): tipo,
@@ -140,6 +140,7 @@ export function resolverBloco(ctx, pedidoBruto, periodo, extra = {}) {
         }
         const data = montarDados(ctx, p, base, valores);
         if (!data) return null;
+        const { inclui, nota } = transparencia(ctx, p, base);
         return {
             id: extra.id || novoId(),
             type: p.type,
@@ -150,11 +151,41 @@ export function resolverBloco(ctx, pedidoBruto, periodo, extra = {}) {
             createdAt: new Date().toISOString(),
             pedido: p, // guardado para refazer, fixar e recalcular em outro período
             data,
+            ...(inclui ? { inclui } : {}),
+            ...(nota ? { nota } : {}),
         };
     } catch (e) {
         console.warn(`[INSIGHTS] bloco "${p.title}" descartado: ${e.message}`);
         return null;
     }
+}
+
+/*
+ * O que o bloco considerou, para o usuário conferir:
+ * - buscas por termos (delivery, uber...) listam os lançamentos que entraram;
+ * - blocos de "gastos" avisam quanto foi para investimentos/metas, que o
+ *   Dashboard conta como saída e aqui não entra como gasto.
+ */
+function transparencia(ctx, p, base) {
+    const fontes = [p.fonte, ...Object.values(p.valores || {})].filter(Boolean);
+    const termos = [...new Set(fontes.flatMap((f) => f.args?.termos || []))];
+    let inclui = null;
+    if (termos.length) {
+        const meses = fontes.find((f) => f.fn === 'serieMensal')?.args?.meses;
+        let inicio = base.inicio;
+        if (meses) {
+            const [y, m] = ctx.hoje.split('-').map(Number);
+            inicio = new Date(Date.UTC(y, m - Math.min(Math.max(meses, 2), 12), 1)).toISOString().slice(0, 10);
+        }
+        inclui = descricoesQueCasam(ctx, termos, inicio).slice(0, 8);
+    }
+    const usaGastos = fontes.some((f) => f.fn === 'resumoPeriodo' && (f.campo === 'saidas' || p.campo === 'saidas')) || p.type === 'story';
+    let nota = null;
+    if (usaGastos) {
+        const guardado = funcoes.resumoPeriodo.run(ctx, {}, base).guardado;
+        if (guardado > 0) nota = `Gastos sem contar ${formatar(guardado)} que foram para investimentos e metas (no Dashboard eles entram como saída).`;
+    }
+    return { inclui, nota };
 }
 
 function montarDados(ctx, p, base, valores) {

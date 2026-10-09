@@ -123,10 +123,38 @@ const mesesAte = (hojeIso, n) => {
     });
 };
 
-const casaTermo = (texto, termos) => {
-    const t = (texto || '').toLowerCase();
-    return termos.some((x) => t.includes(String(x).toLowerCase()));
+/*
+ * Busca por termos (delivery, uber, streaming...). Antes era "contém o pedaço",
+ * e termos curtos casavam com lançamentos que não tinham nada a ver. Agora:
+ * sem acento, sem maiúsculas, e só PALAVRA INTEIRA (ou expressão inteira) na
+ * descrição ou no nome da categoria. Termos com menos de 3 letras são ignorados.
+ */
+const normalizar = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const escaparRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const regexDoTermo = (termo) => {
+    const t = normalizar(termo).trim().replace(/\s+/g, ' ');
+    if (t.replace(/\s/g, '').length < 3) return null;
+    return new RegExp(`(^|[^a-z0-9])${escaparRegex(t)}([^a-z0-9]|$)`);
 };
+const casaTermo = (lancamento, termos) => {
+    const alvo = `${normalizar(lancamento.descricao)} | ${normalizar(lancamento.categoria)}`;
+    return termos.some((x) => {
+        const re = regexDoTermo(x);
+        return re ? re.test(alvo) : false;
+    });
+};
+
+// Descrições que entraram numa busca por termos (o bloco mostra o que considerou)
+export function descricoesQueCasam(ctx, termos, inicio) {
+    const nomes = new Map();
+    for (const l of gastos(ctx.lancamentos)) {
+        if (inicio && l.dia < inicio) continue;
+        if (!casaTermo(l, termos)) continue;
+        const chave = normalizar(l.descricao).trim();
+        if (!nomes.has(chave)) nomes.set(chave, l.descricao.trim());
+    }
+    return [...nomes.values()];
+}
 
 // ---------- Catálogo ----------
 
@@ -193,7 +221,7 @@ export const funcoes = {
                 const doMes = ctx.lancamentos.filter((l) => mesDe(l.dia) === mes);
                 if (categoria || termos?.length) {
                     const filtrados = gastos(doMes).filter(
-                        (l) => (!categoria || l.categoria.toLowerCase() === categoria.toLowerCase()) && (!termos?.length || casaTermo(l.descricao, termos))
+                        (l) => (!categoria || l.categoria.toLowerCase() === categoria.toLowerCase()) && (!termos?.length || casaTermo(l, termos))
                     );
                     return { mes, total: soma(filtrados) };
                 }
@@ -226,7 +254,7 @@ export const funcoes = {
         run(ctx, { termos = [], periodo } = {}, base) {
             if (!termos.length) return null;
             const p = periodo ? resolverPeriodo(periodo, ctx.hoje) : base;
-            const lista = gastos(noPeriodo(ctx, p)).filter((l) => casaTermo(l.descricao, termos));
+            const lista = gastos(noPeriodo(ctx, p)).filter((l) => casaTermo(l, termos));
             if (!lista.length) return null;
             return {
                 total: soma(lista),

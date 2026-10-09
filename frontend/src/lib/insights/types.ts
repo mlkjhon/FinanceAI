@@ -89,6 +89,9 @@ const Base = {
   createdAt: z.string(),
   pedido: z.record(z.any()),
   fixado: z.boolean().optional(),
+  // o que o bloco considerou (busca por termos) e avisos sobre a conta
+  inclui: z.array(z.string()).optional(),
+  nota: z.string().optional(),
 };
 
 export const Bloco = z.discriminatedUnion('type', [

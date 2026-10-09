@@ -98,6 +98,13 @@ export const BlocoFrame = forwardRef<HTMLElement, { bloco: Bloco; ocupado: boole
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {(bloco.inclui?.length || bloco.nota) && (
+        <footer className={cn('mt-4 pt-3 border-t text-xs space-y-1', hero ? 'border-white/20 text-white/75' : 'border-[var(--color-line)] text-[var(--color-ink-muted)]')}>
+          {bloco.inclui?.length ? <p>Considerando: {bloco.inclui.join(', ')}</p> : null}
+          {bloco.nota ? <p>{bloco.nota}</p> : null}
+        </footer>
+      )}
     </motion.article>
   );
 });

@@ -73,8 +73,10 @@ OPERAÇÕES POSSÍVEIS:
 - { "op": "remove", "ids": ["..."] }
 - { "op": "reorder", "ids": [todos os ids na nova ordem] }
 Se o comando citar "essa"/"esse" sem dizer qual, use o bloco mais provável pelo assunto.
-Para buscar um tipo de gasto por nome (delivery, uber, streaming), use buscarGastos ou serieMensal com "termos" (ex.: ["ifood","rappi","delivery","ze delivery"]).
-Se não houver dados para atender, devolva operacoes vazia e explique em "resposta".
+Para buscar um tipo de gasto por nome (delivery, uber, streaming), use buscarGastos ou serieMensal com "termos".
+Termos precisam ser NOMES ESPECÍFICOS de apps, empresas ou da categoria (ex.: ["ifood","rappi","ze delivery","uber eats","delivery"]).
+NUNCA use termos genéricos ou curtos ("app", "food", "pedido", "loja", "compra"): eles casam com lançamentos que não têm nada a ver.
+Confira em "ondeMaisGastou" e nas categorias se esse gasto existe. Se não existir, devolva operacoes vazia e diga em "resposta" que não encontrou, sem inventar.
 ${REGRAS_BLOCOS}
 Responda SOMENTE com JSON: { "operacoes": [...], "resposta": "uma frase curta dizendo o que você fez na página" }`;
 }
