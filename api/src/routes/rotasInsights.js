@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { BD } from "../../db.js";
 import { autenticar } from "../middlewares/autenticar.js";
-import { gerarJSON, gerarJSONStream } from "../services/gemini.js";
+import { gerarJSON, gerarJSONStream } from "../services/ia.js";
 import { carregarContexto, snapshot, resolverPeriodo } from "../services/insightsData.js";
 import { resolverBloco } from "../services/insightsBlocos.js";
 import { promptAnalise, promptComando } from "../services/insightsPrompts.js";
@@ -54,7 +54,7 @@ router.post('/insights/analise', autenticar, async (req, res) => {
         }
 
         /*
-         * Streaming do Gemini: cada bloco é resolvido e enviado assim que a IA
+         * Streaming da IA: cada bloco é resolvido e enviado assim que a IA
          * termina de escrevê-lo (a IA já escreve na ordem de relevância).
          * Se o streaming falhar antes do primeiro bloco, cai na chamada normal.
          */

@@ -14,7 +14,7 @@ import rotasOpenFinance from "./src/routes/rotasOpenFinance.js";
 import rotasInvestimentos from "./src/routes/rotasInvestimentos.js";
 
 import { BD, testarConexao } from "./db.js";
-import { gerarTexto, GEMINI_MODEL } from "./src/services/gemini.js";
+import { gerarTexto, MODELO_IA } from "./src/services/ia.js";
 
 import swaggerUI from "swagger-ui-express";
 import swagger from './config/swagger.js';
@@ -37,16 +37,16 @@ app.get('/', async (req, res) => {
     res.redirect('/swagger')
 });
 
-// Diagnóstico do Gemini: mostra se a chave existe e se o modelo responde
-app.get('/test-gemini', async (req, res) => {
+// Diagnóstico da IA (OpenAI): mostra se a chave existe e se o modelo responde
+app.get('/test-ia', async (req, res) => {
     try {
         const texto = await gerarTexto('Responda apenas: ok');
-        res.json({ status: 200, api_key_loaded: true, modelo: GEMINI_MODEL, resposta: texto.trim() });
+        res.json({ status: 200, api_key_loaded: true, modelo: MODELO_IA, resposta: texto.trim() });
     } catch (error) {
         res.status(error.status || 500).json({
             status: error.status || 500,
-            api_key_loaded: !!process.env.GEMINI_API_KEY,
-            modelo: GEMINI_MODEL,
+            api_key_loaded: !!process.env.OPENAI_API_KEY,
+            modelo: MODELO_IA,
             erro: error.message,
         });
     }

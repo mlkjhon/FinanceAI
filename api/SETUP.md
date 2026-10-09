@@ -10,20 +10,24 @@ Copie o arquivo `.env.example` e renomeie para `.env`:
 cp .env.example .env
 ```
 
-### 2. Obter sua Chave de API do Google Gemini
+### 2. Obter a chave da OpenAI
 
-1. Acesse: https://makersuite.google.com/app/apikey
-2. Clique em "Create API Key"
-3. Selecione um projeto ou crie um novo
-4. Copie a chave gerada
+A IA dos Insights usa a OpenAI.
+
+1. Acesse: https://platform.openai.com/api-keys
+2. Clique em "Create new secret key"
+3. Copie a chave gerada (começa com `sk-`)
 
 ### 3. Adicionar a chave ao `.env`
 
-Abra o arquivo `.env` e substitua `your_gemini_api_key_here` pela sua chave:
-
 ```env
-GEMINI_API_KEY=sua_chave_aqui
+OPENAI_API_KEY=sua_chave_aqui
+# opcionais
+OPENAI_MODEL=gpt-5.5
+OPENAI_REASONING=low
 ```
+
+Em produção (Vercel), as mesmas variáveis ficam em Settings → Environment Variables do projeto da API.
 
 ### 4. Iniciar o servidor
 
@@ -32,14 +36,16 @@ npm install
 npm start
 ```
 
+Para conferir se a IA responde: `GET /test-ia`.
+
 ## Segurança
 
-⚠️ **IMPORTANTE**: Nunca compartilhe ou faça commit do arquivo `.env` com suas chaves!
-O arquivo `.env` está no `.gitignore` e não será versionado.
+**Importante**: nunca compartilhe nem faça commit do arquivo `.env` com suas chaves.
+O arquivo `.env` está no `.gitignore` e não é versionado.
 
 ## Troubleshooting
 
-Se receber erro "Invalid authentication credentials":
+Se o `/test-ia` mostrar erro de autenticação:
 - Verifique se a chave foi copiada corretamente (sem espaços)
-- Certifique-se de que a chave foi adicionada ao arquivo `.env` (não no `.env.example`)
-- Reinicie o servidor após adicionar a chave
+- Certifique-se de que a chave está no `.env` (não no `.env.example`)
+- Reinicie o servidor (ou faça um novo deploy na Vercel) depois de mudar a chave
