@@ -301,6 +301,9 @@ export const goalsApi = {
   },
   update: async () => ({}) as Goal,
   delete: async (id: string) => request<void>(`/metas/${id}`, { method: 'DELETE' }),
+  // Desfaz um depósito: o valor sai da meta e volta para o saldo
+  removerDeposito: (idMeta: string, idTransacao: number) =>
+    request<{ ok: boolean }>(`/metas/${idMeta}/depositos/${idTransacao}`, { method: 'DELETE' }),
   // Deposita dinheiro na meta E desconta automaticamente do saldo geral
   adicionarDinheiro: async (id: string, valor: number, origem: OrigemMeta = 'manual') => {
     const user = getUserData();
@@ -318,6 +321,7 @@ export interface MovimentoMeta {
   valor: number;
   saldo_apos: number | null;
   origem: OrigemMeta | null;
+  id_transacao?: number | null;
   criado_em: string;
   // false = depósito antigo, só com o dia (sem hora registrada)
   hora: boolean;

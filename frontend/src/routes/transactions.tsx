@@ -166,6 +166,8 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['transactions'] });
     qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    // apagar um depósito em meta tira o valor da meta
+    qc.invalidateQueries({ queryKey: ['goals'] });
   };
   const createMut = useMutation({ mutationFn: transactionsApi.create, onSuccess: () => { invalidate(); onSaved(); } });
   const updateMut = useMutation({
@@ -281,7 +283,10 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
 
         {saveError && (
           <p role="alert" className="text-sm text-loss">
-            Não deu para salvar agora. Confira a conexão e tente de novo.
+            {/* recusa explicada pelo servidor (ex.: editar valor de depósito em meta); senão, a genérica */}
+            {(saveError as { status?: number }).status === 400 && saveError.message
+              ? saveError.message
+              : 'Não deu para salvar agora. Confira a conexão e tente de novo.'}
           </p>
         )}
       </div>

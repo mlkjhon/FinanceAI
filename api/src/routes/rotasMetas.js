@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
 import { autenticar } from "../middlewares/autenticar.js";
+import { ehDepositoMeta, estornarDepositoMeta } from "../services/metasDeposito.js";
 
 const router = Router();
 
@@ -59,6 +60,12 @@ router.post('/metas', autenticar, async (req, res) => {
 
     if (!titulo || !valor_meta) {
         return res.status(400).json({ error: 'Os campos titulo e valor_meta são obrigatórios.' });
+    }
+    if (!(Number(valor_meta) > 0)) {
+        return res.status(400).json({ error: 'O valor da meta precisa ser maior que zero.' });
+    }
+    if (Number(valor_atual) < 0 || Number(valor_atual) > Number(valor_meta)) {
+        return res.status(400).json({ error: 'O valor já guardado não pode passar do valor da meta.' });
     }
 
     try {
@@ -175,6 +182,41 @@ router.delete('/metas/:id_meta', autenticar, async (req, res) => {
 });
 
 
+/*
+ * DELETE /metas/:id_meta/depositos/:id_transacao
+ * Desfaz um depósito: o valor sai da meta, some do histórico e a transação
+ * de saída é apagada (o dinheiro volta para o saldo). Tudo ou nada.
+ */
+router.delete('/metas/:id_meta/depositos/:id_transacao', autenticar, async (req, res) => {
+    const { id_meta, id_transacao } = req.params;
+    const id_usuario = req.usuario.id;
+    if (!/^\d+$/.test(String(id_transacao))) return res.status(400).json({ error: 'Depósito inválido.' });
+    const cliente = await BD.connect();
+    try {
+        const t = await cliente.query(
+            'SELECT id_transacao, descricao, valor FROM transacoes WHERE id_transacao = $1 AND id_usuario = $2',
+            [id_transacao, id_usuario]
+        );
+        if (!t.rows.length || !ehDepositoMeta(t.rows[0].descricao)) return res.status(404).json({ error: 'Depósito não encontrado.' });
+
+        await cliente.query('BEGIN');
+        const meta = await estornarDepositoMeta(cliente, id_usuario, t.rows[0]);
+        if (!meta || String(meta.id_meta) !== String(id_meta)) {
+            await cliente.query('ROLLBACK');
+            return res.status(404).json({ error: 'Esse depósito não é desta meta.' });
+        }
+        await cliente.query('DELETE FROM transacoes WHERE id_transacao = $1 AND id_usuario = $2', [id_transacao, id_usuario]);
+        await cliente.query('COMMIT');
+        return res.status(200).json({ ok: true, meta });
+    } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => {});
+        console.error('Erro ao apagar depósito:', error.message);
+        return res.status(500).json({ error: 'Não foi possível apagar o depósito.' });
+    } finally {
+        cliente.release();
+    }
+});
+
 router.patch('/metas/:id_meta/adicionar', autenticar, async (req, res) => {
     const { id_meta } = req.params;
     const id_usuario = req.usuario.id;
@@ -195,12 +237,26 @@ router.patch('/metas/:id_meta/adicionar', autenticar, async (req, res) => {
         }
 
         const meta = buscaMeta.rows[0];
-        const valorNumero = Number(valor);
+        const valorNumero = Math.round(Number(valor) * 100) / 100;
+        const falta = Math.max(Math.round((Number(meta.valor_meta) - Number(meta.valor_atual)) * 100) / 100, 0);
+        const reais = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+        // A meta tem limite: não dá para guardar mais do que o valor dela
+        if (falta <= 0) {
+            return res.status(400).json({ error: 'Essa meta já foi concluída. Não dá para depositar mais nela.', falta: 0 });
+        }
+        if (valorNumero > falta) {
+            return res.status(400).json({ error: `O depósito passa do valor da meta. O máximo agora é ${reais(falta)}.`, falta });
+        }
+
+        // A condição no próprio UPDATE evita estourar o limite com dois depósitos ao mesmo tempo
         const updateMeta = await BD.query(
-            'UPDATE metas_financeiras SET valor_atual = valor_atual + $1 WHERE id_meta = $2 RETURNING *',
+            'UPDATE metas_financeiras SET valor_atual = valor_atual + $1 WHERE id_meta = $2 AND valor_atual + $1 <= valor_meta RETURNING *',
             [valorNumero, id_meta]
         );
+        if (updateMeta.rowCount === 0) {
+            return res.status(400).json({ error: 'O depósito passa do valor da meta. Atualize a página e tente de novo.' });
+        }
 
         const transacao = await BD.query(
             `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria, data_registro)

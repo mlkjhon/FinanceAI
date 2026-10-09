@@ -100,6 +100,8 @@ function MetaConteudo({ id }: { id: string }) {
   const [depositoAberto, setDepositoAberto] = React.useState(false);
   const [valorDeposito, setValorDeposito] = React.useState('');
   const valorDep = paraNumero(valorDeposito);
+  const faltaAgora = meta ? Math.max(meta.valor_meta - meta.valor_atual, 0) : 0;
+  const depositoPassa = !!valorDep && valorDep > faltaAgora + 0.001;
 
   const depositoMut = useMutation({
     mutationFn: (valor: number) => goalsApi.adicionarDinheiro(id, valor),
@@ -108,6 +110,13 @@ function MetaConteudo({ id }: { id: string }) {
       qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
       qc.invalidateQueries({ queryKey: ['transactions'] });
       setDepositoAberto(false);
+    },
+  });
+  // Apagar um depósito do histórico devolve o dinheiro para o saldo
+  const removerDep = useMutation({
+    mutationFn: (idTransacao: number) => goalsApi.removerDeposito(id, idTransacao),
+    onSuccess: () => {
+      ['goals', 'dashboard-summary', 'transactions'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
     },
   });
   const deleteMut = useMutation({
@@ -335,7 +344,11 @@ function MetaConteudo({ id }: { id: string }) {
 
       {/* Histórico */}
       <section aria-label="Histórico" className="space-y-3">
-        <h2 className="font-semibold text-base text-[var(--color-ink)]">Histórico</h2>
+        <div>
+          <h2 className="font-semibold text-base text-[var(--color-ink)]">Histórico</h2>
+          <p className="text-xs text-[var(--color-ink-muted)] mt-0.5">Apagar um depósito tira o valor da meta e devolve para o seu saldo.</p>
+        </div>
+        {removerDep.isError && <p role="alert" className="text-sm text-loss">{(removerDep.error as Error)?.message || 'Não deu para apagar o depósito.'}</p>}
         {c.asc.length ? (
           <div className="space-y-6">
             {[...grupos.entries()].map(([mes, itens], gi) => (
@@ -379,6 +392,14 @@ function MetaConteudo({ id }: { id: string }) {
                           </p>
                         )}
                       </div>
+                      {m.tipo === 'deposito' && m.id_transacao != null && (
+                        <HoldToDelete
+                          compact
+                          label="Segure para apagar"
+                          pending={removerDep.isPending && removerDep.variables === m.id_transacao}
+                          onConfirm={() => removerDep.mutate(m.id_transacao!)}
+                        />
+                      )}
                     </li>
                   ))}
                 </ol>
@@ -396,9 +417,9 @@ function MetaConteudo({ id }: { id: string }) {
         open={depositoAberto}
         onOpenChange={setDepositoAberto}
         title={'Depositar em ' + meta.titulo}
-        onSubmit={() => valorDep && depositoMut.mutate(valorDep)}
+        onSubmit={() => valorDep && !depositoPassa && depositoMut.mutate(valorDep)}
         footer={
-          <button type="submit" disabled={depositoMut.isPending || !valorDep} className="btn-primary w-full py-3.5 text-sm disabled:opacity-60">
+          <button type="submit" disabled={depositoMut.isPending || !valorDep || depositoPassa} className="btn-primary w-full py-3.5 text-sm disabled:opacity-60">
             {depositoMut.isPending ? <span className="spinner" aria-hidden /> : <PiggyBank size={16} />}
             {valorDep ? 'Depositar ' + formatCurrency(valorDep) : 'Depositar'}
           </button>
@@ -421,9 +442,16 @@ function MetaConteudo({ id }: { id: string }) {
             </button>
           )}
         </div>
-        <AmountField id="dep-detalhe" label="Valor do depósito" value={valorDeposito} onChange={setValorDeposito} autoFocus />
+        <AmountField
+          id="dep-detalhe"
+          label="Valor do depósito"
+          value={valorDeposito}
+          onChange={setValorDeposito}
+          erro={depositoPassa ? `Passa do valor da meta. O máximo é ${formatCurrency(c.falta)}.` : undefined}
+          autoFocus
+        />
         <p className="text-xs text-[var(--color-ink-muted)]">O valor sai do seu saldo e entra na meta.</p>
-        {depositoMut.isError && <p role="alert" className="text-sm text-loss">Não deu para depositar. Tente de novo.</p>}
+        {depositoMut.isError && <p role="alert" className="text-sm text-loss">{(depositoMut.error as Error)?.message || 'Não deu para depositar. Tente de novo.'}</p>}
       </Sheet>
     </div>
   );

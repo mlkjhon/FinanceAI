@@ -80,9 +80,11 @@ function GoalsContent() {
   });
 
   const valorMeta = paraNumero(form.valor_meta);
+  const jaGuardado = paraNumero(form.valor_atual) ?? 0;
+  const guardadoPassa = !!valorMeta && jaGuardado > valorMeta;
   const criarMeta = () => {
     setTentou(true);
-    if (!form.nome.trim() || !valorMeta) return;
+    if (!form.nome.trim() || !valorMeta || guardadoPassa) return;
     createMut.mutate({
       nome: form.nome.trim(),
       valor_meta: valorMeta,
@@ -94,8 +96,9 @@ function GoalsContent() {
 
   const valorDep = paraNumero(valorDeposito);
   const faltaDeposito = metaDeposito ? Math.max(metaDeposito.valor_meta - metaDeposito.valor_atual, 0) : 0;
+  const depositoPassa = !!valorDep && valorDep > faltaDeposito + 0.001;
   const depositar = () => {
-    if (!metaDeposito || !valorDep) return;
+    if (!metaDeposito || !valorDep || depositoPassa) return;
     depositoMut.mutate({ id: metaDeposito.id, valor: valorDep });
   };
 
@@ -155,9 +158,11 @@ function GoalsContent() {
                 value={form.valor_atual}
                 onValueChange={(t) => setForm((f) => ({ ...f, valor_atual: t }))}
                 placeholder="0,00"
+                aria-invalid={guardadoPassa}
                 className={campoClasse + ' pl-10'}
               />
             </div>
+            {guardadoPassa && <p className="text-xs text-loss">Não pode passar do valor da meta ({formatCurrency(valorMeta!)}).</p>}
           </Campo>
           <Campo id="meta-data" label="Até quando (opcional)">
             <input id="meta-data" type="date" value={form.data_alvo} onChange={(e) => setForm((f) => ({ ...f, data_alvo: e.target.value }))} className={campoClasse} />
@@ -230,12 +235,16 @@ function GoalsContent() {
               {/* Botões de ação */}
               <div className="flex gap-2 pt-1">
                 {/* Botão: adicionar dinheiro à meta */}
+                {g.valor_atual < g.valor_meta ? (
                 <button
                   onClick={() => abrirDeposito({ id: g.id, nome: g.nome, valor_meta: g.valor_meta, valor_atual: g.valor_atual })}
                   className="flex-1 py-2 rounded-full bg-gain-soft text-gain text-xs font-semibold flex items-center justify-center gap-1"
                 >
                   <PiggyBank size={13} /> Depositar
                 </button>
+                ) : (
+                  <span className="flex-1 py-2 text-center text-xs font-semibold text-gain">Meta concluída</span>
+                )}
                 {/* Botão: remover meta */}
                 <HoldToDelete compact label="Segure para remover" pending={deleteMut.isPending && deleteMut.variables === g.id} onConfirm={() => deleteMut.mutate(g.id)} />
               </div>
@@ -259,7 +268,7 @@ function GoalsContent() {
         title={metaDeposito ? 'Depositar em ' + metaDeposito.nome : 'Depositar'}
         onSubmit={depositar}
         footer={
-          <button type="submit" disabled={depositoMut.isPending || !valorDep} className="btn-primary w-full py-3.5 text-sm disabled:opacity-60">
+          <button type="submit" disabled={depositoMut.isPending || !valorDep || depositoPassa} className="btn-primary w-full py-3.5 text-sm disabled:opacity-60">
             {depositoMut.isPending ? <span className="spinner" aria-hidden /> : <PiggyBank size={16} />}
             {valorDep ? 'Depositar ' + formatCurrency(valorDep) : 'Depositar'}
           </button>
@@ -284,9 +293,16 @@ function GoalsContent() {
                 </button>
               )}
             </div>
-            <AmountField id="dep-valor" label="Valor do depósito" value={valorDeposito} onChange={setValorDeposito} autoFocus />
+            <AmountField
+              id="dep-valor"
+              label="Valor do depósito"
+              value={valorDeposito}
+              onChange={setValorDeposito}
+              erro={depositoPassa ? `Passa do valor da meta. O máximo é ${formatCurrency(faltaDeposito)}.` : undefined}
+              autoFocus
+            />
             <p className="text-xs text-[var(--color-ink-muted)]">O valor sai do seu saldo e entra na meta.</p>
-            {depositoMut.isError && <p role="alert" className="text-sm text-loss">Não deu para depositar. Tente de novo.</p>}
+            {depositoMut.isError && <p role="alert" className="text-sm text-loss">{(depositoMut.error as Error)?.message || 'Não deu para depositar. Tente de novo.'}</p>}
           </>
         )}
       </Sheet>

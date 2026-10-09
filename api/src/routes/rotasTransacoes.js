@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { BD } from "../../db.js";
 import { autenticar } from "../middlewares/autenticar.js";
+import { ehDepositoMeta, estornarDepositoMeta } from "../services/metasDeposito.js";
 
 const router = Router();
 
@@ -33,8 +34,8 @@ router.get('/transacoes/:id_transacao', autenticar,  async (req, res) => {
         if (!id_transacao) {
             return res.status(400).json({ message: 'Informe o ID da transação para obter seus detalhes.' });
         }
-        const comando = `SELECT * FROM transacoes WHERE id_transacao = $1`;
-        const transacoes = await BD.query(comando, [id_transacao]);
+        const comando = `SELECT * FROM transacoes WHERE id_transacao = $1 AND id_usuario = $2`;
+        const transacoes = await BD.query(comando, [id_transacao, req.usuario.id]);
 
         if (transacoes.rowCount === 0) {
             return res.status(404).json({ message: 'Transação não encontrada' });
@@ -63,12 +64,24 @@ router.post('/transacoes', autenticar, async (req, res) => {
     }
 });
 
+
+// Depósito em meta: o valor está somado na meta. Mudar valor/descrição/tipo aqui
+// deixaria a meta errada; o caminho é apagar o depósito (devolve o dinheiro) e depositar de novo.
+function mexeNoDeposito(atual, { descricao, valor, tipo }) {
+    if (!ehDepositoMeta(atual.descricao)) return false;
+    return (descricao !== undefined && descricao !== atual.descricao)
+        || (valor !== undefined && Number(valor) !== Number(atual.valor))
+        || (tipo !== undefined && tipo !== atual.tipo);
+}
+const MSG_DEPOSITO = 'Esse é um depósito em meta: não dá para mudar o valor, a descrição ou o tipo. Apague o depósito (o dinheiro volta) e faça outro.';
+
 router.put('/transacoes/:id_transacao', autenticar, async (req, res) => {
     const { id_transacao } = req.params;
     const { descricao, valor, tipo, id_subcategoria, data_registro } = req.body;
     try {
-        const verificar = await BD.query(`SELECT id_transacao FROM transacoes WHERE id_transacao = $1`, [id_transacao]);
+        const verificar = await BD.query(`SELECT * FROM transacoes WHERE id_transacao = $1 AND id_usuario = $2`, [id_transacao, req.usuario.id]);
         if (verificar.rowCount === 0) return res.status(404).json({ message: 'Transação não encontrada' });
+        if (mexeNoDeposito(verificar.rows[0], { descricao, valor, tipo })) return res.status(400).json({ error: MSG_DEPOSITO });
 
         let comando = `UPDATE transacoes SET descricao=$1, valor=$2, tipo=$3, id_subcategoria=$5`;
         const valores = [descricao, valor, tipo, id_transacao, id_subcategoria || null];
@@ -90,10 +103,11 @@ router.patch('/transacoes/:id_transacao', autenticar, async (req, res) => {
     const { id_transacao } = req.params;
     const { descricao, valor, tipo, id_subcategoria } = req.body;
     try {
-        const verificar = await BD.query(`SELECT * FROM transacoes WHERE id_transacao = $1`, [id_transacao]);
+        const verificar = await BD.query(`SELECT * FROM transacoes WHERE id_transacao = $1 AND id_usuario = $2`, [id_transacao, req.usuario.id]);
         if (verificar.rowCount === 0) return res.status(404).json({ message: 'Transação não encontrada' });
 
         const transacaoAtual = verificar.rows[0];
+        if (mexeNoDeposito(transacaoAtual, { descricao, valor, tipo })) return res.status(400).json({ error: MSG_DEPOSITO });
 
         const novaDescricao = descricao !== undefined ? descricao : transacaoAtual.descricao;
         const novoValor = valor !== undefined ? valor : transacaoAtual.valor;
@@ -112,28 +126,37 @@ router.patch('/transacoes/:id_transacao', autenticar, async (req, res) => {
 
 router.delete('/transacoes/:id_transacao', autenticar, async (req, res) => {
     const { id_transacao } = req.params;
+    const id_usuario = req.usuario.id;
+    const cliente = await BD.connect();
     try {
-        const verificar = await BD.query(`SELECT id_transacao, descricao FROM transacoes WHERE id_transacao = $1`, [id_transacao]);
+        const verificar = await cliente.query(`SELECT id_transacao, descricao, valor FROM transacoes WHERE id_transacao = $1 AND id_usuario = $2`, [id_transacao, id_usuario]);
         if (verificar.rowCount === 0) return res.status(404).json({ message: 'Transação não encontrada' });
 
         const transacao = verificar.rows[0];
-        
+        await cliente.query('BEGIN');
+
         // Verifica se é uma transação gerada pelo módulo de investimentos
         if (transacao.descricao && transacao.descricao.includes('[INV:')) {
             const match = transacao.descricao.match(/\[INV:(\d+)\]/);
             if (match && match[1]) {
-                const id_transacao_inv = match[1];
-                // Remove a transação de investimento (e a transação na conta principal será removida se não for apagada aqui)
-                // Mas, como já estamos apagando a principal aqui, vamos apagar a do investimento também.
-                await BD.query(`DELETE FROM transacoes_investimentos WHERE id_transacao_inv = $1`, [id_transacao_inv]);
+                await cliente.query(`DELETE FROM transacoes_investimentos WHERE id_transacao_inv = $1`, [match[1]]);
             }
         }
 
-        const comando = `DELETE FROM transacoes WHERE id_transacao = $1`;
-        await BD.query(comando, [id_transacao]);
-        return res.status(200).json({ message: 'Transação excluída com sucesso' });
+        // Depósito em meta: o dinheiro sai da meta junto
+        const meta = await estornarDepositoMeta(cliente, id_usuario, transacao);
+
+        await cliente.query(`DELETE FROM transacoes WHERE id_transacao = $1 AND id_usuario = $2`, [id_transacao, id_usuario]);
+        await cliente.query('COMMIT');
+        return res.status(200).json({
+            message: meta ? `Transação excluída e o valor saiu da meta "${meta.titulo}".` : 'Transação excluída com sucesso',
+            meta,
+        });
     } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => {});
         return res.status(500).json({ error: 'Erro ao excluir transação: ' + error.message });
+    } finally {
+        cliente.release();
     }
 });
 
