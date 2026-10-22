@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { transactionsApi, type Transaction } from '../lib/api';
 import { Navbar } from '../components/Navbar';
+import { BotaoNovaCategoria, PainelNovaCategoria } from '../components/nova-categoria';
 import { Segmented } from '../components/segmented';
-import { formatCurrency, formatDate, cn, descricaoVisivel } from '../lib/utils';
+import { formatCurrency, formatDate, cn, descricaoVisivel, ehTransferencia } from '../lib/utils';
 import { DetailHeader, Headline, Strong, MetricStrip, EmptyDetail, DetailSkeleton } from '../components/detail';
 
 export const Route = createFileRoute('/categorias')({
@@ -105,6 +106,7 @@ function CategoriaRow({ g, index, total, aberto, onToggle }: { g: Grupo; index: 
 function CategoriasContent() {
   const [periodo, setPeriodo] = useState<Periodo>('mes');
   const [aberta, setAberta] = useState<string | null>(null);
+  const [criandoCat, setCriandoCat] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['transactions', 'all'],
@@ -114,7 +116,8 @@ function CategoriasContent() {
   const { grupos, total, maior } = useMemo(() => {
     const mes = mesAtual();
     const gastos = (data?.data ?? []).filter(
-      (t) => t.tipo === 'despesa' && (periodo === 'tudo' || (t.data || '').slice(0, 7) === mes)
+      // só gasto de verdade: depósito em meta e aporte não são "para onde foi o dinheiro"
+      (t) => t.tipo === 'despesa' && !ehTransferencia(t.descricao) && (periodo === 'tudo' || (t.data || '').slice(0, 7) === mes)
     );
     const map = new Map<string, Grupo>();
     for (const t of gastos) {
@@ -146,13 +149,25 @@ function CategoriasContent() {
         ) : null}
       </DetailHeader>
 
-      <Segmented
-        id="cat-periodo"
-        label="Período"
-        value={periodo}
-        onChange={(v) => { setPeriodo(v); setAberta(null); }}
-        options={[{ value: 'mes', label: 'Este mês' }, { value: 'tudo', label: 'Tudo' }]}
-      />
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Segmented
+            id="cat-periodo"
+            label="Período"
+            value={periodo}
+            onChange={(v) => { setPeriodo(v); setAberta(null); }}
+            options={[{ value: 'mes', label: 'Este mês' }, { value: 'tudo', label: 'Tudo' }]}
+          />
+          <BotaoNovaCategoria aberto={criandoCat} onClick={() => setCriandoCat((v) => !v)} controla="cat-nova" rotulo="Nova categoria" />
+        </div>
+        <PainelNovaCategoria
+          id="cat-nova"
+          aberto={criandoCat}
+          tipo="despesa"
+          escolherTipo
+          onCriada={() => setCriandoCat(false)}
+        />
+      </div>
 
       {!grupos.length ? (
         <EmptyDetail text={periodo === 'mes' ? 'Nenhum gasto registrado neste mês.' : 'Nenhum gasto registrado ainda.'} />
@@ -162,7 +177,7 @@ function CategoriasContent() {
             items={[
               { label: 'Total gasto', value: total, currency: true },
               { label: 'Categorias', value: grupos.length },
-              { label: maior ? `Maior gasto: ${maior.descricao}` : 'Maior gasto', value: maior?.valor ?? 0, currency: true },
+              { label: maior ? `Maior gasto: ${descricaoVisivel(maior.descricao)}` : 'Maior gasto', value: maior?.valor ?? 0, currency: true },
             ]}
           />
           <ol className="finance-card overflow-hidden divide-y divide-[var(--color-line)]">

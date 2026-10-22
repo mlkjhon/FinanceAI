@@ -26,6 +26,7 @@ router.get('/orcamentos', autenticar, async (req, res) => {
                       AND t.id_usuario = o.id_usuario
                       AND s.id_categoria = o.id_categoria
                       AND t.descricao NOT ILIKE 'Investido na meta:%'
+                      AND t.descricao NOT LIKE '[INV%'
                       AND EXTRACT(MONTH FROM t.data_registro) = o.mes
                       AND EXTRACT(YEAR FROM t.data_registro) = o.ano
                 ), 0) AS valor_gasto

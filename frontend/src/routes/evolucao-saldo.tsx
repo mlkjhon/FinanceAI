@@ -37,7 +37,8 @@ function EvolucaoContent() {
    * cada mês é reconstruído de trás para frente a partir do saldo de hoje.
    */
   const saldoHoje = summary?.saldo_total ?? 0;
-  const resultados = meses.map((m) => (m.entradas ?? 0) - (m.saidas ?? 0));
+  // tudo o que mexeu na conta no mês (inclusive metas e investimentos), para o saldo bater
+  const resultados = meses.map((m) => m.saldo ?? (m.entradas ?? 0) - (m.saidas ?? 0));
   const fimDoMes: number[] = [];
   let acc = saldoHoje;
   for (let i = meses.length - 1; i >= 0; i--) {

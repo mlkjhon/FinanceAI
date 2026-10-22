@@ -7,11 +7,11 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { txSchema, type TxForm } from '../lib/schemas/transaction';
 import { Plus, Search, X, Loader2 } from '../components/icons';
-import { transactionsApi, categoriesApi, subcategoriasApi, type Category, type Transaction, type CreateTransaction } from '../lib/api';
-import { Collapse } from '../components/collapse';
+import { transactionsApi, categoriesApi, subcategoriasApi, type Transaction, type CreateTransaction } from '../lib/api';
+import { BotaoNovaCategoria, PainelNovaCategoria } from '../components/nova-categoria';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter } from '../components/ui';
-import { formatCurrency, cn, descricaoVisivel } from '../lib/utils';
+import { formatCurrency, cn, descricaoVisivel, ehTransferencia } from '../lib/utils';
 import { Segmented } from '../components/segmented';
 import { AmountField } from '../components/sheet';
 import { deNumero, paraNumero } from '../lib/dinheiro';
@@ -61,58 +61,6 @@ const sinal = (tx: Transaction) => (tx.tipo === 'receita' ? tx.valor : -tx.valor
 
 const fieldCls =
   'field w-full px-4 py-3 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm text-[var(--color-ink)]';
-
-/*
- * Criar categoria sem sair da transação. A categoria é só do usuário (não aparece
- * para mais ninguém) e já nasce com a subcategoria "Geral", que fica selecionada.
- */
-function NovaCategoria({ tipo, onCriada }: { tipo: 'receita' | 'despesa'; onCriada: (id: string) => void }) {
-  const qc = useQueryClient();
-  const [nome, setNome] = useState('');
-  const criar = useMutation({
-    mutationFn: () => categoriesApi.create({ nome: nome.trim(), tipo }),
-    onSuccess: (c) => {
-      const id = String(c.id_categoria);
-      // entra na lista na hora (sem esperar o recarregamento) para o select já mostrar
-      qc.setQueryData<Category[]>(['categories'], (antes) => [...(antes ?? []), { id, nome: c.nome, tipo, propria: true }]);
-      qc.invalidateQueries({ queryKey: ['categories'] });
-      setNome('');
-      onCriada(id);
-    },
-  });
-  const enviar = () => {
-    if (nome.trim().length >= 2 && !criar.isPending) criar.mutate();
-  };
-
-  return (
-    <div id="tx-nova-cat" className="rounded-xl bg-[var(--color-surface)] p-3 space-y-2">
-      <label htmlFor="tx-nova-cat-nome" className="text-xs font-medium text-[var(--color-ink-soft)]">
-        Nova categoria de {tipo === 'receita' ? 'receita' : 'despesa'} <span className="text-[var(--color-ink-muted)] font-normal">(só você vê)</span>
-      </label>
-      <div className="flex gap-2">
-        <input
-          id="tx-nova-cat-nome"
-          value={nome}
-          maxLength={60}
-          onChange={(e) => setNome(e.target.value)}
-          // Enter cria a categoria, não envia a transação
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); enviar(); } }}
-          placeholder={tipo === 'receita' ? 'Ex.: Freelas' : 'Ex.: Pets'}
-          className={cn(fieldCls, 'py-2.5')}
-        />
-        <button
-          type="button"
-          onClick={enviar}
-          disabled={nome.trim().length < 2 || criar.isPending}
-          className="btn-primary shrink-0 px-4 text-sm disabled:opacity-50"
-        >
-          {criar.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Criar'}
-        </button>
-      </div>
-      {criar.isError && <p role="alert" className="text-xs text-loss">{(criar.error as Error).message || 'Não deu para criar a categoria.'}</p>}
-    </div>
-  );
-}
 
 function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose: () => void; onSaved: () => void }) {
   const qc = useQueryClient();
@@ -241,15 +189,7 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
             <div className="space-y-2">
               <div className="flex h-6 items-center justify-between gap-2">
                 <label htmlFor="tx-cat" className="text-sm font-medium text-[var(--color-ink-soft)]">Categoria</label>
-                <button
-                  type="button"
-                  onClick={() => setCriandoCat((v) => !v)}
-                  aria-expanded={criandoCat}
-                  aria-controls="tx-nova-cat"
-                  className="pressable inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold text-[var(--color-accent)] hover:bg-gain-soft"
-                >
-                  <Plus size={12} /> Nova
-                </button>
+                <BotaoNovaCategoria aberto={criandoCat} onClick={() => setCriandoCat((v) => !v)} controla="tx-nova-cat" />
               </div>
               <select
                 id="tx-cat"
@@ -269,16 +209,16 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
               </select>
             </div>
           </div>
-          <Collapse open={criandoCat}>
-            <NovaCategoria
-              tipo={tipo}
-              onCriada={(id) => {
-                setCriandoCat(false);
-                setValue('id_categoria', id);
-                setValue('id_subcategoria', '');
-              }}
-            />
-          </Collapse>
+          <PainelNovaCategoria
+            id="tx-nova-cat"
+            aberto={criandoCat}
+            tipo={tipo}
+            onCriada={(id) => {
+              setCriandoCat(false);
+              setValue('id_categoria', id);
+              setValue('id_subcategoria', '');
+            }}
+          />
         </div>
 
         {saveError && (
@@ -373,14 +313,15 @@ function LedgerSkeleton() {
 function MonthSummary({ all }: { all: Transaction[] }) {
   const mes = hojeISO().slice(0, 7);
   const doMes = all.filter((t) => diaDe(t).startsWith(mes));
-  const entrou = doMes.filter((t) => t.tipo === 'receita').reduce((s, t) => s + t.valor, 0);
-  const saiu = doMes.filter((t) => t.tipo === 'despesa').reduce((s, t) => s + t.valor, 0);
+  // Metas e investimentos não são renda nem gasto: ficam fora de "Entrou" e "Saiu"
+  const entrou = doMes.filter((t) => t.tipo === 'receita' && !ehTransferencia(t.descricao)).reduce((s, t) => s + t.valor, 0);
+  const saiu = doMes.filter((t) => t.tipo === 'despesa' && !ehTransferencia(t.descricao)).reduce((s, t) => s + t.valor, 0);
   const resultado = entrou - saiu;
   const nomeMes = new Date().toLocaleDateString('pt-BR', { month: 'long' });
 
   return (
     <div className="border-y border-[var(--color-line)] py-4">
-    <p className="text-xs text-[var(--color-ink-muted)] mb-3 first-letter:uppercase">{nomeMes} até agora</p>
+    <p className="text-xs text-[var(--color-ink-muted)] mb-3 first-letter:uppercase">{nomeMes} até agora · sem contar metas e investimentos</p>
     <dl className="grid grid-cols-3 divide-x divide-[var(--color-line)]">
       <div className="pr-4">
         <dt className="metric-label">Entrou</dt>

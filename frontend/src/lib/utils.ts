@@ -16,7 +16,17 @@ export function formatCurrency(value: number, locale = 'pt-BR', currency = 'BRL'
 
 // Aportes/resgates de investimento levam um marcador interno ("[INV:12] Aporte em CDB"); na tela ele some
 export function descricaoVisivel(descricao: string) {
-  return String(descricao || '').replace(/^[INV(:d+)?]s*/, '');
+  return String(descricao || '').replace(/^\[INV(:\d+)?\]\s*/, '');
+}
+
+/*
+ * Transferência: dinheiro mudando de lugar (aporte/resgate de investimento,
+ * depósito/devolução de meta). Mexe no saldo, mas não é renda nem gasto.
+ * Mesma regra do servidor (rotasDashboard).
+ */
+export function ehTransferencia(descricao: string) {
+  const d = String(descricao || '');
+  return d.startsWith('[INV') || d.startsWith('Investido na meta:') || d.startsWith('Devolvido da meta:') || d.endsWith('(investimento encerrado)');
 }
 
 export function formatDate(dateStr: string) {

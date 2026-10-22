@@ -5,10 +5,11 @@ import { Wallet, Plus, AlertCircle } from '../components/icons';
 import { budgetsApi, categoriesApi, transactionsApi } from '../lib/api';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter, SkeletonCard, ProgressBar } from '../components/ui';
-import { Sheet, AmountField, Campo } from '../components/sheet';
+import { Sheet, AmountField } from '../components/sheet';
 import { campoClasse } from '../lib/classes';
 import { deNumero, paraNumero } from '../lib/dinheiro';
 import { HoldToDelete } from '../components/hold-to-delete';
+import { BotaoNovaCategoria, PainelNovaCategoria } from '../components/nova-categoria';
 import { formatCurrency } from '../lib/utils';
 
 export const Route = createFileRoute('/budgets')({
@@ -27,6 +28,7 @@ function BudgetsContent() {
   const [ano, setAno] = React.useState(now.getFullYear());
   const [showForm, setShowForm] = React.useState(false);
   const [catId, setCatId] = React.useState('');
+  const [criandoCat, setCriandoCat] = React.useState(false);
   const [limite, setLimite] = React.useState('');
   const [tentou, setTentou] = React.useState(false);
 
@@ -117,12 +119,25 @@ function BudgetsContent() {
           erro={tentou && !valorLimite ? 'Informe um limite maior que zero' : undefined}
           autoFocus
         />
-        <Campo id="orc-cat" label="Categoria" ajuda={categoriasLivres.length ? undefined : 'Todas as categorias de despesa já têm orçamento neste mês.'}>
+        <div className="space-y-2">
+          <div className="flex h-6 items-center justify-between gap-2">
+            <label htmlFor="orc-cat" className="text-sm font-medium text-[var(--color-ink-soft)]">Categoria</label>
+            <BotaoNovaCategoria aberto={criandoCat} onClick={() => setCriandoCat((v) => !v)} controla="orc-nova-cat" />
+          </div>
           <select id="orc-cat" value={catId} onChange={(e) => setCatId(e.target.value)} aria-invalid={tentou && !catId} className={campoClasse}>
             <option value="">Escolha a categoria</option>
             {categoriasLivres.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
-        </Campo>
+          {!categoriasLivres.length && (
+            <p className="text-xs text-[var(--color-ink-muted)]">Todas as suas categorias de despesa já têm orçamento neste mês. Crie uma nova acima.</p>
+          )}
+        </div>
+        <PainelNovaCategoria
+          id="orc-nova-cat"
+          aberto={criandoCat}
+          tipo="despesa"
+          onCriada={(id) => { setCriandoCat(false); setCatId(id); }}
+        />
         {tentou && !catId && <p className="-mt-4 text-xs text-loss">Escolha uma categoria</p>}
         {mediaCategoria != null && (
           <div className="rise flex items-center justify-between gap-3 rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm">
