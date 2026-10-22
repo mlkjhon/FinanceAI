@@ -27,6 +27,8 @@ const garantirHistorico = () =>
         await BD.query('CREATE INDEX IF NOT EXISTS metas_movimentos_meta ON metas_movimentos (id_meta, id_usuario)');
         // Metas antigas ficam com criado_em vazio (a data real é desconhecida); as novas ganham a hora exata
         await BD.query('ALTER TABLE metas_financeiras ADD COLUMN IF NOT EXISTS criado_em TIMESTAMPTZ');
+        // categoria da meta (opcional)
+        await BD.query('ALTER TABLE metas_financeiras ADD COLUMN IF NOT EXISTS id_categoria INTEGER');
         await BD.query('ALTER TABLE metas_financeiras ALTER COLUMN criado_em SET DEFAULT now()');
     })().catch((e) => { historicoPronto = null; throw e; }));
 
@@ -38,14 +40,15 @@ router.get('/metas', autenticar, async (req, res) => {
 
     try {
         await garantirHistorico().catch(semHistorico);
-        const comando = `
-            SELECT *
-            FROM metas_financeiras
-            WHERE id_usuario = $1
-            ORDER BY data_objetivo ASC
-        `;
-
-        const resultado = await BD.query(comando, [id_usuario]);
+        // Com o nome da categoria da meta (opcional); se a coluna ainda não existir, lista sem ela
+        const resultado = await BD.query(
+            `SELECT m.*, c.nome AS categoria_nome
+             FROM metas_financeiras m
+             LEFT JOIN categorias c ON c.id_categoria = m.id_categoria
+             WHERE m.id_usuario = $1
+             ORDER BY m.data_objetivo ASC`,
+            [id_usuario]
+        ).catch(() => BD.query('SELECT * FROM metas_financeiras WHERE id_usuario = $1 ORDER BY data_objetivo ASC', [id_usuario]));
 
         return res.status(200).json(resultado.rows);
     } catch (error) {
@@ -88,6 +91,17 @@ router.post('/metas', autenticar, async (req, res) => {
         const meta = resultado.rows[0];
         const inicial = Math.round((Number(valor_atual) || 0) * 100) / 100;
 
+        // Categoria da meta (opcional): só uma que o usuário enxerga (padrão ou dele)
+        if (req.body.id_categoria && /^\d+$/.test(String(req.body.id_categoria))) {
+            await BD.query(
+                `UPDATE metas_financeiras SET id_categoria = $1
+                 WHERE id_meta = $2 AND EXISTS (
+                     SELECT 1 FROM categorias c WHERE c.id_categoria = $1 AND (c.id_usuario IS NULL OR c.id_usuario = $3)
+                 )`,
+                [req.body.id_categoria, meta.id_meta, id_usuario]
+            ).catch((e) => console.warn('[METAS] categoria:', e.message));
+        }
+
         /*
          * "Já tenho guardado": por padrão NÃO mexe no saldo (o dinheiro já estava
          * guardado em outro lugar). Só com "tirarDoSaldo" ele vira uma saída
@@ -128,7 +142,12 @@ router.get('/metas/:id_meta', autenticar, async (req, res) => {
 
     try {
         await garantirHistorico().catch(semHistorico);
-        const r = await BD.query('SELECT * FROM metas_financeiras WHERE id_meta = $1 AND id_usuario = $2', [id_meta, id_usuario]);
+        const r = await BD.query(
+            `SELECT m.*, c.nome AS categoria_nome FROM metas_financeiras m
+             LEFT JOIN categorias c ON c.id_categoria = m.id_categoria
+             WHERE m.id_meta = $1 AND m.id_usuario = $2`,
+            [id_meta, id_usuario]
+        ).catch(() => BD.query('SELECT * FROM metas_financeiras WHERE id_meta = $1 AND id_usuario = $2', [id_meta, id_usuario]));
         if (!r.rows.length) return res.status(404).json({ error: 'Meta não encontrada.' });
         const meta = r.rows[0];
 
@@ -174,6 +193,7 @@ router.get('/metas/:id_meta', autenticar, async (req, res) => {
             valor_atual: Number(meta.valor_atual) || 0,
             data_objetivo: meta.data_objetivo,
             criado_em: meta.criado_em ?? meta.data_criacao ?? meta.created_at ?? null,
+            categoria_nome: meta.categoria_nome ?? null,
             historico,
         });
     } catch (error) {

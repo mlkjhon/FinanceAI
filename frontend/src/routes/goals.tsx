@@ -2,7 +2,8 @@ import React, { Suspense } from 'react';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Target, Plus, Calendar, PiggyBank, ArrowRight } from '../components/icons';
-import { goalsApi, type CreateGoal } from '../lib/api';
+import { goalsApi, categoriesApi, type CreateGoal } from '../lib/api';
+import { BotaoNovaCategoria, PainelNovaCategoria } from '../components/nova-categoria';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter, SkeletonCard } from '../components/ui';
 import { Sheet, AmountField, Campo } from '../components/sheet';
@@ -34,7 +35,9 @@ function CircularProgress({ value, max }: { value: number; max: number }) {
 function GoalsContent() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = React.useState(false);
-  const formVazio = { nome: '', valor_meta: '', valor_atual: '', data_alvo: '', descricao: '', tirarDoSaldo: false };
+  const formVazio = { nome: '', valor_meta: '', valor_atual: '', data_alvo: '', descricao: '', tirarDoSaldo: false, id_categoria: '' };
+  const [criandoCat, setCriandoCat] = React.useState(false);
+  const { data: cats } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.list });
   const [form, setForm] = React.useState(formVazio);
   const [tentou, setTentou] = React.useState(false);
 
@@ -94,6 +97,7 @@ function GoalsContent() {
       data_alvo: form.data_alvo || undefined,
       descricao: form.descricao || undefined,
       tirarDoSaldo: form.tirarDoSaldo && jaGuardado > 0,
+      id_categoria: form.id_categoria || undefined,
     });
   };
 
@@ -208,6 +212,29 @@ function GoalsContent() {
               />
             </button>
         </label>
+        {/* Categoria da meta (opcional), com o mesmo "+ Nova" do resto do app */}
+        <div className="space-y-2">
+          <div className="flex h-6 items-center justify-between gap-2">
+            <label htmlFor="meta-cat" className="text-sm font-medium text-[var(--color-ink-soft)]">Categoria (opcional)</label>
+            <BotaoNovaCategoria aberto={criandoCat} onClick={() => setCriandoCat((v) => !v)} controla="meta-nova-cat" />
+          </div>
+          <select
+            id="meta-cat"
+            value={form.id_categoria}
+            onChange={(e) => setForm((f) => ({ ...f, id_categoria: e.target.value }))}
+            className={campoClasse}
+          >
+            <option value="">Sem categoria</option>
+            {(cats ?? []).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
+        </div>
+        <PainelNovaCategoria
+          id="meta-nova-cat"
+          aberto={criandoCat}
+          tipo="despesa"
+          escolherTipo
+          onCriada={(id) => { setCriandoCat(false); setForm((f) => ({ ...f, id_categoria: id })); }}
+        />
         <Campo id="meta-desc" label="Descrição (opcional)">
           <input id="meta-desc" value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Ex.: passagens e hospedagem" className={campoClasse} />
         </Campo>
@@ -233,6 +260,9 @@ function GoalsContent() {
                   <Link to="/goals/$id" params={{ id: g.id }} className="font-semibold text-gray-900 hover:text-[var(--color-accent)] transition-colors duration-150">
                     {g.nome}
                   </Link>
+                  {g.categoria && (
+                    <span className="mt-1 inline-flex rounded-md bg-[var(--color-surface)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-ink-soft)]">{g.categoria}</span>
+                  )}
                   {g.descricao && <p className="text-xs text-gray-400 mt-0.5">{g.descricao}</p>}
                 </div>
                 {g.valor_atual >= g.valor_meta ? (

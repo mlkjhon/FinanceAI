@@ -174,6 +174,9 @@ function MetaConteudo({ id }: { id: string }) {
             >
               {status}
             </span>
+            {meta.categoria_nome && (
+              <span className="ml-1.5 inline-flex rounded-md bg-[var(--color-surface)] px-2 py-0.5 text-xs font-medium text-[var(--color-ink-soft)]">{meta.categoria_nome}</span>
+            )}
             <h1 className="font-brand text-3xl font-bold tracking-tight text-[var(--color-ink)] break-words">{meta.titulo}</h1>
             {meta.descricao && <p className="text-sm text-[var(--color-ink-muted)]">{meta.descricao}</p>}
           </div>

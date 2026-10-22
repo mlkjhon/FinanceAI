@@ -24,7 +24,7 @@ interface TransacaoApi {
 interface CategoriaApi { id_categoria: number; nome: string; tipo: string; propria?: boolean }
 interface SubcategoriaApi { id_subcategoria: number; id_categoria: number; nome: string }
 interface OrcamentoApi { id_orcamento: number; id_categoria: number; categoria_nome: string; valor_limite: Num; valor_gasto?: Num | null; mes: number; ano: number }
-interface MetaApi { id_meta: number; titulo: string; valor_meta: Num; valor_atual?: Num | null; data_objetivo?: string; descricao?: string }
+interface MetaApi { id_meta: number; titulo: string; valor_meta: Num; valor_atual?: Num | null; data_objetivo?: string; descricao?: string; categoria_nome?: string | null }
 interface DashboardApi {
   saldoTotal?: Num;
   resumoMes?: { entradas?: Num; saidas?: Num };
@@ -272,6 +272,7 @@ export const goalsApi = {
       valor_atual: typeof d.valor_atual === 'string' ? parseFloat(d.valor_atual) : (d.valor_atual || 0),
       data_alvo: d.data_objetivo,
       descricao: d.descricao,
+      categoria: d.categoria_nome ?? undefined,
     }));
   },
   // A meta com o histórico de criação e depósitos (data e hora)
@@ -296,6 +297,7 @@ export const goalsApi = {
         data_objetivo: data.data_alvo,
         descricao: data.descricao,
         tirarDoSaldo: !!data.tirarDoSaldo,
+        id_categoria: data.id_categoria || undefined,
         origem,
       })
     });
@@ -335,6 +337,7 @@ export interface MetaDetalhe {
   valor_atual: number;
   data_objetivo?: string | null;
   criado_em: string | null;
+  categoria_nome?: string | null;
   historico: MovimentoMeta[];
 }
 
@@ -470,6 +473,7 @@ export interface Goal {
   data_alvo?: string;
   descricao?: string;
   icone?: string;
+  categoria?: string;
 }
 
 export interface CreateGoal {
@@ -480,6 +484,7 @@ export interface CreateGoal {
   descricao?: string;
   // true = o "já tenho guardado" sai do saldo (vira uma saída "Investido na meta")
   tirarDoSaldo?: boolean;
+  id_categoria?: string;
 }
 
 export interface DashboardSummary {
