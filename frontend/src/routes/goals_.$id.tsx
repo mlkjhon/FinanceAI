@@ -139,6 +139,7 @@ function MetaConteudo({ id }: { id: string }) {
   }
 
   const c = calcular(meta);
+  const topoEixo = Math.max(meta.valor_meta, ...c.serie.map((p) => p.guardado), 1);
   const atrasada = !c.concluida && c.diasAtePrazo != null && c.diasAtePrazo < 0;
   const status = c.concluida ? 'Concluída' : atrasada ? 'Prazo vencido' : 'Em andamento';
 
@@ -257,7 +258,9 @@ function MetaConteudo({ id }: { id: string }) {
                       tick={{ fontSize: 11, fill: '#6b7280' }}
                       tickFormatter={(v) => formatCompactCurrency(v)}
                       width={64}
-                      domain={[0, (max: number) => Math.max(max, meta.valor_meta)]}
+                      // marcas em intervalos iguais até o valor da meta (o automático do recharts sobrepunha os rótulos)
+                      domain={[0, topoEixo]}
+                      ticks={[0, 0.25, 0.5, 0.75, 1].map((f) => f * topoEixo)}
                     />
                     <Tooltip content={<ChartTooltip names={{ guardado: 'Guardado' }} />} cursor={{ stroke: cor, strokeWidth: 1 }} />
                     <Area
@@ -360,7 +363,7 @@ function MetaConteudo({ id }: { id: string }) {
                 <h3 className="metric-label first-letter:uppercase">{mes}</h3>
                 <ol className="finance-card divide-y divide-[var(--color-line)]">
                   {itens.map((m) => (
-                    <li key={m.id} className="flex items-center gap-4 px-5 py-4">
+                    <li key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
                       <span
                         className={cn(
                           'grid size-9 shrink-0 place-items-center rounded-full',
@@ -397,12 +400,14 @@ function MetaConteudo({ id }: { id: string }) {
                         )}
                       </div>
                       {m.tipo === 'deposito' && m.id_transacao != null && (
-                        <HoldToDelete
-                          compact
-                          label="Segure para apagar"
-                          pending={removerDep.isPending && removerDep.variables === m.id_transacao}
-                          onConfirm={() => removerDep.mutate(m.id_transacao!)}
-                        />
+                        <div className="flex w-full justify-end sm:w-auto">
+                          <HoldToDelete
+                            compact
+                            label="Segure para apagar"
+                            pending={removerDep.isPending && removerDep.variables === m.id_transacao}
+                            onConfirm={() => removerDep.mutate(m.id_transacao!)}
+                          />
+                        </div>
                       )}
                     </li>
                   ))}

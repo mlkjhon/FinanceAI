@@ -257,7 +257,7 @@ function GoalsContent() {
               {/* Título e ícone */}
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
-                  <Link to="/goals/$id" params={{ id: g.id }} className="font-semibold text-gray-900 hover:text-[var(--color-accent)] transition-colors duration-150">
+                  <Link to="/goals/$id" params={{ id: g.id }} className="block font-semibold text-gray-900 hover:text-[var(--color-accent)] transition-colors duration-150 [overflow-wrap:anywhere]">
                     {g.nome}
                   </Link>
                   {g.categoria && (

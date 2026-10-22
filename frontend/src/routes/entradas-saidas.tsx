@@ -48,7 +48,7 @@ function FlowChart({ meses, ativo, onAtivo }: { meses: Mes[]; ativo: number; onA
               : 'Sem entradas no mês'}
           </p>
         </div>
-        <dl className="flex gap-6 text-right">
+        <dl className="flex flex-wrap gap-x-6 gap-y-2 sm:text-right min-w-0">
           <div>
             <dt className="text-xs text-[var(--color-ink-muted)]">Entrou</dt>
             <dd className="text-sm font-semibold text-gain" data-num>{formatCurrency(m.entradas)}</dd>

@@ -377,14 +377,14 @@ function InvestimentoDetailsPage() {
               </p>
             ) : (
               <>
-                <dl className="grid grid-cols-2 gap-4 rounded-xl bg-gain-soft px-4 py-3 mb-4">
-                  <div>
+                <dl className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3 rounded-xl bg-gain-soft px-4 py-3 mb-4">
+                  <div className="min-w-0">
                     <dt className="text-xs text-[var(--color-ink-muted)]">Total rendido</dt>
-                    <dd className="font-brand font-bold text-lg text-gain" data-num>+{formatCurrency(totalRendido)}</dd>
+                    <dd className="font-brand font-bold text-lg text-gain [overflow-wrap:anywhere]" data-num>+{formatCurrency(totalRendido)}</dd>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <dt className="text-xs text-[var(--color-ink-muted)]">Média por dia</dt>
-                    <dd className="font-brand font-bold text-lg text-[var(--color-ink)]" data-num>+{formatCurrency(mediaPorDia)}</dd>
+                    <dd className="font-brand font-bold text-lg text-[var(--color-ink)] [overflow-wrap:anywhere]" data-num>+{formatCurrency(mediaPorDia)}</dd>
                   </div>
                 </dl>
                 <ol className="divide-y divide-[var(--color-line)]">

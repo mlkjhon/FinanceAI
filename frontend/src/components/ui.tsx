@@ -91,7 +91,7 @@ export function FinanceCard({ children, className, glass, gradient, onClick, ind
       data-clickable={onClick ? '' : undefined}
       style={index !== undefined ? ({ '--i': index } as React.CSSProperties) : undefined}
       className={cn(
-        'finance-card p-5',
+        'finance-card p-5 min-w-0',
         index !== undefined && 'rise',
         glass && 'glass',
         gradient && 'gradient-hero text-white border-0',

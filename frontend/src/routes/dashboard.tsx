@@ -203,7 +203,7 @@ function DashboardContent() {
       {/* Linha 1: saldo em destaque (5) + evolução (7) */}
       <div className="grid lg:grid-cols-12 gap-6">
         <section
-          className="rise lg:col-span-5 rounded-[var(--radius-card)] bg-[var(--color-accent)] text-white p-6 sm:p-7 flex flex-col justify-between gap-8 on-dark"
+          className="rise min-w-0 lg:col-span-5 rounded-[var(--radius-card)] bg-[var(--color-accent)] text-white p-6 sm:p-7 flex flex-col justify-between gap-8 on-dark"
           style={{ '--i': 1 } as React.CSSProperties}
           aria-label="Resumo do mês"
         >
@@ -216,17 +216,17 @@ function DashboardContent() {
             )}
           </div>
 
-          <dl className="grid grid-cols-3 divide-x divide-white/20 border-t border-white/20 pt-5">
+          <dl className="grid grid-cols-1 sm:grid-cols-3 max-sm:divide-y sm:divide-x divide-white/20 border-t border-white/20 sm:pt-5">
             {/* min-w-0 + fonte menor em milhões/bilhões: o valor nunca invade a coluna vizinha */}
-            <div className="pr-3 min-w-0">
+            <div className="min-w-0 max-sm:flex max-sm:items-baseline max-sm:justify-between max-sm:gap-3 max-sm:py-2.5 sm:pr-3">
               <dt className="text-xs text-white/70">Entrou</dt>
               <dd data-num title={formatCurrency(receitas)} className={`mt-1 font-semibold [overflow-wrap:anywhere] ${tamanhoValorPequeno(receitas)}`}>{formatCurrency(receitas)}</dd>
             </div>
-            <div className="px-3 min-w-0">
+            <div className="min-w-0 max-sm:flex max-sm:items-baseline max-sm:justify-between max-sm:gap-3 max-sm:py-2.5 sm:px-3">
               <dt className="text-xs text-white/70">Saiu</dt>
               <dd data-num title={formatCurrency(despesas)} className={`mt-1 font-semibold [overflow-wrap:anywhere] ${tamanhoValorPequeno(despesas)}`}>{formatCurrency(despesas)}</dd>
             </div>
-            <div className="pl-3 min-w-0">
+            <div className="min-w-0 max-sm:flex max-sm:items-baseline max-sm:justify-between max-sm:gap-3 max-sm:py-2.5 sm:pl-3">
               <dt className="text-xs text-white/70">Guardou</dt>
               <dd data-num className="mt-1 text-sm sm:text-base font-semibold">
                 {receitas > 0 ? `${taxaEconomia.toFixed(0)}%` : formatCurrency(economia)}

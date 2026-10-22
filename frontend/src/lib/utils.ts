@@ -54,6 +54,14 @@ export function tamanhoValorDestaque(valor: number) {
   return 'text-4xl sm:text-5xl';
 }
 
+// Faixas de métricas (Entrou/Saiu/Resultado, Guardado/Falta): fonte menor em bilhões
+export function tamanhoValorMedio(valor: number) {
+  const abs = Math.abs(valor || 0);
+  if (abs >= 1e9) return 'text-base sm:text-lg lg:text-xl';
+  if (abs >= 1e6) return 'text-lg sm:text-xl';
+  return 'text-lg sm:text-2xl';
+}
+
 // Valores pequenos lado a lado (Entrou/Saiu): a fonte diminui com milhões/bilhões
 export function tamanhoValorPequeno(valor: number) {
   const abs = Math.abs(valor || 0);

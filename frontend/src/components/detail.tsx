@@ -3,7 +3,7 @@ import type { TooltipProps } from '../lib/chart';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft } from './icons';
 import { AnimatedCounter } from './ui';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn, formatCurrency, tamanhoValorMedio } from '../lib/utils';
 
 /*
  * Peças compartilhadas pelas telas de detalhe do dashboard
@@ -48,12 +48,15 @@ export function Strong({ children, tone = 'ink' }: { children: React.ReactNode; 
 export function MetricStrip({ items }: {
   items: { label: string; value: number; currency?: boolean; suffix?: string; tone?: 'ink' | 'gain' | 'loss'; signed?: boolean }[];
 }) {
+  // Com valores em bilhões, duas colunas não cabem no celular: vira uma métrica por linha
+  const grande = items.some((it) => it.currency && Math.abs(it.value) >= 1e9);
+  const maior = Math.max(...items.filter((it) => it.currency).map((it) => Math.abs(it.value)), 0);
   return (
-    <dl className={cn("grid grid-cols-2 gap-y-4 border-y border-[var(--color-line)] py-4", items.length === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
+    <dl className={cn("grid gap-y-4 border-y border-[var(--color-line)] py-4", grande ? "grid-cols-1" : "grid-cols-2", items.length === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
       {items.map((it, i) => (
-        <div key={it.label} className={cn("pr-4 sm:px-4 sm:first:pl-0 sm:border-l sm:first:border-l-0 border-[var(--color-line)]", i % 2 === 1 && "max-sm:pl-4 max-sm:border-l")}>
+        <div key={it.label} className={cn("min-w-0 pr-4 sm:px-4 sm:first:pl-0 sm:border-l sm:first:border-l-0 border-[var(--color-line)]", !grande && i % 2 === 1 && "max-sm:pl-4 max-sm:border-l")}>
           <dt className="metric-label truncate" title={it.label}>{it.label}</dt>
-          <dd className={cn('mt-1 font-brand font-bold tracking-tight text-lg sm:text-2xl', it.tone === 'gain' ? 'text-gain' : it.tone === 'loss' ? 'text-loss' : 'text-[var(--color-ink)]')} data-num>
+          <dd className={cn('mt-1 font-brand font-bold tracking-tight [overflow-wrap:anywhere]', tamanhoValorMedio(maior), it.tone === 'gain' ? 'text-gain' : it.tone === 'loss' ? 'text-loss' : 'text-[var(--color-ink)]')} data-num>
             {it.signed && it.value > 0 ? '+' : it.signed && it.value < 0 ? '-' : ''}
             {it.currency
               ? <AnimatedCounter value={it.signed ? Math.abs(it.value) : it.value} isCurrency className="text-inherit" />

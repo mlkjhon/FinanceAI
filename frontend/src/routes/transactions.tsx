@@ -11,7 +11,7 @@ import { transactionsApi, categoriesApi, subcategoriasApi, type Transaction, typ
 import { BotaoNovaCategoria, PainelNovaCategoria } from '../components/nova-categoria';
 import { Navbar } from '../components/Navbar';
 import { AnimatedCounter } from '../components/ui';
-import { formatCurrency, cn, descricaoVisivel, ehTransferencia } from '../lib/utils';
+import { formatCurrency, cn, descricaoVisivel, ehTransferencia, tamanhoValorMedio } from '../lib/utils';
 import { Segmented } from '../components/segmented';
 import { AmountField } from '../components/sheet';
 import { deNumero, paraNumero } from '../lib/dinheiro';
@@ -321,23 +321,24 @@ function MonthSummary({ all }: { all: Transaction[] }) {
   const entrou = doMes.filter((t) => t.tipo === 'receita' && !ehTransferencia(t.descricao)).reduce((s, t) => s + t.valor, 0);
   const saiu = doMes.filter((t) => t.tipo === 'despesa' && !ehTransferencia(t.descricao)).reduce((s, t) => s + t.valor, 0);
   const resultado = entrou - saiu;
+  const maiorValor = Math.max(entrou, saiu, Math.abs(resultado));
   const nomeMes = new Date().toLocaleDateString('pt-BR', { month: 'long' });
 
   return (
     <div className="border-y border-[var(--color-line)] py-4">
     <p className="text-xs text-[var(--color-ink-muted)] mb-3 first-letter:uppercase">{nomeMes} até agora · sem contar metas e investimentos</p>
-    <dl className="grid grid-cols-3 divide-x divide-[var(--color-line)]">
-      <div className="pr-4">
+    <dl className="grid grid-cols-2 sm:grid-cols-3 gap-y-3">
+      <div className="min-w-0 pr-4">
         <dt className="metric-label">Entrou</dt>
-        <dd><AnimatedCounter value={entrou} isCurrency className="mt-1 block text-lg sm:text-2xl text-gain" /></dd>
+        <dd className="[overflow-wrap:anywhere]"><AnimatedCounter value={entrou} isCurrency className={cn('mt-1 block text-gain', tamanhoValorMedio(maiorValor))} /></dd>
       </div>
-      <div className="px-4">
+      <div className="min-w-0 pl-4 border-l border-[var(--color-line)] sm:px-4">
         <dt className="metric-label">Saiu</dt>
-        <dd><AnimatedCounter value={saiu} isCurrency className="mt-1 block text-lg sm:text-2xl text-[var(--color-ink)]" /></dd>
+        <dd className="[overflow-wrap:anywhere]"><AnimatedCounter value={saiu} isCurrency className={cn('mt-1 block text-[var(--color-ink)]', tamanhoValorMedio(maiorValor))} /></dd>
       </div>
-      <div className="pl-4">
+      <div className="min-w-0 col-span-2 sm:col-span-1 max-sm:pt-3 max-sm:border-t sm:pl-4 sm:border-l border-[var(--color-line)]">
         <dt className="metric-label">Resultado</dt>
-        <dd className={cn('mt-1 font-brand font-bold tracking-tight text-lg sm:text-2xl', resultado < 0 ? 'text-loss' : 'text-[var(--color-ink)]')} data-num>
+        <dd className={cn('mt-1 font-brand font-bold tracking-tight [overflow-wrap:anywhere]', tamanhoValorMedio(maiorValor), resultado < 0 ? 'text-loss' : 'text-[var(--color-ink)]')} data-num>
           {resultado < 0 ? '-' : resultado > 0 ? '+' : ''}{formatCurrency(Math.abs(resultado))}
         </dd>
       </div>
