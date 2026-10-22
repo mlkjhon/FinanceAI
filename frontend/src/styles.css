@@ -964,3 +964,16 @@ html[data-reduzir-animacoes] *::after {
   transition-delay: 0ms !important;
   scroll-behavior: auto !important;
 }
+
+/*
+ * iPhone dá zoom ao focar um campo com letra menor que 16px (e não volta sozinho).
+ * A regra da base perdia para classes como text-sm; esta fica fora das camadas,
+ * então vence. Só em telas de toque: no computador os campos seguem do tamanho do design.
+ */
+@media (pointer: coarse) {
+  input:not(.amount-input):not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
