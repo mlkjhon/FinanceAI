@@ -15,6 +15,7 @@ import { salvarPreferencia, usePreferencia } from '../lib/preferencias';
 import { campoClasse } from '../lib/classes';
 import { cn, formatDate } from '../lib/utils';
 import { Avatar } from '../components/avatar';
+import { FotoAmpliada } from '../components/foto-ampliada';
 import { ConfirmDialog } from '../components/confirm-dialog';
 import { prepararFoto } from '../lib/imagem';
 
@@ -109,7 +110,9 @@ function FotoPerfil() {
   return (
     <div className="flex flex-wrap items-center gap-5 pb-6 mb-6 border-b border-[var(--color-line)]">
       <div className="relative">
-        <Avatar nome={user?.nome} foto={user?.foto} tamanho="xl" />
+        <FotoAmpliada foto={user?.foto} nome={user?.nome}>
+          <Avatar nome={user?.nome} foto={user?.foto} tamanho="xl" />
+        </FotoAmpliada>
         {salvar.isPending && (
           <span className="absolute inset-0 grid place-items-center rounded-full bg-black/40 text-white">
             <Loader2 size={20} className="animate-spin" />
@@ -584,7 +587,9 @@ function ProfileContent() {
   return (
     <div className="stagger pb-16">
       <div className="flex flex-wrap items-center gap-4 mb-8">
-        <Avatar nome={user?.nome} foto={user?.foto} tamanho="lg" />
+        <FotoAmpliada foto={user?.foto} nome={user?.nome}>
+          <Avatar nome={user?.nome} foto={user?.foto} tamanho="lg" />
+        </FotoAmpliada>
         <div className="min-w-0 flex-1">
           <h1 className="font-brand text-2xl font-bold tracking-tight text-[var(--color-ink)] truncate">{user?.nome}</h1>
           <p className="text-sm text-[var(--color-ink-muted)] flex items-center gap-1.5 mt-0.5 truncate">

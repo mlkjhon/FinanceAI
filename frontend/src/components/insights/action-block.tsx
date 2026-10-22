@@ -65,7 +65,7 @@ function LinkDestino({ d, alvoId, nome, destino }: { d: Acao; alvoId: string | n
       <span className="arrow-nudge"><Icon name="arrow-right" size={14} /></span>
     </>
   );
-  const classe = 'group shrink-0 inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)]';
+  const classe = 'group shrink-0 self-start sm:self-auto inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)]';
   if (alvoId && (d.acao === 'criar_meta' || d.acao === 'depositar_meta')) {
     return <Link to="/goals/$id" params={{ id: alvoId }} className={classe}>{conteudo('Ver meta')}</Link>;
   }
@@ -190,16 +190,17 @@ export function ActionBlock({ b }: { b: BlocoDe<'action'> }) {
           {estado === 'feito' ? (
             <motion.div
               key="feito"
-              className="[grid-area:1/1] flex items-center justify-between gap-3"
+              // Recibo da ação: no celular, status e data em cima e o link embaixo (nada encostado)
+              className="[grid-area:1/1] min-w-0 flex flex-col gap-3 rounded-xl bg-gain-soft px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
               initial={{ opacity: 0, filter: 'blur(4px)' }}
               animate={{ opacity: 1, filter: 'blur(0px)', transition: { duration: 0.25, ease: ease.out } }}
             >
-              <span className="min-w-0">
-                <span className="pop-in inline-flex items-center gap-2 text-sm font-semibold text-gain" style={{ animationDelay: '0ms' }}>
-                  <Icon name="check" size={16} /> {textoFeito(d)}
+              <span className="min-w-0 space-y-1">
+                <span className="pop-in flex items-center gap-2 text-sm font-semibold leading-5 text-gain" style={{ animationDelay: '0ms' }}>
+                  <Icon name="check" size={16} className="shrink-0" /> {textoFeito(d)}
                 </span>
                 {feito && (
-                  <span className="block text-xs text-[var(--color-ink-muted)]" data-num>
+                  <span className="block pl-6 text-xs leading-4 text-[var(--color-ink-muted)]" data-num>
                     {quando(feito.em)}{feito.valor ? ` · ${fmt(feito.valor)}` : ''}
                   </span>
                 )}
