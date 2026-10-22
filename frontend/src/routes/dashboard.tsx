@@ -288,7 +288,7 @@ function DashboardContent() {
         <FinanceCard className="lg:col-span-7 flex flex-col" index={2}>
           <SectionHeader title="Evolução do saldo" to="/evolucao-saldo" />
           <div className="h-52 lg:h-auto lg:flex-1 lg:min-h-52">
-            {isLoading ? <SkeletonCard lines={1} className="h-full border-0" /> : <BalanceChart data={summary?.evolucao_saldo || []} />}
+            {isLoading ? <SkeletonCard lines={1} className="h-full border-0" /> : <BalanceChart data={(summary?.evolucao_saldo || []).map((m) => ({ mes: m.mes, saldo: m.saldo_fim ?? m.saldo }))} />}
           </div>
         </FinanceCard>
       </div>

@@ -33,8 +33,8 @@ function EvolucaoContent() {
   if (!meses.length) return <EmptyDetail text="Ainda não há meses com movimentações para mostrar a evolução." />;
 
   /*
-   * A API manda o resultado de cada mês (entradas - saídas). O saldo no fim de
-   * cada mês é reconstruído de trás para frente a partir do saldo de hoje.
+   * A API manda o resultado de cada mês e o saldo no fim dele (saldo_fim).
+   * Sem saldo_fim (API antiga), reconstrói de trás para frente a partir do saldo de hoje.
    */
   const saldoHoje = summary?.saldo_agora ?? summary?.saldo_total ?? 0;
   // tudo o que mexeu na conta no mês (inclusive metas e investimentos), para o saldo bater
@@ -42,8 +42,8 @@ function EvolucaoContent() {
   const fimDoMes: number[] = [];
   let acc = saldoHoje;
   for (let i = meses.length - 1; i >= 0; i--) {
-    fimDoMes[i] = acc;
-    acc -= resultados[i];
+    fimDoMes[i] = meses[i].saldo_fim ?? acc;
+    acc = fimDoMes[i] - resultados[i];
   }
   const saldoInicial = acc;
   const variacao = saldoHoje - saldoInicial;

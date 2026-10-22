@@ -31,7 +31,7 @@ interface DashboardApi {
   guardadoMetas?: Num;
   investido?: Num;
   resumoMes?: { entradas?: Num; saidas?: Num };
-  evolucaoMensal?: { mes: string; saldo: Num; entradas?: Num; saidas?: Num }[];
+  evolucaoMensal?: { mes: string; saldo: Num; saldo_fim?: Num; entradas?: Num; saidas?: Num }[];
   resumoCategorias?: { nome: string; total: Num }[];
   ultimasTransacoes?: { descricao: string; valor: Num; tipo: string; categoria_nome?: string; data_registro: string }[];
 }
@@ -89,7 +89,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const text = await res.text();
     try { return JSON.parse(text); } catch { return text as unknown as T; }
   }
-  
+
   return res.json();
 }
 
@@ -371,6 +371,7 @@ export const dashboardApi = {
       evolucao_saldo: data.evolucaoMensal?.map((e) => ({
         mes: e.mes,
         saldo: typeof e.saldo === 'string' ? parseFloat(e.saldo) : e.saldo,
+        saldo_fim: e.saldo_fim === undefined || e.saldo_fim === null ? undefined : num(e.saldo_fim),
         entradas: typeof e.entradas === 'string' ? parseFloat(e.entradas) : (e.entradas || 0),
         saidas: typeof e.saidas === 'string' ? parseFloat(e.saidas) : (e.saidas || 0),
       })) || [],
@@ -509,7 +510,8 @@ export interface DashboardSummary {
   receitas_mes: number;
   despesas_mes: number;
   economia_mes: number;
-  evolucao_saldo?: { mes: string; saldo: number; entradas?: number; saidas?: number }[];
+  // saldo = resultado do mês; saldo_fim = quanto havia na conta no fim do mês
+  evolucao_saldo?: { mes: string; saldo: number; saldo_fim?: number; entradas?: number; saidas?: number }[];
   gastos_por_categoria?: { categoria: string; valor: number; cor?: string }[];
   ultimas_transacoes?: Transaction[];
 }
