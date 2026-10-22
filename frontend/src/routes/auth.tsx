@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router';
 import { getToken } from '../lib/api';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Counter } from '../components/motion/counter';
+import { AuthShowcase } from '../components/auth-showcase';
 import { spring, ease } from '../lib/motion-tokens';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -104,47 +104,8 @@ function AuthPage() {
 
   return (
     <div className="min-h-[100dvh] flex">
-      {/* Left panel */}
-      <div className="hidden lg:flex w-1/2 gradient-hero flex-col items-center justify-center p-12 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute left-1/2 top-1/2 h-[75%] aspect-square -translate-x-1/2 -translate-y-1/2">
-            {[100, 66, 33].map((size) => (
-              <span
-                key={size}
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/80"
-                style={{ width: size + '%', height: size + '%' }}
-              />
-            ))}
-            {[0, 60, 120].map((angle) => (
-              <span
-                key={angle}
-                className="absolute left-0 top-1/2 h-px w-full bg-white/60"
-                style={{ transform: 'rotate(' + angle + 'deg)' }}
-              />
-            ))}
-          </div>
-        </div>
-        <div className="relative z-10 text-center text-white">
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              <TrendingUp size={28} className="text-white" />
-            </div>
-            <span className="font-brand text-3xl font-bold">FinanceAI</span>
-          </div>
-          <h2 className="font-brand text-2xl font-bold mb-4">Inteligência que organiza sua vida financeira</h2>
-          <p className="text-white/70 text-sm max-w-xs">
-            Tome controle das suas finanças com o poder da IA. Dashboard, Metas, Orçamentos e Insights em um único lugar.
-          </p>
-          <div className="mt-10 grid grid-cols-3 gap-4 text-center">
-            {[['16', 'Indexadores'], ['13', 'Tipos de investimento'], ['6', 'Módulos']].map(([v, l]) => (
-              <div key={l} className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
-                <p className="font-brand font-bold text-xl"><Counter value={Number(v)} /></p>
-                <p className="text-white/60 text-xs mt-1">{l}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      {/* Painel verde: o que o app faz + taxas do dia (dados reais) */}
+      <AuthShowcase />
 
       {/* Right panel */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[var(--color-finance-bg-light)] relative">
