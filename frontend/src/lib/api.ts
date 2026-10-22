@@ -27,6 +27,9 @@ interface OrcamentoApi { id_orcamento: number; id_categoria: number; categoria_n
 interface MetaApi { id_meta: number; titulo: string; valor_meta: Num; valor_atual?: Num | null; data_objetivo?: string; descricao?: string; categoria_nome?: string | null }
 interface DashboardApi {
   saldoTotal?: Num;
+  saldoAgora?: Num;
+  guardadoMetas?: Num;
+  investido?: Num;
   resumoMes?: { entradas?: Num; saidas?: Num };
   evolucaoMensal?: { mes: string; saldo: Num; entradas?: Num; saidas?: Num }[];
   resumoCategorias?: { nome: string; total: Num }[];
@@ -356,8 +359,12 @@ export const dashboardApi = {
     const receitas = typeof data.resumoMes?.entradas === 'string' ? parseFloat(data.resumoMes?.entradas) : (data.resumoMes?.entradas || 0);
     const despesas = typeof data.resumoMes?.saidas === 'string' ? parseFloat(data.resumoMes?.saidas) : (data.resumoMes?.saidas || 0);
     const saldoTotal = typeof data.saldoTotal === 'string' ? parseFloat(data.saldoTotal) : (data.saldoTotal || 0);
+    const num = (v?: Num) => (typeof v === 'string' ? parseFloat(v) : v || 0);
     return {
       saldo_total: saldoTotal,
+      saldo_agora: data.saldoAgora === undefined ? saldoTotal : num(data.saldoAgora),
+      guardado_metas: num(data.guardadoMetas),
+      investido: num(data.investido),
       receitas_mes: receitas,
       despesas_mes: despesas,
       economia_mes: Math.max(receitas - despesas, 0),
@@ -493,7 +500,12 @@ export interface CreateGoal {
 }
 
 export interface DashboardSummary {
+  // tudo, inclusive lançamentos com data futura
   saldo_total: number;
+  // o que você tem hoje (sem os lançamentos futuros)
+  saldo_agora: number;
+  guardado_metas: number;
+  investido: number;
   receitas_mes: number;
   despesas_mes: number;
   economia_mes: number;

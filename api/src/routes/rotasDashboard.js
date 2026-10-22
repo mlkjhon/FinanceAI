@@ -29,10 +29,12 @@ router.get('/dashboard', autenticar, async (req, res) => {
             params.push(id_conexao);
         }
 
-        // Saldo TOTAL (todos os tempos) para o card principal
+        // Saldo do card principal: "agora" ignora lançamentos com data no futuro;
+        // o total (com eles) serve para mostrar quanto ainda vai entrar/sair
         const selecaoSaldoTotal = `
         SELECT
-            COALESCE(SUM(CASE WHEN t.tipo = 'E' THEN t.valor ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN t.tipo = 'S' THEN t.valor ELSE 0 END), 0) AS saldo_total
+            COALESCE(SUM(CASE WHEN t.tipo = 'E' THEN t.valor ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN t.tipo = 'S' THEN t.valor ELSE 0 END), 0) AS saldo_total,
+            COALESCE(SUM(CASE WHEN t.data_registro > NOW() THEN 0 WHEN t.tipo = 'E' THEN t.valor ELSE -t.valor END), 0) AS saldo_agora
         FROM transacoes t
         WHERE t.id_usuario = $1 ${filtroConexao}
         `;
@@ -99,6 +101,18 @@ router.get('/dashboard', autenticar, async (req, res) => {
         `;
 
         const resSaldoTotal = await BD.query(selecaoSaldoTotal, params);
+        // Dinheiro que é seu mas está fora do saldo: metas e investimentos
+        let guardadoMetas = 0, investido = 0;
+        try {
+            const resFora = await BD.query(`
+                SELECT
+                    (SELECT COALESCE(SUM(valor_atual), 0) FROM metas_financeiras WHERE id_usuario = $1)::float AS metas,
+                    (SELECT COALESCE(SUM(CASE WHEN ti.tipo IN ('aporte','rendimento') THEN ti.valor ELSE -ti.valor END), 0)
+                       FROM transacoes_investimentos ti JOIN investimentos i ON i.id_investimento = ti.id_investimento
+                      WHERE i.id_usuario = $1)::float AS investido`, [id_usuario]);
+            guardadoMetas = resFora.rows[0]?.metas || 0;
+            investido = resFora.rows[0]?.investido || 0;
+        } catch (_) { /* sem metas/investimentos ainda: fica 0 */ }
         const resMaioresGastos = await BD.query(selecaoMaioresGastos, params);
         const resResumoMes = await BD.query(selecaoResumoMes, params);
         const resEvolucaoMensal = await BD.query(selecaoEvolucaoMensal, params);
@@ -117,6 +131,9 @@ router.get('/dashboard', autenticar, async (req, res) => {
             maioresGastos: resMaioresGastos.rows,
             resumoMes: resResumoMes.rows[0] || {entradas:0, saidas:0, saldo:0},
             saldoTotal: resSaldoTotal.rows[0]?.saldo_total || 0,
+            saldoAgora: resSaldoTotal.rows[0]?.saldo_agora || 0,
+            guardadoMetas,
+            investido,
             evolucaoMensal: resEvolucaoMensal.rows,
             ultimasTransacoes: resUltimasTransacoes.rows
         }

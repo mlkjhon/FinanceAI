@@ -186,6 +186,12 @@ function DashboardContent() {
   const despesas = summary?.despesas_mes ?? 0;
   const economia = summary?.economia_mes ?? 0;
   const taxaEconomia = receitas > 0 ? (economia / receitas) * 100 : 0;
+  const saldoAgora = summary?.saldo_agora ?? 0;
+  const guardadoMetas = summary?.guardado_metas ?? 0;
+  const investido = summary?.investido ?? 0;
+  // lançamentos com data futura: ainda não estão no saldo de hoje
+  const agendado = (summary?.saldo_total ?? 0) - saldoAgora;
+  const foraDoSaldo = guardadoMetas + investido;
 
   return (
     <div className="space-y-6 pb-16">
@@ -205,17 +211,60 @@ function DashboardContent() {
         <section
           className="rise min-w-0 lg:col-span-5 rounded-[var(--radius-card)] bg-[var(--color-accent)] text-white p-6 sm:p-7 flex flex-col justify-between gap-8 on-dark"
           style={{ '--i': 1 } as React.CSSProperties}
-          aria-label="Resumo do mês"
+          aria-label="Seu saldo agora e resumo do mês"
         >
-          <div>
-            <p className="text-sm text-white/75">Saldo total</p>
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-sm text-white/75">
+              <span aria-hidden className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:hidden" style={{ background: "#fff" }} />
+                <span className="relative inline-flex size-2 rounded-full" style={{ background: "#fff" }} />
+              </span>
+              Seu saldo agora
+            </p>
             {isLoading ? (
               <span className="media-frame block h-10 w-48 mt-3 rounded-lg opacity-30" data-loading="" />
             ) : (
-              <AnimatedCounter value={summary?.saldo_total ?? 0} isCurrency className={`mt-2 block ${tamanhoValorDestaque(summary?.saldo_total ?? 0)} text-white`} />
+              <>
+                <AnimatedCounter value={saldoAgora} isCurrency className={`mt-2 block ${tamanhoValorDestaque(saldoAgora)} text-white`} />
+                <p className="mt-1 text-xs text-white/65">O que está disponível na sua conta hoje</p>
+                {(foraDoSaldo > 0 || Math.abs(agendado) >= 0.01) && (
+                  <ul className="mt-4 flex flex-wrap gap-2 text-xs">
+                    {guardadoMetas > 0 && (
+                      <li>
+                        <Link to="/goals" className="pressable inline-flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1.5 ring-1 ring-white/15 hover:bg-white/20">
+                          <span className="text-white/70">Em metas</span>
+                          <span data-num className="font-semibold">{formatCurrency(guardadoMetas)}</span>
+                        </Link>
+                      </li>
+                    )}
+                    {investido > 0 && (
+                      <li>
+                        <Link to="/investimentos" className="pressable inline-flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1.5 ring-1 ring-white/15 hover:bg-white/20">
+                          <span className="text-white/70">Investido</span>
+                          <span data-num className="font-semibold">{formatCurrency(investido)}</span>
+                        </Link>
+                      </li>
+                    )}
+                    {foraDoSaldo > 0 && (
+                      <li className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5">
+                        <span className="text-white/80">Tudo somado</span>
+                        <span data-num className="font-semibold">{formatCurrency(saldoAgora + foraDoSaldo)}</span>
+                      </li>
+                    )}
+                    {Math.abs(agendado) >= 0.01 && (
+                      <li className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 ring-1 ring-white/25">
+                        <span className="text-white/70">{agendado > 0 ? 'Ainda vai entrar' : 'Ainda vai sair'}</span>
+                        <span data-num className="font-semibold">{formatCurrency(Math.abs(agendado))}</span>
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </>
             )}
           </div>
 
+          <div className="min-w-0">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-white/60">Este mês</p>
           <dl className="grid grid-cols-1 sm:grid-cols-3 max-sm:divide-y sm:divide-x divide-white/20 border-t border-white/20 sm:pt-5">
             {/* min-w-0 + fonte menor em milhões/bilhões: o valor nunca invade a coluna vizinha */}
             <div className="min-w-0 max-sm:flex max-sm:items-baseline max-sm:justify-between max-sm:gap-3 max-sm:py-2.5 sm:pr-3">
@@ -233,6 +282,7 @@ function DashboardContent() {
               </dd>
             </div>
           </dl>
+          </div>
         </section>
 
         <FinanceCard className="lg:col-span-7 flex flex-col" index={2}>
