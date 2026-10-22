@@ -5,14 +5,14 @@ import React, { useState } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { AnimatedCounter, FinanceCard, SkeletonCard } from '../../components/ui';
 import { investimentosApi, type CreateInvestment } from '../../lib/api';
-import { MoneyInput } from '../../components/money-input';
-import { paraNumero } from '../../lib/dinheiro';
+import { deNumero, paraNumero } from '../../lib/dinheiro';
 import { TaxaPreview } from '../../components/investimentos/taxa-preview';
 import { INDEXADORES, nomeIndexador, rotuloTaxa } from '../../lib/investimentos';
 import { formatCurrency, formatCompactCurrency, formatDate, descreverTaxa } from '../../lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
-import { modal, backdrop } from '../../lib/motion-tokens';
-import { ArrowLeft, TrendingUp, TrendingDown, PiggyBank, X, History, Trash2, Edit2 } from '../../components/icons';
+import { ArrowLeft, TrendingUp, TrendingDown, PiggyBank, History, Trash2, Edit2 } from '../../components/icons';
+import { Sheet, AmountField, Campo } from '../../components/sheet';
+import { ConfirmDialog } from '../../components/confirm-dialog';
+import { campoClasse } from '../../lib/classes';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer
@@ -44,6 +44,10 @@ function InvestimentoDetailsPage() {
   const [tipoTransacao, setTipoTransacao] = useState<'aporte' | 'resgate'>('aporte');
   const [valor, setValor] = useState('');
 
+  // Confirmações (no visual do app, não o aviso do navegador)
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [movParaApagar, setMovParaApagar] = useState<null | { id: string | number; tipo: string; valor: number }>(null);
+
   // Edit State
   const [modalEditAberto, setModalEditAberto] = useState(false);
   const [editForm, setEditForm] = useState({ nome: '', tipo: '', taxa_rendimento: '', indexador: 'PREFIXADO' });
@@ -68,6 +72,7 @@ function InvestimentoDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investimentos', id] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }); // Aporte/Resgate mexe na conta principal
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
       setModalAberto(false);
       setValor('');
     }
@@ -78,6 +83,8 @@ function InvestimentoDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investimentos', id] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      setMovParaApagar(null);
     }
   });
 
@@ -99,10 +106,12 @@ function InvestimentoDetailsPage() {
     }
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const numero = paraNumero(valor);
-    if (!numero || numero <= 0) return;
+  const valorNumero = paraNumero(valor);
+  // resgate não pode passar do que tem no investimento
+  const resgatePassa = tipoTransacao === 'resgate' && !!valorNumero && valorNumero > saldoAtual + 0.001;
+  const confirmarTransacao = () => {
+    const numero = valorNumero;
+    if (!numero || numero <= 0 || resgatePassa) return;
     transacaoMutation.mutate({
       tipo: tipoTransacao,
       valor: numero
@@ -127,12 +136,12 @@ function InvestimentoDetailsPage() {
     }
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const salvarEdicao = () => {
+    if (!editForm.nome.trim() || !(parseFloat(String(editForm.taxa_rendimento).replace(',', '.')) > 0)) return;
     updateInvMutation.mutate({
-      nome: editForm.nome,
+      nome: editForm.nome.trim(),
       tipo: editForm.tipo,
-      taxa_rendimento: parseFloat(editForm.taxa_rendimento),
+      taxa_rendimento: parseFloat(String(editForm.taxa_rendimento).replace(',', '.')),
       indexador: editForm.indexador
     });
   };
@@ -182,11 +191,7 @@ function InvestimentoDetailsPage() {
                 <Edit2 size={18} />
               </button>
               <button
-                onClick={() => {
-                  if (confirm('Excluir este investimento? O valor atual dele (com os rendimentos) volta para o seu saldo, e o histórico é apagado. Isso não pode ser desfeito.')) {
-                    deleteInvMutation.mutate();
-                  }
-                }}
+                onClick={() => { deleteInvMutation.reset(); setConfirmarExclusao(true); }}
                 className="p-2 bg-white rounded-full shadow-sm hover:bg-loss-soft text-loss transition-colors border border-gray-100"
                 title="Excluir investimento"
                 disabled={deleteInvMutation.isPending}
@@ -327,11 +332,8 @@ function InvestimentoDetailsPage() {
                       )}
                     </div>
                     <button 
-                      onClick={() => {
-                        if (confirm('Excluir esta transação?')) {
-                          deleteTransacaoMutation.mutate(t.id_transacao_inv);
-                        }
-                      }}
+                      onClick={() => { deleteTransacaoMutation.reset(); setMovParaApagar({ id: t.id_transacao_inv, tipo: t.tipo, valor: parseFloat(String(t.valor)) }); }}
+                      aria-label={`Excluir ${t.tipo} de ${formatCurrency(parseFloat(String(t.valor)))}`}
                       className="text-gray-300 hover:text-loss transition-colors p-1"
                       title="Excluir Transação"
                     >
@@ -346,162 +348,130 @@ function InvestimentoDetailsPage() {
 
       </div>
 
-      {/* Modal Transação */}
-      <AnimatePresence>
-        {modalAberto && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              {...backdrop}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setModalAberto(false)}
-            />
-            <motion.div 
-              {...modal}
-              className="bg-white rounded-3xl shadow-xl w-full max-w-sm relative z-10 overflow-hidden"
-            >
-              <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900 capitalize">{tipoTransacao}</h2>
-                <button onClick={() => setModalAberto(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-full transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {tipoTransacao === 'aporte' && (
-                  <div className="p-3 bg-gain-soft text-gain text-xs rounded-xl mb-4">
-                    O valor do aporte será debitado do seu saldo principal no dashboard.
-                  </div>
-                )}
-                {tipoTransacao === 'resgate' && (
-                  <div className="p-3 bg-loss-soft text-red-700 text-xs rounded-xl mb-4">
-                    O valor do resgate será creditado no seu saldo principal no dashboard.
-                  </div>
-                )}
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Valor (R$)</label>
-                  <MoneyInput
-                    required
-                    value={valor}
-                    onValueChange={setValor}
-                    placeholder="Ex.: 1.500,00"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
-                  />
-                </div>
-
-                <div className="pt-4 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setModalAberto(false)}
-                    className="flex-1 px-4 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-xl transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={transacaoMutation.isPending}
-                    className={`flex-1 text-white font-medium rounded-xl transition-colors disabled:opacity-50 py-3 ${
-                      tipoTransacao === 'resgate' ? 'bg-red-500 hover:bg-red-600' : 'bg-[var(--color-accent)] hover:opacity-90'
-                    }`}
-                  >
-                    {transacaoMutation.isPending ? 'Salvando...' : 'Confirmar'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+      {/* Aporte / resgate: mesmo painel lateral da nova transação */}
+      <Sheet
+        open={modalAberto}
+        onOpenChange={setModalAberto}
+        title={tipoTransacao === 'aporte' ? `Aportar em ${inv?.nome ?? ''}` : `Resgatar de ${inv?.nome ?? ''}`}
+        onSubmit={confirmarTransacao}
+        footer={
+          <button
+            type="submit"
+            disabled={transacaoMutation.isPending || !valorNumero || resgatePassa}
+            className="btn-primary w-full py-3.5 text-sm disabled:opacity-60"
+          >
+            {transacaoMutation.isPending ? <span className="spinner" aria-hidden /> : tipoTransacao === 'aporte' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+            {valorNumero ? `${tipoTransacao === 'aporte' ? 'Aportar' : 'Resgatar'} ${formatCurrency(valorNumero)}` : tipoTransacao === 'aporte' ? 'Aportar' : 'Resgatar'}
+          </button>
+        }
+      >
+        <div className="rounded-xl bg-[var(--color-surface)] p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div>
+            <p className="text-[var(--color-ink-muted)]">Saldo no investimento</p>
+            <p className="font-semibold text-[var(--color-ink)]" data-num>{formatCurrency(saldoAtual)}</p>
           </div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal Editar investimento */}
-      <AnimatePresence>
-        {modalEditAberto && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              {...backdrop}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setModalEditAberto(false)}
-            />
-            <motion.div 
-              {...modal}
-              className="bg-white rounded-3xl shadow-xl w-full max-w-sm relative z-10 overflow-hidden"
+          {tipoTransacao === 'resgate' && saldoAtual > 0 && (
+            <button
+              type="button"
+              onClick={() => setValor(deNumero(saldoAtual))}
+              className="shrink-0 rounded-full bg-gain-soft px-3 py-1.5 text-xs font-semibold text-gain"
             >
-              <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900">Editar investimento</h2>
-                <button onClick={() => setModalEditAberto(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-full transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Nome do Investimento</label>
-                  <input
-                    type="text"
-                    required
-                    value={editForm.nome}
-                    onChange={e => setEditForm({...editForm, nome: e.target.value})}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo (Ações, Renda Fixa, etc)</label>
-                  <input
-                    type="text"
-                    required
-                    value={editForm.tipo}
-                    onChange={e => setEditForm({...editForm, tipo: e.target.value})}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Indexador</label>
-                  <select
-                    value={editForm.indexador}
-                    onChange={e => setEditForm({...editForm, indexador: e.target.value})}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
-                  >
-                    {INDEXADORES.map(idx => (
-                      <option key={idx} value={idx}>{nomeIndexador(idx)}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    {rotuloTaxa(editForm.indexador)}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    required
-                    value={editForm.taxa_rendimento}
-                    onChange={e => setEditForm({...editForm, taxa_rendimento: e.target.value})}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-finance-primary)]/20 focus:border-[var(--color-accent)] transition-[color,background-color,border-color,box-shadow,opacity]"
-                  />
-                </div>
-                <TaxaPreview indexador={editForm.indexador} taxa={editForm.taxa_rendimento} valor={saldoAtual > 0 ? saldoAtual : 1000} />
+              Resgatar tudo
+            </button>
+          )}
+        </div>
+        <AmountField
+          id="inv-valor"
+          label={tipoTransacao === 'aporte' ? 'Valor do aporte' : 'Valor do resgate'}
+          value={valor}
+          onChange={setValor}
+          erro={resgatePassa ? `Passa do saldo do investimento (${formatCurrency(saldoAtual)}).` : undefined}
+          autoFocus
+        />
+        <p className="text-xs text-[var(--color-ink-muted)]">
+          {tipoTransacao === 'aporte' ? 'O valor sai do seu saldo e entra no investimento.' : 'O valor sai do investimento e volta para o seu saldo.'}
+        </p>
+        {transacaoMutation.isError && <p role="alert" className="text-sm text-loss">{(transacaoMutation.error as Error)?.message || 'Não deu para salvar. Tente de novo.'}</p>}
+      </Sheet>
 
-                <div className="pt-4 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setModalEditAberto(false)}
-                    className="flex-1 px-4 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-xl transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={updateInvMutation.isPending}
-                    className="flex-1 text-white font-medium rounded-xl transition-colors disabled:opacity-50 py-3 bg-[var(--color-accent)] hover:opacity-90"
-                  >
-                    {updateInvMutation.isPending ? 'Salvando...' : 'Salvar'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
+      {/* Editar investimento: mesmo painel */}
+      <Sheet
+        open={modalEditAberto}
+        onOpenChange={setModalEditAberto}
+        title="Editar investimento"
+        onSubmit={salvarEdicao}
+        footer={
+          <button type="submit" disabled={updateInvMutation.isPending} className="btn-primary w-full py-3.5 text-sm disabled:opacity-60">
+            {updateInvMutation.isPending && <span className="spinner" aria-hidden />}
+            Salvar alterações
+          </button>
+        }
+      >
+        <Campo id="edit-nome" label="Nome">
+          <input id="edit-nome" type="text" value={editForm.nome} onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })} className={campoClasse} />
+        </Campo>
+        <Campo id="edit-tipo" label="Tipo">
+          <input id="edit-tipo" type="text" value={editForm.tipo} onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })} placeholder="Ex.: CDB, Tesouro Direto" className={campoClasse} />
+        </Campo>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Campo id="edit-idx" label="Indexador">
+            <select id="edit-idx" value={editForm.indexador} onChange={(e) => setEditForm({ ...editForm, indexador: e.target.value })} className={campoClasse}>
+              {INDEXADORES.map((idx) => <option key={idx} value={idx}>{nomeIndexador(idx)}</option>)}
+            </select>
+          </Campo>
+          <Campo id="edit-taxa" label={rotuloTaxa(editForm.indexador)}>
+            <div className="relative">
+              <input
+                id="edit-taxa"
+                type="text"
+                inputMode="decimal"
+                value={editForm.taxa_rendimento}
+                onChange={(e) => setEditForm({ ...editForm, taxa_rendimento: e.target.value.replace(/[^0-9.,]/g, '') })}
+                className={campoClasse + ' pr-10'}
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]">%</span>
+            </div>
+          </Campo>
+        </div>
+        <TaxaPreview indexador={editForm.indexador} taxa={editForm.taxa_rendimento} valor={saldoAtual > 0 ? saldoAtual : 1000} />
+        {updateInvMutation.isError && <p role="alert" className="text-sm text-loss">{(updateInvMutation.error as Error)?.message || 'Não deu para salvar. Tente de novo.'}</p>}
+      </Sheet>
+
+      {/* Excluir investimento */}
+      <ConfirmDialog
+        open={confirmarExclusao}
+        onOpenChange={setConfirmarExclusao}
+        titulo={`Excluir ${inv?.nome ?? 'investimento'}?`}
+        confirmar="Excluir e devolver ao saldo"
+        onConfirm={() => deleteInvMutation.mutate()}
+        pendente={deleteInvMutation.isPending}
+        erro={deleteInvMutation.isError && ((deleteInvMutation.error as Error)?.message || 'Não deu para excluir. Tente de novo.')}
+      >
+        {saldoAtual > 0 ? (
+          <p>
+            <strong className="text-[var(--color-ink)]" data-num>{formatCurrency(saldoAtual)}</strong> (com os rendimentos) volta para o seu saldo,
+            como uma entrada “Resgate de {inv?.nome}” em Transações.
+          </p>
+        ) : (
+          <p>O investimento está sem saldo, então nada volta para a conta.</p>
         )}
-      </AnimatePresence>
+        <p>Isso não pode ser desfeito.</p>
+      </ConfirmDialog>
+
+      {/* Excluir uma movimentação */}
+      <ConfirmDialog
+        open={!!movParaApagar}
+        onOpenChange={(v) => !v && setMovParaApagar(null)}
+        titulo={movParaApagar ? `Excluir ${movParaApagar.tipo} de ${formatCurrency(movParaApagar.valor)}?` : 'Excluir movimentação?'}
+        confirmar="Excluir"
+        onConfirm={() => movParaApagar && deleteTransacaoMutation.mutate(movParaApagar.id)}
+        pendente={deleteTransacaoMutation.isPending}
+        erro={deleteTransacaoMutation.isError && ((deleteTransacaoMutation.error as Error)?.message || 'Não deu para excluir. Tente de novo.')}
+      >
+        {movParaApagar?.tipo === 'aporte' && <p>O valor sai do investimento e volta para o seu saldo.</p>}
+        {movParaApagar?.tipo === 'resgate' && <p>O valor volta para o investimento e sai do seu saldo.</p>}
+        {movParaApagar?.tipo === 'rendimento' && <p>O rendimento sai do saldo do investimento.</p>}
+      </ConfirmDialog>
     </div>
   );
 }

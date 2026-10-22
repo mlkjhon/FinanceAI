@@ -5,9 +5,9 @@ import { Navbar } from '../../components/Navbar';
 import { AnimatedCounter, SkeletonCard } from '../../components/ui';
 import { investimentosApi } from '../../lib/api';
 import { formatCurrency, descreverTaxa } from '../../lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
-import { modal, backdrop } from '../../lib/motion-tokens';
-import { Plus, ArrowRight, X } from '../../components/icons';
+import { Plus, ArrowRight } from '../../components/icons';
+import { Sheet, Campo } from '../../components/sheet';
+import { campoClasse } from '../../lib/classes';
 import { TaxaPreview } from '../../components/investimentos/taxa-preview';
 import { INDEXADORES, SUGESTAO_POR_TIPO, exemploTaxa, nomeIndexador, rotuloTaxa } from '../../lib/investimentos';
 
@@ -57,14 +57,17 @@ function InvestimentosPage() {
       setIndexador(SUGESTAO_POR_TIPO[TIPOS_INVESTIMENTO[0]]?.indexador ?? 'PREFIXADO');
       setTaxa(SUGESTAO_POR_TIPO[TIPOS_INVESTIMENTO[0]]?.taxa ?? '');
       setAjustouTaxa(false);
+      setTentou(false);
     }
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nome) return;
+  const [tentou, setTentou] = useState(false);
+  const taxaValida = Number(String(taxa || '').replace(',', '.')) > 0;
+  const criar = () => {
+    setTentou(true);
+    if (!nome.trim() || !taxaValida) return;
     createMutation.mutate({
-      nome,
+      nome: nome.trim(),
       tipo,
       taxa_rendimento: parseFloat(String(taxa || '0').replace(',', '.')),
       indexador
@@ -156,93 +159,71 @@ function InvestimentosPage() {
 
       </div>
 
-      {/* Modal Novo investimento */}
-      <AnimatePresence>
-        {modalAberto && (
-          <div className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center p-4">
-            <motion.div {...backdrop} className="absolute inset-0 bg-[var(--color-ink)]/30" onClick={() => setModalAberto(false)} />
-            <motion.div
-              {...modal}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="novo-inv-titulo"
-              className="relative bg-white rounded-[20px] shadow-xl w-full max-w-md max-h-[92dvh] overflow-y-auto"
+      {/* Novo investimento: mesmo painel lateral da nova transação */}
+      <Sheet
+        open={modalAberto}
+        onOpenChange={setModalAberto}
+        title="Novo investimento"
+        onSubmit={criar}
+        footer={
+          <button type="submit" disabled={createMutation.isPending} className="btn-primary w-full py-3.5 text-sm disabled:opacity-60">
+            {createMutation.isPending && <span className="spinner" aria-hidden />}
+            Cadastrar investimento
+          </button>
+        }
+      >
+        <Campo id="inv-nome" label="Nome">
+          <input
+            id="inv-nome"
+            type="text"
+            autoFocus
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            placeholder="Ex.: CDB Nubank, Tesouro Selic 2029"
+            aria-invalid={tentou && !nome.trim()}
+            className={campoClasse}
+          />
+        </Campo>
+        {tentou && !nome.trim() && <p className="-mt-4 text-xs text-loss">Dê um nome para o investimento</p>}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Campo id="inv-tipo" label="Tipo">
+            <select id="inv-tipo" value={tipo} onChange={(e) => escolherTipo(e.target.value)} className={campoClasse}>
+              {TIPOS_INVESTIMENTO.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Campo>
+          <Campo id="inv-idx" label="Indexador">
+            <select
+              id="inv-idx"
+              value={indexador}
+              onChange={(e) => { setIndexador(e.target.value); setAjustouTaxa(true); }}
+              className={campoClasse}
             >
-              <div className="px-6 pt-5 pb-2 flex items-center justify-between">
-                <h2 id="novo-inv-titulo" className="font-brand text-lg font-bold text-[var(--color-ink)]">Novo investimento</h2>
-                <button onClick={() => setModalAberto(false)} aria-label="Fechar" className="p-2 -mr-2 rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)]">
-                  <X size={18} />
-                </button>
-              </div>
+              {INDEXADORES.map((idx) => <option key={idx} value={idx}>{nomeIndexador(idx)}</option>)}
+            </select>
+          </Campo>
+        </div>
 
-              <form onSubmit={handleSubmit} className="px-6 pb-6 pt-2 space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="inv-nome" className="text-sm font-medium text-[var(--color-ink-soft)]">Nome</label>
-                  <input
-                    id="inv-nome"
-                    type="text"
-                    required
-                    autoFocus
-                    value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                    placeholder="Ex.: CDB Nubank, Tesouro Selic 2029"
-                    className="field w-full px-4 py-3 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <label htmlFor="inv-tipo" className="text-sm font-medium text-[var(--color-ink-soft)]">Tipo</label>
-                    <select id="inv-tipo" value={tipo} onChange={(e) => escolherTipo(e.target.value)} className="field w-full px-3 py-3 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm">
-                      {TIPOS_INVESTIMENTO.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="inv-idx" className="text-sm font-medium text-[var(--color-ink-soft)]">Indexador</label>
-                    <select
-                      id="inv-idx"
-                      value={indexador}
-                      onChange={(e) => { setIndexador(e.target.value); setAjustouTaxa(true); }}
-                      className="field w-full px-3 py-3 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm"
-                    >
-                      {INDEXADORES.map((idx) => <option key={idx} value={idx}>{nomeIndexador(idx)}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="inv-taxa" className="text-sm font-medium text-[var(--color-ink-soft)]">{rotuloTaxa(indexador)}</label>
-                  <div className="relative">
-                    <input
-                      id="inv-taxa"
-                      type="text"
-                      inputMode="decimal"
-                      required
-                      value={taxa}
-                      onChange={(e) => { setTaxa(e.target.value.replace(/[^0-9.,]/g, '')); setAjustouTaxa(true); }}
-                      placeholder={exemploTaxa(indexador)}
-                      className="field w-full px-4 py-3 pr-10 rounded-[var(--radius-input)] border border-[var(--color-line)] bg-white text-sm"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]">%</span>
-                  </div>
-                </div>
-
-                <TaxaPreview indexador={indexador} taxa={taxa} />
-                <p className="text-xs text-[var(--color-ink-muted)]">O rendimento entra no saldo todo dia, calculado com essa taxa.</p>
-
-                <div className="pt-2 flex gap-3">
-                  <button type="button" onClick={() => setModalAberto(false)} className="flex-1 px-4 py-3 rounded-full border border-[var(--color-line)] text-sm font-medium text-[var(--color-ink-soft)]">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={createMutation.isPending} className="btn-primary flex-1 py-3 text-sm disabled:opacity-50">
-                    {createMutation.isPending ? 'Salvando' : 'Adicionar'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+        <Campo id="inv-taxa" label={rotuloTaxa(indexador)} ajuda="O rendimento entra no saldo todo dia, calculado com essa taxa.">
+          <div className="relative">
+            <input
+              id="inv-taxa"
+              type="text"
+              inputMode="decimal"
+              value={taxa}
+              onChange={(e) => { setTaxa(e.target.value.replace(/[^0-9.,]/g, '')); setAjustouTaxa(true); }}
+              placeholder={exemploTaxa(indexador)}
+              aria-invalid={tentou && !taxaValida}
+              className={campoClasse + ' pr-10'}
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]">%</span>
           </div>
-        )}
-      </AnimatePresence>
+        </Campo>
+        {tentou && !taxaValida && <p className="-mt-4 text-xs text-loss">Informe a taxa</p>}
+
+        <TaxaPreview indexador={indexador} taxa={taxa} />
+        {createMutation.isError && <p role="alert" className="text-sm text-loss">{(createMutation.error as Error)?.message || 'Não deu para cadastrar. Tente de novo.'}</p>}
+      </Sheet>
     </div>
   );
 }

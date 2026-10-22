@@ -3,12 +3,13 @@ import { formatCurrency as formatarMoeda } from '../lib/utils';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { modal } from '../lib/motion-tokens';
-import { Plus, CreditCard, Building2, Wallet, ShieldCheck, Trash2 } from '../components/icons';
+import { Plus, CreditCard, Building2, Wallet, ShieldCheck, Trash2, X } from '../components/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navbar } from '../components/Navbar';
 import { FinanceCard, SkeletonCard } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { OpenFinanceWidget } from '../components/OpenFinanceWidget';
+import { ConfirmDialog } from '../components/confirm-dialog';
 
 export const Route = createFileRoute('/bancos')({
   beforeLoad: () => {
@@ -35,6 +36,8 @@ function BancosPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; nome: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Resultado da sincronização, mostrado na página (no lugar do alert do navegador)
+  const [aviso, setAviso] = useState<null | { tipo: 'ok' | 'erro'; titulo: string; texto?: string }>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -79,18 +82,22 @@ function BancosPage() {
       const result = await res.json();
       
       if (!res.ok) {
-        alert(`❌ Erro ao sincronizar: ${result.error}`);
+        setAviso({ tipo: 'erro', titulo: 'Não deu para sincronizar', texto: result.error });
       } else {
         const totalTx = result.totalTransacoes ?? 0;
         const totalContas = result.contas?.length ?? 0;
-        alert(`✅ Sincronização concluída!\n${totalContas} conta(s) importada(s)\n${totalTx} transação(ões) importada(s)`);
+        setAviso({
+          tipo: 'ok',
+          titulo: 'Sincronização concluída',
+          texto: `${totalContas} ${totalContas === 1 ? 'conta importada' : 'contas importadas'} e ${totalTx} ${totalTx === 1 ? 'transação importada' : 'transações importadas'}.`,
+        });
       }
 
       queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
       setPendingConnection(null);
     } catch (error) {
       console.error('Erro ao salvar a conexão no banco de dados:', error);
-      alert('❌ Erro de conexão. Tente novamente.');
+      setAviso({ tipo: 'erro', titulo: 'Erro de conexão', texto: 'Confira a internet e tente de novo.' });
     } finally {
       setIsSyncing(false);
     }
@@ -117,6 +124,23 @@ function BancosPage() {
             <span className="sm:hidden">Conectar conta</span>
           </button>
         </header>
+
+        {aviso && (
+          <div
+            role={aviso.tipo === 'erro' ? 'alert' : 'status'}
+            className={`pop-in flex items-start justify-between gap-4 rounded-2xl border px-5 py-4 ${
+              aviso.tipo === 'ok' ? 'border-[var(--color-accent)]/25 bg-gain-soft' : 'border-[var(--color-finance-error)]/25 bg-loss-soft'
+            }`}
+          >
+            <div>
+              <p className={`text-sm font-semibold ${aviso.tipo === 'ok' ? 'text-gain' : 'text-loss'}`}>{aviso.titulo}</p>
+              {aviso.texto && <p className="mt-0.5 text-sm text-[var(--color-ink-soft)]">{aviso.texto}</p>}
+            </div>
+            <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso" className="pressable -mr-1 rounded-full p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)]">
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -238,68 +262,34 @@ function BancosPage() {
           </div>
         )}
 
-        {/* Modal de confirmação de exclusão de banco */}
-        {deleteConfirm && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <motion.div
-              {...modal}
-              transition={{ duration: 0.2 }}
-              className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden"
-            >
-              {/* Header vermelho */}
-              <div className="bg-loss-soft px-6 pt-6 pb-4 flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-loss-soft flex items-center justify-center shrink-0">
-                  <Trash2 size={22} className="text-[var(--color-finance-error)]" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Remover Banco</h3>
-                  <p className="text-sm text-gray-500 mt-0.5">{deleteConfirm.nome}</p>
-                </div>
-              </div>
-
-              {/* Body */}
-              <div className="px-6 py-4">
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  Tem certeza que deseja remover <strong>{deleteConfirm.nome}</strong>?<br />
-                  <span className="text-loss font-medium">Esta ação irá apagar todas as contas e transações vinculadas a este banco e não pode ser desfeita.</span>
-                </p>
-              </div>
-
-              {/* Actions */}
-              <div className="px-6 pb-6 flex gap-3">
-                <button
-                  onClick={() => setDeleteConfirm(null)}
-                  disabled={isDeleting}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      setIsDeleting(true);
-                      const API_URL = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
-                      await fetch(`${API_URL}/conexoes/${deleteConfirm.id}`, { method: 'DELETE' });
-                      queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
-                      setDeleteConfirm(null);
-                    } catch (e) {
-                      console.error('Erro ao remover', e);
-                    } finally {
-                      setIsDeleting(false);
-                    }
-                  }}
-                  disabled={isDeleting}
-                  className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isDeleting ? (
-                    <><span className="spinner" aria-hidden="true" />Removendo...</>
-                  ) : 'Sim, remover'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
       </AnimatePresence>
+
+      {/* Remover banco: mesma confirmação do resto do app */}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={(v) => !v && setDeleteConfirm(null)}
+        titulo={`Remover ${deleteConfirm?.nome ?? 'banco'}?`}
+        confirmar="Remover banco"
+        pendente={isDeleting}
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          try {
+            setIsDeleting(true);
+            const API_URL = import.meta.env.VITE_API_URL || 'https://api-lyart-kappa.vercel.app';
+            await fetch(`${API_URL}/conexoes/${deleteConfirm.id}`, { method: 'DELETE' });
+            queryClient.invalidateQueries({ queryKey: ['openfinance', user?.id] });
+            setDeleteConfirm(null);
+          } catch (e) {
+            console.error('Erro ao remover', e);
+            setAviso({ tipo: 'erro', titulo: 'Não deu para remover o banco', texto: 'Tente de novo.' });
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+      >
+        <p>Todas as contas e transações vinculadas a este banco serão apagadas.</p>
+        <p>Isso não pode ser desfeito.</p>
+      </ConfirmDialog>
     </div>
   );
 }

@@ -613,6 +613,22 @@
   .sheet[data-ending-style] { transform: translateX(calc(100% + 0.75rem)); }
 }
 
+/* Confirmação (substitui o confirm() do navegador): centralizada, scale + fade */
+.dialog-pop {
+  transform: translate(-50%, -50%);
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+.dialog-pop[data-starting-style],
+.dialog-pop[data-ending-style] {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
+}
+.dialog-pop[data-ending-style] { transition-duration: 150ms; }
+@media (prefers-reduced-motion: reduce) {
+  .dialog-pop[data-starting-style],
+  .dialog-pop[data-ending-style] { transform: translate(-50%, -50%); }
+}
+
 /* Campo do valor: o número é o protagonista do formulário */
 .amount-input {
   width: 100%;
