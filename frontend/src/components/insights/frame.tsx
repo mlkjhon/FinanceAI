@@ -85,11 +85,11 @@ export const BlocoFrame = forwardRef<HTMLElement, { bloco: Bloco; ocupado: boole
         {bloco.reasoning || 'A IA considerou este dado relevante para o período.'}
       </Collapse>
 
-      <div className="grid">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)]">
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={bloco.createdAt}
-            className="[grid-area:1/1]"
+            className="[grid-area:1/1] min-w-0"
             initial={{ opacity: 0, filter: 'blur(4px)' }}
             animate={{ opacity: 1, filter: 'blur(0px)', transition: { duration: 0.3, ease: ease.out } }}
             exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.15, ease: ease.out } }}

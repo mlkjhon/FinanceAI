@@ -88,7 +88,7 @@ function Tabela({ b }: { b: BlocoDe<'table'> }) {
               {colunas.map((c, j) => {
                 const v = l[c.chave];
                 return (
-                  <td key={c.chave} className={cn('px-5 py-2.5', j === 0 ? 'text-left text-[var(--color-ink)] max-w-[14rem] truncate' : 'text-right text-[var(--color-ink-soft)]', destacadas.has(l) && 'font-semibold')} data-num={j > 0 || undefined}>
+                  <td key={c.chave} className={cn('px-5 py-2.5', j === 0 ? 'text-left text-[var(--color-ink)] max-w-[14rem] truncate' : 'text-right text-[var(--color-ink-soft)] whitespace-nowrap', destacadas.has(l) && 'font-semibold')} data-num={j > 0 || undefined}>
                     {v == null ? '—' : typeof v === 'number' ? fmt(v, c.formato) : String(v)}
                   </td>
                 );
