@@ -7,7 +7,7 @@ import { dashboardApi } from '../lib/api';
 import { AnimatedCounter, FinanceCard, SkeletonCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
-import { formatCurrency, formatDate, descricaoVisivel } from '../lib/utils';
+import { formatCurrency, formatDate, descricaoVisivel, tamanhoValorDestaque } from '../lib/utils';
 import { DonutRing } from '../components/ConicChart';
 
 export const Route = createFileRoute('/dashboard')({
@@ -212,7 +212,7 @@ function DashboardContent() {
             {isLoading ? (
               <span className="media-frame block h-10 w-48 mt-3 rounded-lg opacity-30" data-loading="" />
             ) : (
-              <AnimatedCounter value={summary?.saldo_total ?? 0} isCurrency className="mt-2 block text-4xl sm:text-5xl text-white" />
+              <AnimatedCounter value={summary?.saldo_total ?? 0} isCurrency className={`mt-2 block ${tamanhoValorDestaque(summary?.saldo_total ?? 0)} text-white`} />
             )}
           </div>
 

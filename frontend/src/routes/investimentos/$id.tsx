@@ -8,7 +8,7 @@ import { investimentosApi, type CreateInvestment } from '../../lib/api';
 import { deNumero, paraNumero } from '../../lib/dinheiro';
 import { TaxaPreview } from '../../components/investimentos/taxa-preview';
 import { INDEXADORES, nomeIndexador, rotuloTaxa } from '../../lib/investimentos';
-import { formatCurrency, formatCompactCurrency, formatDate, descreverTaxa } from '../../lib/utils';
+import { formatCurrency, formatCompactCurrency, formatDate, descreverTaxa, tamanhoValorDestaque } from '../../lib/utils';
 import { ArrowLeft, TrendingUp, TrendingDown, PiggyBank, History, Trash2, Edit2 } from '../../components/icons';
 import { Sheet, AmountField, Campo } from '../../components/sheet';
 import { ConfirmDialog } from '../../components/confirm-dialog';
@@ -228,7 +228,7 @@ function InvestimentoDetailsPage() {
                 {isLoading ? (
                   <span className="media-frame block h-11 w-56 mt-3 rounded-lg opacity-30" data-loading="" />
                 ) : (
-                  <AnimatedCounter value={parseFloat(String(inv?.saldo_atual || 0))} isCurrency className="mt-2 block text-4xl sm:text-5xl text-white" />
+                  <AnimatedCounter value={parseFloat(String(inv?.saldo_atual || 0))} isCurrency className={`mt-2 block ${tamanhoValorDestaque(parseFloat(String(inv?.saldo_atual || 0)))} text-white`} />
                 )}
               </div>
               <div className="flex flex-wrap gap-3">

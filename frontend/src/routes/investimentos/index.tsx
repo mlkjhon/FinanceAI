@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { AnimatedCounter, SkeletonCard } from '../../components/ui';
 import { investimentosApi } from '../../lib/api';
-import { formatCurrency, descreverTaxa } from '../../lib/utils';
+import { formatCurrency, descreverTaxa, tamanhoValorDestaque } from '../../lib/utils';
 import { Plus, ArrowRight } from '../../components/icons';
 import { Sheet, Campo } from '../../components/sheet';
 import { campoClasse } from '../../lib/classes';
@@ -98,7 +98,7 @@ function InvestimentosPage() {
             {isLoading ? (
               <span className="media-frame block h-10 w-48 mt-3 rounded-lg opacity-30" data-loading="" />
             ) : (
-              <AnimatedCounter value={totalInvestido} isCurrency className="mt-2 block text-4xl sm:text-5xl text-white" />
+              <AnimatedCounter value={totalInvestido} isCurrency className={`mt-2 block ${tamanhoValorDestaque(totalInvestido)} text-white`} />
             )}
           </div>
           {!!investimentos?.length && (

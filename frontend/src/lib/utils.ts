@@ -29,6 +29,15 @@ export function ehTransferencia(descricao: string) {
   return d.startsWith('[INV') || d.startsWith('Investido na meta:') || d.startsWith('Devolvido da meta:') || d.endsWith('(investimento encerrado)');
 }
 
+// Número em destaque (saldo, patrimônio): a fonte diminui quando o valor chega a milhões/bilhões,
+// para "R$ 38.933.100.000,00" caber no card sem estourar
+export function tamanhoValorDestaque(valor: number) {
+  const abs = Math.abs(valor || 0);
+  if (abs >= 1e9) return 'text-2xl sm:text-3xl lg:text-4xl';
+  if (abs >= 1e6) return 'text-3xl sm:text-4xl';
+  return 'text-4xl sm:text-5xl';
+}
+
 export function formatDate(dateStr: string) {
   if (!dateStr) return '';
   const texto = String(dateStr);

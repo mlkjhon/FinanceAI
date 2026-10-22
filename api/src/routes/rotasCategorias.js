@@ -9,7 +9,8 @@ const router = Router();
  * Cada usuário vê as categorias padrão do app e as que ele mesmo criou.
  * Só as próprias podem ser editadas ou excluídas (as padrão valem para todos).
  */
-const tipoValido = (tipo) => (['E', 'receita'].includes(tipo) ? 'E' : ['S', 'despesa'].includes(tipo) ? 'S' : null);
+// O banco guarda o tipo como 'receita' | 'despesa' (check constraint categorias_tipo_check)
+const tipoValido = (tipo) => (['E', 'receita'].includes(tipo) ? 'receita' : ['S', 'despesa'].includes(tipo) ? 'despesa' : null);
 
 router.get('/categorias', autenticar, async (req, res) => {
     try {
