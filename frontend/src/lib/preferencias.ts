@@ -4,13 +4,15 @@ import { useSyncExternalStore } from 'react';
  * Preferências do app guardadas no navegador (como o tema):
  * - ocultarValores: borra os números de dinheiro (para usar em público)
  * - reduzirAnimacoes: desliga as animações mesmo que o sistema não peça
+ * - simplificarNumeros: R$ 1,5K, R$ 2,3M, R$ 38,93B no lugar do número inteiro
  * Cada uma vira um atributo no <html>, e o CSS faz o resto.
  */
-export type Preferencia = 'ocultarValores' | 'reduzirAnimacoes';
+export type Preferencia = 'ocultarValores' | 'reduzirAnimacoes' | 'simplificarNumeros';
 
 const CONFIG: Record<Preferencia, { chave: string; atributo: string }> = {
   ocultarValores: { chave: 'financeai:ocultar-valores', atributo: 'data-ocultar-valores' },
   reduzirAnimacoes: { chave: 'financeai:reduzir-animacoes', atributo: 'data-reduzir-animacoes' },
+  simplificarNumeros: { chave: 'financeai:simplificar-numeros', atributo: 'data-simplificar-numeros' },
 };
 const EVENTO = 'financeai:preferencias';
 

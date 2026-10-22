@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { Icon, type IconName } from './icons';
+import { Avatar } from './avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { salvarPreferencia as salvarTema, usePreferenciaTema, type PreferenciaTema } from '../lib/theme';
 import { salvarPreferencia, usePreferencia } from '../lib/preferencias';
@@ -14,29 +15,6 @@ import { cn } from '../lib/utils';
  * Motion: nasce do gatilho (transform-origin), scale 0.96 -> 1 em 150ms ease-out;
  * a setinha gira junto. Nada anima por teclado além do foco.
  */
-const iniciais = (nome?: string) =>
-  (nome || '?')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join('');
-
-function Avatar({ nome, tamanho = 'sm' }: { nome?: string; tamanho?: 'sm' | 'md' }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'gradient-hero grid shrink-0 place-items-center rounded-full font-brand font-bold text-white',
-        tamanho === 'md' ? 'size-10 text-sm' : 'size-8 text-[11px]'
-      )}
-    >
-      {iniciais(nome)}
-    </span>
-  );
-}
-
 function Item({ icone, children, onClick, perigo, atalho }: { icone: IconName; children: ReactNode; onClick: () => void; perigo?: boolean; atalho?: string }) {
   return (
     <Menu.Item
@@ -89,7 +67,7 @@ export function AccountMenu() {
             : 'border-[var(--color-line)] hover:bg-[var(--color-surface)] data-[popup-open]:bg-[var(--color-surface)]'
         )}
       >
-        <Avatar nome={user?.nome} />
+        <Avatar nome={user?.nome} foto={user?.foto} />
         <span className="max-w-[9rem] truncate text-sm font-medium text-[var(--color-ink)]">{primeiroNome}</span>
         <Icon
           name="caret-down"
@@ -103,7 +81,7 @@ export function AccountMenu() {
           <Menu.Popup className="menu-pop w-72 rounded-2xl border border-[var(--color-line)] bg-white p-1.5 shadow-xl outline-none">
             {/* Quem está logado */}
             <div className="flex items-center gap-3 px-2.5 pb-3 pt-2">
-              <Avatar nome={user?.nome} tamanho="md" />
+              <Avatar nome={user?.nome} foto={user?.foto} tamanho="md" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-[var(--color-ink)]">{user?.nome}</p>
                 <p className="truncate text-xs text-[var(--color-ink-muted)]">{user?.email}</p>

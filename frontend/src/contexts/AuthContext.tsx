@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { authApi, setUserData, removeUserData, getUserData, atualizarUsuarioLocal, type User } from '../lib/api';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { authApi, perfilApi, setUserData, removeUserData, getUserData, atualizarUsuarioLocal, getToken, type User } from '../lib/api';
 
 interface AuthContextType {
   user: User | null;
@@ -38,11 +38,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = '/auth';
   }, []);
 
-  // Depois de editar nome/e-mail nas configurações
+  // Depois de editar nome/e-mail/foto nas configurações
   const atualizarUsuario = useCallback((novo: User) => {
     atualizarUsuarioLocal(novo);
     setUser(novo);
   }, []);
+
+  // A foto não vem no login: busca o perfil uma vez por conta (e guarda junto do usuário)
+  const idUsuario = user?.id;
+  useEffect(() => {
+    if (!idUsuario || !getToken()) return;
+    let vivo = true;
+    perfilApi.get()
+      .then((p) => {
+        if (!vivo) return;
+        setUser((atual) => {
+          if (!atual || (atual.foto ?? null) === (p.foto ?? null)) return atual;
+          const novo = { ...atual, foto: p.foto ?? null };
+          atualizarUsuarioLocal(novo);
+          return novo;
+        });
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [idUsuario]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, login, register, logout, atualizarUsuario }}>

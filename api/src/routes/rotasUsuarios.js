@@ -182,13 +182,49 @@ async function conferirSenha(id_usuario, senha) {
     return bcrypt.compare(String(senha), r.rows[0].senha);
 }
 
+/*
+ * Foto de perfil: o navegador já reduz a imagem para 256x256 (JPEG/WebP, poucos KB)
+ * e ela fica numa coluna de texto como data URL. A coluna é criada na primeira chamada.
+ */
+let colunaFotoPronta = null;
+const garantirColunaFoto = () =>
+    (colunaFotoPronta ??= BD.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS foto TEXT')
+        .catch((e) => { colunaFotoPronta = null; throw e; }));
+const FOTO_MAX = 300_000; // ~220 KB de imagem em base64
+const fotoValida = (f) => typeof f === 'string' && f.length <= FOTO_MAX && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(f);
+
 router.get('/perfil', autenticar, async (req, res) => {
     try {
-        const r = await BD.query('SELECT id_usuario AS id, nome, email FROM usuarios WHERE id_usuario = $1', [req.usuario.id]);
+        await garantirColunaFoto().catch(() => {});
+        const r = await BD.query('SELECT id_usuario AS id, nome, email, foto FROM usuarios WHERE id_usuario = $1', [req.usuario.id])
+            .catch(() => BD.query('SELECT id_usuario AS id, nome, email FROM usuarios WHERE id_usuario = $1', [req.usuario.id]));
         if (!r.rows.length) return res.status(404).json({ error: 'Conta não encontrada.' });
-        return res.status(200).json(r.rows[0]);
+        return res.status(200).json({ foto: null, ...r.rows[0] });
     } catch (error) {
         return res.status(500).json({ error: 'Não foi possível carregar a conta.' });
+    }
+});
+
+router.put('/perfil/foto', autenticar, async (req, res) => {
+    const foto = req.body?.foto;
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagem inválida ou grande demais. Use JPG, PNG ou WebP.' });
+    try {
+        await garantirColunaFoto();
+        await BD.query('UPDATE usuarios SET foto = $1 WHERE id_usuario = $2', [foto, req.usuario.id]);
+        return res.status(200).json({ foto });
+    } catch (error) {
+        console.error('Erro ao salvar foto:', error.message);
+        return res.status(500).json({ error: 'Não foi possível salvar a foto.' });
+    }
+});
+
+router.delete('/perfil/foto', autenticar, async (req, res) => {
+    try {
+        await garantirColunaFoto();
+        await BD.query('UPDATE usuarios SET foto = NULL WHERE id_usuario = $1', [req.usuario.id]);
+        return res.status(200).json({ foto: null });
+    } catch (error) {
+        return res.status(500).json({ error: 'Não foi possível remover a foto.' });
     }
 });
 

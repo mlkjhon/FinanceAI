@@ -14,6 +14,9 @@ import { salvarPreferencia as salvarTema, usePreferenciaTema } from '../lib/them
 import { salvarPreferencia, usePreferencia } from '../lib/preferencias';
 import { campoClasse } from '../lib/classes';
 import { cn, formatDate } from '../lib/utils';
+import { Avatar } from '../components/avatar';
+import { ConfirmDialog } from '../components/confirm-dialog';
+import { prepararFoto } from '../lib/imagem';
 
 export const Route = createFileRoute('/profile')({
   beforeLoad: () => {
@@ -80,18 +83,100 @@ function Mensagem({ ok, erro }: { ok?: string | false; erro?: string | false }) 
   return null;
 }
 
+/*
+ * Foto de perfil: escolher, trocar e remover. A imagem é recortada e reduzida
+ * no navegador (256x256) antes de ir para o servidor.
+ */
+function FotoPerfil() {
+  const { user, atualizarUsuario } = useAuth();
+  const entrada = React.useRef<HTMLInputElement>(null);
+  const [erro, setErro] = React.useState('');
+  const [confirmarRemover, setConfirmarRemover] = React.useState(false);
+  const salvar = useMutation({
+    mutationFn: async (arquivo: File) => perfilApi.salvarFoto(await prepararFoto(arquivo)),
+    onSuccess: (r) => user && atualizarUsuario({ ...user, foto: r.foto }),
+    onError: (e) => setErro((e as Error).message || 'Não deu para salvar a foto.'),
+  });
+  const remover = useMutation({
+    mutationFn: () => perfilApi.removerFoto(),
+    onSuccess: () => { if (user) atualizarUsuario({ ...user, foto: null }); setConfirmarRemover(false); },
+  });
+  const escolher = (arquivo?: File) => {
+    setErro('');
+    if (arquivo) salvar.mutate(arquivo);
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-5 pb-6 mb-6 border-b border-[var(--color-line)]">
+      <div className="relative">
+        <Avatar nome={user?.nome} foto={user?.foto} tamanho="xl" />
+        {salvar.isPending && (
+          <span className="absolute inset-0 grid place-items-center rounded-full bg-black/40 text-white">
+            <Loader2 size={20} className="animate-spin" />
+          </span>
+        )}
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-[var(--color-ink)]">Foto de perfil</p>
+        <p className="text-xs text-[var(--color-ink-muted)]">JPG, PNG ou WebP. A foto é recortada em quadrado.</p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => entrada.current?.click()}
+            disabled={salvar.isPending}
+            className="btn-primary px-4 py-2 text-sm disabled:opacity-60"
+          >
+            {user?.foto ? 'Trocar foto' : 'Colocar foto'}
+          </button>
+          {user?.foto && (
+            <button
+              type="button"
+              onClick={() => { remover.reset(); setConfirmarRemover(true); }}
+              className="pressable rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-surface)]"
+            >
+              Remover foto
+            </button>
+          )}
+        </div>
+        <input
+          ref={entrada}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          aria-label="Escolher foto de perfil"
+          onChange={(e) => { escolher(e.target.files?.[0]); e.target.value = ''; }}
+        />
+        {erro && <p role="alert" className="text-xs text-loss">{erro}</p>}
+      </div>
+      <ConfirmDialog
+        open={confirmarRemover}
+        onOpenChange={setConfirmarRemover}
+        titulo="Remover a foto de perfil?"
+        confirmar="Remover foto"
+        onConfirm={() => remover.mutate()}
+        pendente={remover.isPending}
+        erro={remover.isError && 'Não deu para remover. Tente de novo.'}
+      >
+        <p>No lugar dela aparecem as suas iniciais.</p>
+      </ConfirmDialog>
+    </div>
+  );
+}
+
 function Conta() {
   const { user, atualizarUsuario } = useAuth();
   const [nome, setNome] = React.useState(user?.nome ?? '');
   const [email, setEmail] = React.useState(user?.email ?? '');
   const salvar = useMutation({
     mutationFn: () => perfilApi.update({ nome: nome.trim(), email: email.trim() }),
-    onSuccess: (u) => atualizarUsuario({ id: String(u.id ?? user?.id), nome: u.nome, email: u.email }),
+    // a foto não vem nessa resposta: mantém a que já estava
+    onSuccess: (u) => atualizarUsuario({ id: String(u.id ?? user?.id), nome: u.nome, email: u.email, foto: user?.foto ?? null }),
   });
   const mudou = nome.trim() !== (user?.nome ?? '') || email.trim().toLowerCase() !== (user?.email ?? '').toLowerCase();
 
   return (
     <Secao id="conta" titulo="Conta" descricao="Seu nome aparece no app; o e-mail é usado para entrar.">
+      <FotoPerfil />
       <form
         className="space-y-4"
         onSubmit={(e) => { e.preventDefault(); if (mudou) salvar.mutate(); }}
@@ -218,6 +303,7 @@ function Aparencia() {
 
 function Privacidade() {
   const ocultar = usePreferencia('ocultarValores');
+  const simplificar = usePreferencia('simplificarNumeros');
   return (
     <Secao id="privacidade" titulo="Privacidade">
       <Interruptor
@@ -227,6 +313,15 @@ function Privacidade() {
         ativo={ocultar}
         onChange={(v) => salvarPreferencia('ocultarValores', v)}
       />
+      <div className="mt-3 border-t border-[var(--color-line)] pt-3">
+        <Interruptor
+          id="pref-simplificar"
+          titulo="Simplificar números"
+          descricao="A partir de mil, os valores ficam curtos: R$ 1,5K, R$ 2,3M, R$ 38,93B. Vale só neste navegador."
+          ativo={simplificar}
+          onChange={(v) => salvarPreferencia('simplificarNumeros', v)}
+        />
+      </div>
     </Secao>
   );
 }
@@ -489,9 +584,7 @@ function ProfileContent() {
   return (
     <div className="stagger pb-16">
       <div className="flex flex-wrap items-center gap-4 mb-8">
-        <div className="size-14 rounded-2xl gradient-hero grid place-items-center text-white font-brand font-bold text-2xl" aria-hidden>
-          {user?.nome?.charAt(0).toUpperCase()}
-        </div>
+        <Avatar nome={user?.nome} foto={user?.foto} tamanho="lg" />
         <div className="min-w-0 flex-1">
           <h1 className="font-brand text-2xl font-bold tracking-tight text-[var(--color-ink)] truncate">{user?.nome}</h1>
           <p className="text-sm text-[var(--color-ink-muted)] flex items-center gap-1.5 mt-0.5 truncate">

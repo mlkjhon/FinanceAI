@@ -207,6 +207,9 @@ export const perfilApi = {
     request<{ ok: boolean }>('/perfil/senha', { method: 'PUT', body: JSON.stringify({ senhaAtual, novaSenha }) }),
   excluirConta: (senha: string) =>
     request<{ ok: boolean }>('/perfil', { method: 'DELETE', body: JSON.stringify({ senha }) }),
+  salvarFoto: (foto: string) =>
+    request<{ foto: string }>('/perfil/foto', { method: 'PUT', body: JSON.stringify({ foto }) }),
+  removerFoto: () => request<{ foto: null }>('/perfil/foto', { method: 'DELETE' }),
 };
 
 // Atualiza o usuário guardado sem mexer no token nem em onde ele está (local/sessão)
@@ -387,6 +390,8 @@ export interface User {
   id: string;
   nome: string;
   email: string;
+  // foto de perfil (data URL 256x256) ou null
+  foto?: string | null;
 }
 
 export interface RegisterData {

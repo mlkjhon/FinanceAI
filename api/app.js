@@ -30,7 +30,8 @@ app.use(cors({
     credentials: true
 }));
 
-app.use(express.json());
+// 1 MB: cabe a foto de perfil (data URL) com folga
+app.use(express.json({ limit: '1mb' }));
 
 // Valores em dinheiro: colunas do banco grandes o bastante + teto com mensagem clara
 app.use((req, res, next) => (['POST', 'PUT', 'PATCH'].includes(req.method) ? limitarValores(req, res, next) : next()));

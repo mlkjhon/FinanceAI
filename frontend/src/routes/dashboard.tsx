@@ -7,7 +7,7 @@ import { dashboardApi } from '../lib/api';
 import { AnimatedCounter, FinanceCard, SkeletonCard } from '../components/ui';
 import { Navbar } from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
-import { formatCurrency, formatDate, descricaoVisivel, tamanhoValorDestaque } from '../lib/utils';
+import { formatCurrency, formatDate, descricaoVisivel, tamanhoValorDestaque, tamanhoValorPequeno } from '../lib/utils';
 import { DonutRing } from '../components/ConicChart';
 
 export const Route = createFileRoute('/dashboard')({
@@ -217,15 +217,16 @@ function DashboardContent() {
           </div>
 
           <dl className="grid grid-cols-3 divide-x divide-white/20 border-t border-white/20 pt-5">
-            <div className="pr-3">
+            {/* min-w-0 + fonte menor em milhões/bilhões: o valor nunca invade a coluna vizinha */}
+            <div className="pr-3 min-w-0">
               <dt className="text-xs text-white/70">Entrou</dt>
-              <dd data-num className="mt-1 text-sm sm:text-base font-semibold">{formatCurrency(receitas)}</dd>
+              <dd data-num title={formatCurrency(receitas)} className={`mt-1 font-semibold [overflow-wrap:anywhere] ${tamanhoValorPequeno(receitas)}`}>{formatCurrency(receitas)}</dd>
             </div>
-            <div className="px-3">
+            <div className="px-3 min-w-0">
               <dt className="text-xs text-white/70">Saiu</dt>
-              <dd data-num className="mt-1 text-sm sm:text-base font-semibold">{formatCurrency(despesas)}</dd>
+              <dd data-num title={formatCurrency(despesas)} className={`mt-1 font-semibold [overflow-wrap:anywhere] ${tamanhoValorPequeno(despesas)}`}>{formatCurrency(despesas)}</dd>
             </div>
-            <div className="pl-3">
+            <div className="pl-3 min-w-0">
               <dt className="text-xs text-white/70">Guardou</dt>
               <dd data-num className="mt-1 text-sm sm:text-base font-semibold">
                 {receitas > 0 ? `${taxaEconomia.toFixed(0)}%` : formatCurrency(economia)}

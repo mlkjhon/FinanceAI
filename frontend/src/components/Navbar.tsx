@@ -3,6 +3,7 @@ import { Link, useRouterState } from '@tanstack/react-router';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Menu, X } from './icons';
 import { AccountMenu } from './account-menu';
+import { Avatar } from './avatar';
 import { Wordmark } from './landing/wordmark';
 import { useAuth } from '../contexts/AuthContext';
 import { spring } from '../lib/motion-tokens';
@@ -105,7 +106,10 @@ export function Navbar() {
               className="lg:hidden fixed top-0 right-0 h-[100dvh] w-72 z-[var(--z-drawer)] bg-white shadow-2xl flex flex-col p-6 pt-[calc(1.5rem+env(safe-area-inset-top))]"
             >
               <div className="flex justify-between items-center mb-8">
-                <span className="text-sm text-[var(--color-ink-muted)]">Olá, {user?.nome?.split(' ')[0]}</span>
+                <span className="flex items-center gap-2.5 text-sm text-[var(--color-ink-muted)]">
+                  <Avatar nome={user?.nome} foto={user?.foto} />
+                  Olá, {user?.nome?.split(' ')[0]}
+                </span>
                 <button
                   onClick={() => setMenuOpen(false)}
                   aria-label="Fechar menu"

@@ -9,8 +9,24 @@ export function cn(...inputs: ClassValue[]) {
 const valoresOcultos = () => typeof document !== 'undefined' && document.documentElement.hasAttribute('data-ocultar-valores');
 const OCULTO = 'R$ ••••';
 
+// "Simplificar números" (configurações): a partir de mil, R$ 1,5K · R$ 2,3M · R$ 38,93B · R$ 1,2T
+const numerosSimplificados = () => typeof document !== 'undefined' && document.documentElement.hasAttribute('data-simplificar-numeros');
+const ESCALAS: [number, string][] = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
+export function simplificarNumero(valor: number) {
+  const abs = Math.abs(valor);
+  const escala = ESCALAS.find(([lim]) => abs >= lim);
+  if (!escala) return null;
+  const n = abs / escala[0];
+  const casas = n >= 100 ? 0 : n >= 10 ? 1 : 2;
+  return `${valor < 0 ? '-' : ''}R$ ${n.toLocaleString('pt-BR', { maximumFractionDigits: casas })}${escala[1]}`;
+}
+
 export function formatCurrency(value: number, locale = 'pt-BR', currency = 'BRL') {
   if (valoresOcultos()) return OCULTO;
+  if (numerosSimplificados()) {
+    const curto = simplificarNumero(value);
+    if (curto) return curto;
+  }
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value);
 }
 
@@ -36,6 +52,14 @@ export function tamanhoValorDestaque(valor: number) {
   if (abs >= 1e9) return 'text-2xl sm:text-3xl lg:text-4xl';
   if (abs >= 1e6) return 'text-3xl sm:text-4xl';
   return 'text-4xl sm:text-5xl';
+}
+
+// Valores pequenos lado a lado (Entrou/Saiu): a fonte diminui com milhões/bilhões
+export function tamanhoValorPequeno(valor: number) {
+  const abs = Math.abs(valor || 0);
+  if (abs >= 1e9) return 'text-xs sm:text-sm';
+  if (abs >= 1e6) return 'text-sm';
+  return 'text-sm sm:text-base';
 }
 
 export function formatDate(dateStr: string) {
