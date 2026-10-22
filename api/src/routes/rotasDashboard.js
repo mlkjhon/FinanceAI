@@ -57,27 +57,18 @@ router.get('/dashboard', autenticar, async (req, res) => {
         WHERE DATE_TRUNC('month', t.data_registro) = DATE_TRUNC('month', CURRENT_DATE) AND t.id_usuario = $1 ${filtroConexao}
         `;
 
-        // Últimos 6 meses. "saldo" = resultado do mês; "saldo_fim" = quanto havia
-        // na conta no fim do mês (soma de toda a história até ali, sem lançamentos futuros)
         const selecaoEvolucaoMensal = `
-        WITH por_mes AS (
-            SELECT
-               DATE_TRUNC('month', t.data_registro) AS inicio,
-               COALESCE(SUM(CASE WHEN ${ENTRADA} THEN t.valor ELSE 0 END), 0) AS entradas,
-               COALESCE(SUM(CASE WHEN ${SAIDA} THEN t.valor ELSE 0 END), 0) AS saidas,
-               ${GUARDADO} AS guardado,
-               -- tudo o que mexeu na conta (inclusive transferências)
-               COALESCE(SUM(CASE WHEN t.tipo = 'E' THEN t.valor ELSE -t.valor END), 0) AS saldo
-            FROM transacoes t
-            WHERE t.id_usuario = $1 AND t.data_registro <= NOW() ${filtroConexao}
-            GROUP BY 1
-        ), acumulado AS (
-            SELECT *, SUM(saldo) OVER (ORDER BY inicio) AS saldo_fim FROM por_mes
-        )
-        SELECT TO_CHAR(inicio, 'MM/YYYY') AS mes, entradas, saidas, guardado, saldo, saldo_fim
-        FROM acumulado
-        WHERE inicio >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
-        ORDER BY inicio
+        SELECT
+           TO_CHAR(t.data_registro, 'MM/YYYY') AS mes,
+           COALESCE(SUM(CASE WHEN ${ENTRADA} THEN t.valor ELSE 0 END), 0) AS entradas,
+           COALESCE(SUM(CASE WHEN ${SAIDA} THEN t.valor ELSE 0 END), 0) AS saidas,
+           ${GUARDADO} AS guardado,
+           -- saldo do mês: tudo o que mexeu na conta (inclusive transferências)
+           COALESCE(SUM(CASE WHEN t.tipo = 'E' THEN t.valor ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN t.tipo = 'S' THEN t.valor ELSE 0 END), 0) AS saldo
+        FROM transacoes t
+        WHERE DATE_TRUNC('month', t.data_registro) >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months' AND t.id_usuario = $1 ${filtroConexao}
+        GROUP BY mes
+        ORDER BY mes
         `;
 
         const selecaoUltimasTransacoes = `
