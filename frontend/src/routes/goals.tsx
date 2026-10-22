@@ -171,15 +171,21 @@ function GoalsContent() {
             <input id="meta-data" type="date" value={form.data_alvo} onChange={(e) => setForm((f) => ({ ...f, data_alvo: e.target.value }))} className={campoClasse} />
           </Campo>
         </div>
-        {/* Por padrão o "já tenho guardado" não mexe no saldo; ligando, ele sai do saldo */}
-        {jaGuardado > 0 && (
-          <label htmlFor="meta-tirar" className="pop-in flex cursor-pointer items-start justify-between gap-4 rounded-xl bg-[var(--color-surface)] p-4">
+        {/* Por padrão o "já tenho guardado" não mexe no saldo; ligando, ele sai do saldo.
+            Fica sempre visível (antes só aparecia depois de digitar o valor e passava despercebido). */}
+        <label htmlFor="meta-tirar" className="flex cursor-pointer items-start justify-between gap-4 rounded-xl bg-[var(--color-surface)] p-4">
             <span>
-              <span className="block text-sm font-medium text-[var(--color-ink)]">Tirar {formatCurrency(jaGuardado)} do meu saldo</span>
+              <span className="block text-sm font-medium text-[var(--color-ink)]">
+                {jaGuardado > 0 ? `Tirar ${formatCurrency(jaGuardado)} do meu saldo` : 'Tirar o "já tenho guardado" do meu saldo'}
+              </span>
               <span className="mt-0.5 block text-xs text-[var(--color-ink-muted)]">
-                {form.tirarDoSaldo
-                  ? 'O valor sai do saldo como um depósito na meta (e volta se você apagar a meta).'
-                  : 'Desligado: esse dinheiro já está guardado em outro lugar e o saldo não muda.'}
+                {jaGuardado <= 0
+                  ? form.tirarDoSaldo
+                    ? 'Ligado: agora digite em "Já tenho guardado" quanto vai sair do saldo.'
+                    : 'Desligado, o saldo não muda. Ligue para tirar o "já tenho guardado" do saldo.'
+                  : form.tirarDoSaldo
+                    ? 'O valor sai do saldo como um depósito na meta (e volta se você apagar a meta).'
+                    : 'Desligado: esse dinheiro já está guardado em outro lugar e o saldo não muda.'}
               </span>
             </span>
             <button
@@ -187,7 +193,12 @@ function GoalsContent() {
               type="button"
               role="switch"
               aria-checked={form.tirarDoSaldo}
-              onClick={() => setForm((f) => ({ ...f, tirarDoSaldo: !f.tirarDoSaldo }))}
+              onClick={() => {
+                const ligar = !form.tirarDoSaldo;
+                setForm((f) => ({ ...f, tirarDoSaldo: ligar }));
+                // ligou sem valor: leva direto para o campo "Já tenho guardado"
+                if (ligar && jaGuardado <= 0) document.getElementById('meta-atual')?.focus();
+              }}
               className={'relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ' + (form.tirarDoSaldo ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-line)]')}
             >
               <span
@@ -196,8 +207,7 @@ function GoalsContent() {
                 style={{ transform: form.tirarDoSaldo ? 'translateX(20px)' : 'translateX(0)' }}
               />
             </button>
-          </label>
-        )}
+        </label>
         <Campo id="meta-desc" label="Descrição (opcional)">
           <input id="meta-desc" value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Ex.: passagens e hospedagem" className={campoClasse} />
         </Campo>
