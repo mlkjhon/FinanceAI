@@ -291,8 +291,8 @@ function DashboardContent() {
         <FinanceCard className="lg:col-span-7 flex flex-col" index={2}>
           {/* cada ponto é o resultado do mês (entrou - saiu), não o saldo acumulado do card verde */}
           <SectionHeader
-            title="Quanto sobrou em cada mês"
-            descricao="Entrou menos saiu, mês a mês. Não é o seu saldo: o que você tem hoje é o valor do card verde."
+            title="Sobra de cada mês"
+            descricao="Entradas menos saídas de cada mês."
             to="/evolucao-saldo"
           />
           <div className="h-52 lg:h-auto lg:flex-1 lg:min-h-52">
