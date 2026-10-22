@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import { BD } from "../../db.js";
 import { autenticar } from "../middlewares/autenticar.js";
 import { ehDepositoMeta, estornarDepositoMeta } from "../services/metasDeposito.js";
+import { ehEstouroNumerico, MSG_ESTOURO } from "../services/limitesValor.js";
 
 const router = Router();
 
@@ -60,6 +61,7 @@ router.post('/transacoes', autenticar, async (req, res) => {
         await BD.query(comando, valores);
         return res.status(201).json({ message: 'Transação cadastrada com sucesso' });
     } catch (error) {
+        if (ehEstouroNumerico(error)) return res.status(400).json({ error: MSG_ESTOURO });
         return res.status(500).json({ error: 'Erro ao cadastrar transação: ' + error.message });
     }
 });
@@ -95,6 +97,7 @@ router.put('/transacoes/:id_transacao', autenticar, async (req, res) => {
         await BD.query(comando, valores);
         return res.status(200).json({ message: 'Transação atualizada com sucesso' });
     } catch (error) {
+        if (ehEstouroNumerico(error)) return res.status(400).json({ error: MSG_ESTOURO });
         return res.status(500).json({ error: 'Erro ao atualizar transação: ' + error.message });
     }
 });
@@ -120,6 +123,7 @@ router.patch('/transacoes/:id_transacao', autenticar, async (req, res) => {
 
         return res.status(200).json({ message: 'Transação atualizada parcialmente com sucesso' });
     } catch (error) {
+        if (ehEstouroNumerico(error)) return res.status(400).json({ error: MSG_ESTOURO });
         return res.status(500).json({ error: 'Erro ao atualizar transação: ' + error.message });
     }
 });

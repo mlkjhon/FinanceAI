@@ -134,8 +134,12 @@ function TransactionSheet({ tx, onClose, onSaved }: { tx?: Transaction; onClose:
       id_subcategoria: data.id_subcategoria || undefined,
       data: data.data || undefined,
     };
-    if (tx) await updateMut.mutateAsync({ id: tx.id, data: payload });
-    else await createMut.mutateAsync(payload);
+    try {
+      if (tx) await updateMut.mutateAsync({ id: tx.id, data: payload });
+      else await createMut.mutateAsync(payload);
+    } catch {
+      /* o erro já aparece no painel (saveError); não precisa estourar no console */
+    }
   };
 
   return (

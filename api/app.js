@@ -15,6 +15,7 @@ import rotasInvestimentos from "./src/routes/rotasInvestimentos.js";
 
 import { BD, testarConexao } from "./db.js";
 import { gerarTexto, MODELO_IA } from "./src/services/ia.js";
+import { limitarValores } from "./src/services/limitesValor.js";
 
 import swaggerUI from "swagger-ui-express";
 import swagger from './config/swagger.js';
@@ -30,6 +31,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Valores em dinheiro: colunas do banco grandes o bastante + teto com mensagem clara
+app.use((req, res, next) => (['POST', 'PUT', 'PATCH'].includes(req.method) ? limitarValores(req, res, next) : next()));
 
 app.get('/', async (req, res) => {
     await testarConexao();
