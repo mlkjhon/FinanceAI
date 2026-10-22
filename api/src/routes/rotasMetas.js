@@ -86,10 +86,27 @@ router.post('/metas', autenticar, async (req, res) => {
 
         const resultado = await BD.query(comando, valores);
         const meta = resultado.rows[0];
+        const inicial = Math.round((Number(valor_atual) || 0) * 100) / 100;
+
+        /*
+         * "Já tenho guardado": por padrão NÃO mexe no saldo (o dinheiro já estava
+         * guardado em outro lugar). Só com "tirarDoSaldo" ele vira uma saída
+         * "Investido na meta: …", igual a um depósito, ligada ao histórico da meta
+         * (assim apagar a meta também devolve esse valor).
+         */
+        let id_transacao = null;
+        if (req.body.tirarDoSaldo === true && inicial > 0) {
+            const t = await BD.query(
+                `INSERT INTO transacoes (id_usuario, descricao, valor, tipo, id_subcategoria, data_registro)
+                 VALUES ($1, $2, $3, 'S', NULL, CURRENT_DATE) RETURNING id_transacao`,
+                [id_usuario, `Investido na meta: ${meta.titulo}`, inicial]
+            );
+            id_transacao = t.rows[0]?.id_transacao ?? null;
+        }
 
         await BD.query(
-            `INSERT INTO metas_movimentos (id_meta, id_usuario, tipo, valor, saldo_apos, origem) VALUES ($1, $2, 'criacao', $3, $3, $4)`,
-            [meta.id_meta, id_usuario, Number(valor_atual) || 0, origemValida(req.body.origem)]
+            `INSERT INTO metas_movimentos (id_meta, id_usuario, tipo, valor, saldo_apos, id_transacao, origem) VALUES ($1, $2, 'criacao', $3, $3, $4, $5)`,
+            [meta.id_meta, id_usuario, inicial, id_transacao, origemValida(req.body.origem)]
         ).catch(semHistorico);
 
         return res.status(201).json(meta);

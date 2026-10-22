@@ -295,6 +295,7 @@ export const goalsApi = {
         valor_atual: data.valor_atual,
         data_objetivo: data.data_alvo,
         descricao: data.descricao,
+        tirarDoSaldo: !!data.tirarDoSaldo,
         origem,
       })
     });
@@ -477,6 +478,8 @@ export interface CreateGoal {
   valor_atual?: number;
   data_alvo?: string;
   descricao?: string;
+  // true = o "já tenho guardado" sai do saldo (vira uma saída "Investido na meta")
+  tirarDoSaldo?: boolean;
 }
 
 export interface DashboardSummary {

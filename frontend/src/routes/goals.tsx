@@ -34,7 +34,7 @@ function CircularProgress({ value, max }: { value: number; max: number }) {
 function GoalsContent() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = React.useState(false);
-  const formVazio = { nome: '', valor_meta: '', valor_atual: '', data_alvo: '', descricao: '' };
+  const formVazio = { nome: '', valor_meta: '', valor_atual: '', data_alvo: '', descricao: '', tirarDoSaldo: false };
   const [form, setForm] = React.useState(formVazio);
   const [tentou, setTentou] = React.useState(false);
 
@@ -55,7 +55,8 @@ function GoalsContent() {
   const createMut = useMutation({
     mutationFn: (d: CreateGoal) => goalsApi.create(d),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['goals'] });
+      // com "tirar do saldo" ligado, o saldo e as transações mudam também
+      ['goals', 'dashboard-summary', 'transactions'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
       setShowForm(false);
       setForm(formVazio);
       setTentou(false);
@@ -92,6 +93,7 @@ function GoalsContent() {
       valor_atual: paraNumero(form.valor_atual) ?? 0,
       data_alvo: form.data_alvo || undefined,
       descricao: form.descricao || undefined,
+      tirarDoSaldo: form.tirarDoSaldo && jaGuardado > 0,
     });
   };
 
@@ -169,6 +171,33 @@ function GoalsContent() {
             <input id="meta-data" type="date" value={form.data_alvo} onChange={(e) => setForm((f) => ({ ...f, data_alvo: e.target.value }))} className={campoClasse} />
           </Campo>
         </div>
+        {/* Por padrão o "já tenho guardado" não mexe no saldo; ligando, ele sai do saldo */}
+        {jaGuardado > 0 && (
+          <label htmlFor="meta-tirar" className="pop-in flex cursor-pointer items-start justify-between gap-4 rounded-xl bg-[var(--color-surface)] p-4">
+            <span>
+              <span className="block text-sm font-medium text-[var(--color-ink)]">Tirar {formatCurrency(jaGuardado)} do meu saldo</span>
+              <span className="mt-0.5 block text-xs text-[var(--color-ink-muted)]">
+                {form.tirarDoSaldo
+                  ? 'O valor sai do saldo como um depósito na meta (e volta se você apagar a meta).'
+                  : 'Desligado: esse dinheiro já está guardado em outro lugar e o saldo não muda.'}
+              </span>
+            </span>
+            <button
+              id="meta-tirar"
+              type="button"
+              role="switch"
+              aria-checked={form.tirarDoSaldo}
+              onClick={() => setForm((f) => ({ ...f, tirarDoSaldo: !f.tirarDoSaldo }))}
+              className={'relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ' + (form.tirarDoSaldo ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-line)]')}
+            >
+              <span
+                aria-hidden
+                className="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow-sm transition-transform duration-200 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)]"
+                style={{ transform: form.tirarDoSaldo ? 'translateX(20px)' : 'translateX(0)' }}
+              />
+            </button>
+          </label>
+        )}
         <Campo id="meta-desc" label="Descrição (opcional)">
           <input id="meta-desc" value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Ex.: passagens e hospedagem" className={campoClasse} />
         </Campo>

@@ -42,7 +42,12 @@ export async function estornarDepositoMeta(cliente, id_usuario, transacao) {
     );
     try {
         await cliente.query('SAVEPOINT apaga_mov');
-        await cliente.query('DELETE FROM metas_movimentos WHERE id_transacao = $1 AND id_usuario = $2', [transacao.id_transacao, id_usuario]);
+        await cliente.query("DELETE FROM metas_movimentos WHERE id_transacao = $1 AND id_usuario = $2 AND tipo = 'deposito'", [transacao.id_transacao, id_usuario]);
+        // "Já tenho guardado" tirado do saldo: a linha "Meta criada" fica, mas sem valor
+        await cliente.query(
+            "UPDATE metas_movimentos SET id_transacao = NULL, valor = 0, saldo_apos = 0 WHERE id_transacao = $1 AND id_usuario = $2 AND tipo = 'criacao'",
+            [transacao.id_transacao, id_usuario]
+        );
         await cliente.query('RELEASE SAVEPOINT apaga_mov');
     } catch {
         await cliente.query('ROLLBACK TO SAVEPOINT apaga_mov').catch(() => {});

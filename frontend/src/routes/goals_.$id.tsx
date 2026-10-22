@@ -389,7 +389,7 @@ function MetaConteudo({ id }: { id: string }) {
                         )}
                         {m.saldo_apos != null && (
                           <p className="text-xs text-[var(--color-ink-muted)]" data-num>
-                            {m.tipo === 'criacao' ? 'já guardado' : `total ${formatCurrency(m.saldo_apos)}`}
+                            {m.tipo === 'criacao' ? (m.id_transacao != null ? 'saiu do saldo' : 'já guardado, fora do saldo') : `total ${formatCurrency(m.saldo_apos)}`}
                           </p>
                         )}
                       </div>
