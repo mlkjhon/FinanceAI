@@ -79,6 +79,9 @@ function EvolucaoContent() {
 
       <section className="finance-card p-5 sm:p-6" aria-label="Gráfico do saldo">
         <h2 className="font-semibold text-base text-[var(--color-ink)]">Saldo no fim de cada mês</h2>
+        <p className="mt-0.5 text-xs text-[var(--color-ink-muted)] text-pretty">
+          Quanto havia na sua conta quando cada mês terminou, somando tudo até ali. No painel inicial, o gráfico mostra outra coisa: quanto sobrou em cada mês.
+        </p>
         <div className="h-72 mt-5 -ml-2">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -108,7 +111,10 @@ function EvolucaoContent() {
       </section>
 
       <section aria-label="Mês a mês">
-        <h2 className="font-semibold text-base text-[var(--color-ink)] mb-3">Mês a mês</h2>
+        <h2 className="font-semibold text-base text-[var(--color-ink)]">Mês a mês</h2>
+        <p className="mt-0.5 mb-3 text-xs text-[var(--color-ink-muted)] text-pretty">
+          Em destaque, quanto sobrou no mês (entrou menos saiu). Embaixo, quanto ficou na conta no fim dele.
+        </p>
         <ol className="finance-card divide-y divide-[var(--color-line)]">
           {[...meses].reverse().map((m, ri) => {
             const i = meses.length - 1 - ri;
@@ -129,7 +135,7 @@ function EvolucaoContent() {
                   <p className={cn('text-sm font-semibold', r >= 0 ? 'text-gain' : 'text-loss')} data-num>
                     {r >= 0 ? '+' : '-'}{formatCurrency(Math.abs(r))}
                   </p>
-                  <p className="text-xs text-[var(--color-ink-muted)]" data-num>saldo {formatCurrency(fimDoMes[i])}</p>
+                  <p className="text-xs text-[var(--color-ink-muted)]" data-num>na conta: {formatCurrency(fimDoMes[i])}</p>
                 </div>
               </li>
             );

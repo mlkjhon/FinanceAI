@@ -76,7 +76,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white border border-[var(--color-line)] rounded-[10px] px-3 py-2 shadow-md">
-      <p className="text-xs text-[var(--color-ink-muted)]">{label}</p>
+      <p className="text-xs text-[var(--color-ink-muted)]">Sobrou em {label}</p>
       <p data-num className="text-sm font-semibold text-[var(--color-ink)]">{formatCurrency(payload[0].value)}</p>
     </div>
   );
@@ -159,10 +159,13 @@ function EmptyState({ text, action }: { text: string; action?: React.ReactNode }
   );
 }
 
-function SectionHeader({ title, to, linkLabel = 'Ver detalhes' }: { title: string; to?: string; linkLabel?: string }) {
+function SectionHeader({ title, descricao, to, linkLabel = 'Ver detalhes' }: { title: string; descricao?: string; to?: string; linkLabel?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 mb-5">
-      <h2 className="font-semibold text-base text-[var(--color-ink)]">{title}</h2>
+      <div className="min-w-0">
+        <h2 className="font-semibold text-base text-[var(--color-ink)]">{title}</h2>
+        {descricao && <p className="mt-0.5 text-xs text-[var(--color-ink-muted)] text-pretty">{descricao}</p>}
+      </div>
       {to && (
         <Link to={to} className="group inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)]">
           <span className="link-line">{linkLabel}</span>
@@ -286,7 +289,12 @@ function DashboardContent() {
         </section>
 
         <FinanceCard className="lg:col-span-7 flex flex-col" index={2}>
-          <SectionHeader title="Evolução do saldo" to="/evolucao-saldo" />
+          {/* cada ponto é o resultado do mês (entrou - saiu), não o saldo acumulado do card verde */}
+          <SectionHeader
+            title="Quanto sobrou em cada mês"
+            descricao="Entrou menos saiu, mês a mês. Não é o seu saldo: o que você tem hoje é o valor do card verde."
+            to="/evolucao-saldo"
+          />
           <div className="h-52 lg:h-auto lg:flex-1 lg:min-h-52">
             {isLoading ? <SkeletonCard lines={1} className="h-full border-0" /> : <BalanceChart data={summary?.evolucao_saldo || []} />}
           </div>
