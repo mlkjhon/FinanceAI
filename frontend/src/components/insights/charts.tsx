@@ -164,7 +164,7 @@ function Donut({ data }: { data: BlocoDe<'chart'>['data'] }) {
         className="w-36 h-36 shrink-0 rounded-full"
         style={{ background, WebkitMask: mascara, mask: mascara }}
       />
-      <ul className="w-full space-y-1">
+      <ul className="w-full min-w-0 space-y-1">
         {itens.map((t, i) => (
           <li
             key={t.rotulo}
@@ -176,9 +176,9 @@ function Donut({ data }: { data: BlocoDe<'chart'>['data'] }) {
             className={cn('flex items-center gap-2.5 text-sm rounded-md px-2 py-1 -mx-2 transition-opacity duration-150 outline-none focus-visible:bg-[var(--color-surface)]', ativo !== null && ativo !== i && 'opacity-45')}
           >
             <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ backgroundColor: t.cor }} />
-            <span className="text-[var(--color-ink-soft)] truncate">{t.rotulo}</span>
-            <span className="ml-auto text-xs text-[var(--color-ink-muted)]" data-num>{fmt((t.valor / total) * 100, 'pct')}</span>
-            <span className="w-24 text-right font-medium text-[var(--color-ink)]" data-num>{fmt(t.valor)}</span>
+            <span className="min-w-0 flex-1 text-[var(--color-ink-soft)] truncate">{t.rotulo}</span>
+            <span className="shrink-0 text-xs text-[var(--color-ink-muted)]" data-num>{fmt((t.valor / total) * 100, 'pct')}</span>
+            <span className="shrink-0 whitespace-nowrap text-right font-medium text-[var(--color-ink)]" data-num>{fmt(t.valor)}</span>
           </li>
         ))}
       </ul>

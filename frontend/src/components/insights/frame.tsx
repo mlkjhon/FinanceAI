@@ -49,7 +49,7 @@ export const BlocoFrame = forwardRef<HTMLElement, { bloco: Bloco; ocupado: boole
       aria-busy={ocupado}
       className={cn(
         SPAN[bloco.size],
-        'relative rounded-[var(--radius-card)] p-5',
+        'relative min-w-0 rounded-[var(--radius-card)] p-5',
         hero ? 'bg-[var(--color-accent)] text-white on-dark p-6 sm:p-8' : 'finance-card',
         novo && 'block-flash',
         ocupado && 'opacity-60'

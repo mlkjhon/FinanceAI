@@ -205,13 +205,13 @@ function Story({ b }: { b: BlocoDe<'story'> }) {
         </div>
       </div>
       {kpis.length > 0 && (
-        <dl className="grid grid-cols-3 lg:grid-cols-1 gap-x-6 gap-y-4 lg:min-w-48 lg:border-l lg:border-white/20 lg:pl-8">
+        <dl className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-x-6 gap-y-3 sm:gap-y-4 min-w-0 lg:min-w-48 lg:border-l lg:border-white/20 lg:pl-8">
           {kpis.map((k) => (
-            <div key={k.rotulo}>
+            <div key={k.rotulo} className="min-w-0 max-sm:flex max-sm:items-baseline max-sm:justify-between max-sm:gap-3">
               <dt className="text-xs text-white/70">{k.rotulo}</dt>
               <dd>
                 {k.formato === 'moeda' ? (
-                  <AnimatedCounter value={k.valor} isCurrency className="block text-lg sm:text-xl text-white" />
+                  <AnimatedCounter value={k.valor} isCurrency className={cn('block text-white [overflow-wrap:anywhere]', Math.abs(k.valor) >= 1e9 ? 'text-base sm:text-lg' : 'text-lg sm:text-xl')} />
                 ) : (
                   <span className="block font-brand font-bold text-lg sm:text-xl text-white" data-num>{fmt(k.valor, k.formato)}</span>
                 )}
@@ -339,7 +339,7 @@ function Comparativo({ b }: { b: BlocoDe<'comparison'> }) {
                   style={{ width: largura, transformOrigin: subiu ? 'left' : 'right', '--i': i } as React.CSSProperties}
                 />
               </span>
-              <span className={cn('w-24 text-right text-xs font-semibold', subiu ? 'text-loss' : 'text-gain')} data-num>
+              <span className={cn('shrink-0 whitespace-nowrap text-right text-xs font-semibold', subiu ? 'text-loss' : 'text-gain')} data-num>
                 {subiu ? '+' : '-'}{fmt(Math.abs(l.diferenca))}
               </span>
             </li>

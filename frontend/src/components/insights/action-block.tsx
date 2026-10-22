@@ -177,7 +177,8 @@ export function ActionBlock({ b }: { b: BlocoDe<'action'> }) {
                 disabled={estado === 'feito' || estado === 'executando'}
                 onValueChange={setValorTexto}
                 aria-invalid={valorInvalido}
-                className="field w-24 rounded-md border border-[var(--color-line)] bg-[var(--color-bg)] px-2 py-1 text-right tabular-nums disabled:opacity-70"
+                style={{ width: `${Math.min(Math.max(valorTexto.length, 4) + 3, 20)}ch` }}
+                className="field max-w-[11rem] rounded-md border border-[var(--color-line)] bg-[var(--color-bg)] px-2 py-1 text-right tabular-nums disabled:opacity-70"
               />
             </dd>
           </div>
