@@ -157,6 +157,23 @@ function InvestimentoDetailsPage() {
   }
 
   const historicoInvertido = [...(inv?.historico || [])].reverse();
+  // Dois históricos: o que VOCÊ moveu (aporte/resgate) e o que o investimento rendeu sozinho
+  const movimentacoes = historicoInvertido.filter((t) => t.tipo !== 'rendimento');
+  const rendimentosPorDia = (() => {
+    const porDia = new Map<string, { dia: string; valor: number }>();
+    for (const t of historicoInvertido) {
+      if (t.tipo !== 'rendimento') continue;
+      const dia = String(t.data_registro).slice(0, 10);
+      const atual = porDia.get(dia) ?? { dia, valor: 0 };
+      atual.valor += parseFloat(String(t.valor)) || 0;
+      porDia.set(dia, atual);
+    }
+    return [...porDia.values()];
+  })();
+  const totalRendido = rendimentosPorDia.reduce((s, d) => s + d.valor, 0);
+  const mediaPorDia = rendimentosPorDia.length ? totalRendido / rendimentosPorDia.length : 0;
+  const [verTodosRend, setVerTodosRend] = useState(false);
+  const rendVisiveis = verTodosRend ? rendimentosPorDia : rendimentosPorDia.slice(0, 10);
 
   const rendimentoPrevisto = saldoAtual > 0 && simulacao ? simulacao.exemplo.porDia : 0;
 
@@ -289,62 +306,111 @@ function InvestimentoDetailsPage() {
           )}
         </FinanceCard>
 
-        {/* Histórico */}
-        <FinanceCard>
-          <div className="flex items-center gap-2 mb-6">
-            <History size={18} className="text-gray-400" />
-            <h2 className="font-semibold text-gray-900">Histórico de movimentações</h2>
-          </div>
-          
-          {isLoading ? (
-            <div className="space-y-4">
-              <SkeletonCard lines={1} className="border-0 shadow-none" />
-              <SkeletonCard lines={1} className="border-0 shadow-none" />
+        {/* Históricos: o que você moveu e o que o investimento rendeu sozinho */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <FinanceCard>
+            <div className="flex items-center gap-2 mb-1">
+              <History size={18} className="text-[var(--color-ink-muted)]" />
+              <h2 className="font-semibold text-[var(--color-ink)]">Histórico de movimentações</h2>
             </div>
-          ) : historicoInvertido.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">Nenhum histórico disponível.</p>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {historicoInvertido.map((t, i) => (
-                <div key={t.id_transacao_inv} style={{ '--i': Math.min(i, 8) } as React.CSSProperties} className={i < 12 ? 'rise py-4 flex items-center justify-between' : 'py-4 flex items-center justify-between'}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center 
-                      ${t.tipo === 'aporte' ? 'bg-gain-soft text-gain' 
-                        : t.tipo === 'resgate' ? 'bg-loss-soft text-loss' 
-                        : 'bg-gain-soft text-gain'}`}
-                    >
-                      {t.tipo === 'aporte' ? <TrendingUp size={18} /> 
-                       : t.tipo === 'resgate' ? <TrendingDown size={18} /> 
-                       : <PiggyBank size={18} />}
+            <p className="text-xs text-[var(--color-ink-muted)] mb-4">Aportes e resgates que você fez.</p>
+
+            {isLoading ? (
+              <div className="space-y-4">
+                <SkeletonCard lines={1} className="border-0 shadow-none" />
+                <SkeletonCard lines={1} className="border-0 shadow-none" />
+              </div>
+            ) : movimentacoes.length === 0 ? (
+              <p className="text-sm text-[var(--color-ink-muted)] text-center py-6">Nenhum aporte ou resgate ainda.</p>
+            ) : (
+              <div className="divide-y divide-[var(--color-line)]">
+                {movimentacoes.map((t, i) => (
+                  <div key={t.id_transacao_inv} style={{ '--i': Math.min(i, 8) } as React.CSSProperties} className={(i < 12 ? 'rise ' : '') + 'py-3.5 flex items-center justify-between gap-3'}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${t.tipo === 'resgate' ? 'bg-loss-soft text-loss' : 'bg-gain-soft text-gain'}`}>
+                        {t.tipo === 'resgate' ? <TrendingDown size={18} /> : <TrendingUp size={18} />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[var(--color-ink)] capitalize">{t.tipo}</p>
+                        <p className="text-xs text-[var(--color-ink-muted)]" data-num>{formatDate(t.data_registro)}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900 capitalize">{t.tipo}</p>
-                      <p className="text-xs text-gray-400">{formatDate(t.data_registro)}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className={`font-semibold text-sm ${t.tipo === 'resgate' ? 'text-loss' : 'text-[var(--color-ink)]'}`} data-num>
+                          {t.tipo === 'resgate' ? '-' : '+'}{formatCurrency(parseFloat(String(t.valor)))}
+                        </p>
+                        {t.saldoAposTransacao !== undefined && (
+                          <p className="text-xs text-[var(--color-ink-muted)] mt-0.5" data-num>Saldo {formatCurrency(t.saldoAposTransacao)}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => { deleteTransacaoMutation.reset(); setMovParaApagar({ id: t.id_transacao_inv, tipo: t.tipo, valor: parseFloat(String(t.valor)) }); }}
+                        aria-label={`Excluir ${t.tipo} de ${formatCurrency(parseFloat(String(t.valor)))}`}
+                        title="Excluir movimentação"
+                        className="pressable p-1.5 rounded-lg text-[var(--color-ink-muted)] hover:text-loss hover:bg-loss-soft transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
-                  <div className="text-right flex items-center justify-end gap-4">
-                    <div>
-                      <p className={`font-bold text-sm ${t.tipo === 'resgate' ? 'text-loss' : (t.tipo === 'rendimento' ? 'text-gain' : 'text-gray-900')}`}>
-                        {t.tipo === 'resgate' ? '-' : '+'}{formatCurrency(parseFloat(String(t.valor)))}
-                      </p>
-                      {t.saldoAposTransacao !== undefined && (
-                        <p className="text-xs text-gray-400 mt-0.5">Saldo: {formatCurrency(t.saldoAposTransacao)}</p>
-                      )}
-                    </div>
-                    <button 
-                      onClick={() => { deleteTransacaoMutation.reset(); setMovParaApagar({ id: t.id_transacao_inv, tipo: t.tipo, valor: parseFloat(String(t.valor)) }); }}
-                      aria-label={`Excluir ${t.tipo} de ${formatCurrency(parseFloat(String(t.valor)))}`}
-                      className="text-gray-300 hover:text-loss transition-colors p-1"
-                      title="Excluir Transação"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </FinanceCard>
+
+          <FinanceCard>
+            <div className="flex items-center gap-2 mb-1">
+              <PiggyBank size={18} className="text-gain" />
+              <h2 className="font-semibold text-[var(--color-ink)]">Histórico de rendimento</h2>
             </div>
-          )}
-        </FinanceCard>
+            <p className="text-xs text-[var(--color-ink-muted)] mb-4">Quanto o investimento rendeu sozinho, dia a dia.</p>
+
+            {isLoading ? (
+              <div className="space-y-4">
+                <SkeletonCard lines={1} className="border-0 shadow-none" />
+                <SkeletonCard lines={1} className="border-0 shadow-none" />
+              </div>
+            ) : rendimentosPorDia.length === 0 ? (
+              <p className="text-sm text-[var(--color-ink-muted)] text-center py-6">
+                Ainda não rendeu nada. O rendimento entra todo dia útil, sozinho.
+              </p>
+            ) : (
+              <>
+                <dl className="grid grid-cols-2 gap-4 rounded-xl bg-gain-soft px-4 py-3 mb-4">
+                  <div>
+                    <dt className="text-xs text-[var(--color-ink-muted)]">Total rendido</dt>
+                    <dd className="font-brand font-bold text-lg text-gain" data-num>+{formatCurrency(totalRendido)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--color-ink-muted)]">Média por dia</dt>
+                    <dd className="font-brand font-bold text-lg text-[var(--color-ink)]" data-num>+{formatCurrency(mediaPorDia)}</dd>
+                  </div>
+                </dl>
+                <ol className="divide-y divide-[var(--color-line)]">
+                  {rendVisiveis.map((d, i) => (
+                    <li key={d.dia} style={{ '--i': Math.min(i, 8) } as React.CSSProperties} className={(i < 12 ? 'rise ' : '') + 'py-2.5 flex items-center justify-between gap-3'}>
+                      <span className="text-sm text-[var(--color-ink-soft)]" data-num>
+                        {new Date(`${d.dia}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }).replace('.', '')}
+                      </span>
+                      <span className="text-sm font-semibold text-gain" data-num>+{formatCurrency(d.valor)}</span>
+                    </li>
+                  ))}
+                </ol>
+                {rendimentosPorDia.length > 10 && (
+                  <button
+                    type="button"
+                    onClick={() => setVerTodosRend((v) => !v)}
+                    aria-expanded={verTodosRend}
+                    className="pressable mt-3 w-full rounded-xl border border-[var(--color-line)] py-2.5 text-sm font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-surface)]"
+                  >
+                    {verTodosRend ? 'Mostrar menos' : `Mostrar todos os ${rendimentosPorDia.length} dias`}
+                  </button>
+                )}
+              </>
+            )}
+          </FinanceCard>
+        </div>
 
       </div>
 
