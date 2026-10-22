@@ -22,7 +22,11 @@ export function FotoAmpliada({ foto, nome, children }: { foto?: string | null; n
         <Dialog.Popup className="dialog-pop fixed left-1/2 top-1/2 z-[var(--z-drawer)] w-[min(22rem,calc(100vw-2.5rem))] outline-none">
           <Dialog.Title className="sr-only">Foto de perfil{nome ? ` de ${nome}` : ''}</Dialog.Title>
           <img src={foto} alt={nome ? `Foto de perfil de ${nome}` : 'Foto de perfil'} className="aspect-square w-full rounded-[28px] object-cover shadow-2xl" />
-          {nome && <p className="mt-3 text-center text-sm font-medium text-white drop-shadow">{nome}</p>}
+          {nome && (
+            <p className="mt-3 text-center">
+              <span className="inline-block rounded-full bg-[var(--color-ink)]/75 px-3 py-1 text-sm font-medium text-white">{nome}</span>
+            </p>
+          )}
           <Dialog.Close
             aria-label="Fechar"
             className="pressable absolute -right-2 -top-2 grid size-9 place-items-center rounded-full bg-white text-[var(--color-ink)] shadow-lg"
