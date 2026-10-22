@@ -33,6 +33,31 @@ function Item({ icone, children, onClick, perigo, atalho }: { icone: IconName; c
   );
 }
 
+// Preferência liga/desliga dentro do menu (o menu continua aberto ao trocar)
+function ItemInterruptor({ icone, rotulo, dica, ativo, onChange }: { icone: IconName; rotulo: string; dica?: string; ativo: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <Menu.CheckboxItem
+      checked={ativo}
+      onCheckedChange={onChange}
+      closeOnClick={false}
+      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--color-ink-soft)] outline-none cursor-default select-none transition-colors duration-100 data-[highlighted]:bg-[var(--color-surface)] data-[highlighted]:text-[var(--color-ink)]"
+    >
+      <Icon name={icone} size={16} className="shrink-0" />
+      <span className="min-w-0 flex-1">
+        {rotulo}
+        {dica && <span className="block text-[11px] text-[var(--color-ink-muted)]" data-num>{dica}</span>}
+      </span>
+      {/* interruptor visual (o estado real é o aria-checked do item) */}
+      <span aria-hidden className={cn('relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200', ativo ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-line)]')}>
+        <span
+          className="absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform duration-200 [transition-timing-function:var(--ease-out)]"
+          style={{ transform: ativo ? 'translateX(16px)' : 'translateX(0)' }}
+        />
+      </span>
+    </Menu.CheckboxItem>
+  );
+}
+
 const Separador = () => <div role="separator" className="my-1 h-px bg-[var(--color-line)]" />;
 
 const TEMAS: { valor: PreferenciaTema; rotulo: string; icone: IconName }[] = [
@@ -47,6 +72,7 @@ export function AccountMenu() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const tema = usePreferenciaTema();
   const ocultar = usePreferencia('ocultarValores');
+  const simplificar = usePreferencia('simplificarNumeros');
   const primeiroNome = user?.nome?.trim().split(/\s+/)[0] ?? '';
 
   const trocarTema = (p: PreferenciaTema) => {
@@ -116,22 +142,19 @@ export function AccountMenu() {
                 ))}
               </Menu.RadioGroup>
             </div>
-            <Menu.CheckboxItem
-              checked={ocultar}
-              onCheckedChange={(v) => salvarPreferencia('ocultarValores', v)}
-              closeOnClick={false}
-              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--color-ink-soft)] outline-none cursor-default select-none transition-colors duration-100 data-[highlighted]:bg-[var(--color-surface)] data-[highlighted]:text-[var(--color-ink)]"
-            >
-              <Icon name={ocultar ? 'eye-slash' : 'eye'} size={16} />
-              <span className="flex-1">Ocultar valores</span>
-              {/* interruptor visual (o estado real é o aria-checked do item) */}
-              <span aria-hidden className={cn('relative h-5 w-9 rounded-full transition-colors duration-200', ocultar ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-line)]')}>
-                <span
-                  className="absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform duration-200 [transition-timing-function:var(--ease-out)]"
-                  style={{ transform: ocultar ? 'translateX(16px)' : 'translateX(0)' }}
-                />
-              </span>
-            </Menu.CheckboxItem>
+            <ItemInterruptor
+              icone={ocultar ? 'eye-slash' : 'eye'}
+              rotulo="Ocultar valores"
+              ativo={ocultar}
+              onChange={(v) => salvarPreferencia('ocultarValores', v)}
+            />
+            <ItemInterruptor
+              icone="coins"
+              rotulo="Simplificar números"
+              dica="R$ 1,5K · 2,3M · 38,9B"
+              ativo={simplificar}
+              onChange={(v) => salvarPreferencia('simplificarNumeros', v)}
+            />
             <Separador />
 
             <Item icone="sign-out" onClick={logout} perigo>Sair</Item>
