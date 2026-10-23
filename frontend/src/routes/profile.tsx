@@ -36,12 +36,36 @@ const SECOES = [
   { id: 'excluir', titulo: 'Excluir conta' },
 ] as const;
 
+// Qual seção está na tela agora (para marcar no índice lateral)
+function useSecaoAtiva() {
+  const [ativa, setAtiva] = React.useState<string>(SECOES[0].id);
+  React.useEffect(() => {
+    const visiveis = new Map<string, number>();
+    const obs = new IntersectionObserver(
+      (entradas) => {
+        for (const e of entradas) visiveis.set(e.target.id, e.isIntersecting ? e.intersectionRatio : 0);
+        // a primeira seção (na ordem da página) que está aparecendo
+        const primeira = SECOES.find((sec) => (visiveis.get(sec.id) ?? 0) > 0);
+        if (primeira) setAtiva(primeira.id);
+      },
+      // conta só a faixa de cima da tela: a seção "ativa" é a que você está lendo
+      { rootMargin: '-130px 0px -55% 0px', threshold: [0, 0.01, 1] }
+    );
+    for (const sec of SECOES) {
+      const el = document.getElementById(sec.id);
+      if (el) obs.observe(el);
+    }
+    return () => obs.disconnect();
+  }, []);
+  return [ativa, setAtiva] as const;
+}
+
 const erroDe = (e: unknown) => (e as Error)?.message || 'Não deu para salvar agora. Tente de novo.';
 
 // Bloco de configuração: título, explicação curta e o conteúdo
 function Secao({ id, titulo, descricao, children, perigo }: { id: string; titulo: string; descricao?: string; children: React.ReactNode; perigo?: boolean }) {
   return (
-    <section id={id} aria-labelledby={`${id}-titulo`} className={cn('finance-card p-5 sm:p-6 scroll-mt-24', perigo && 'border-[var(--color-finance-error)]/30')}>
+    <section id={id} aria-labelledby={`${id}-titulo`} className={cn('finance-card p-5 sm:p-6 scroll-mt-32 lg:scroll-mt-24', perigo && 'border-[var(--color-finance-error)]/30')}>
       <h2 id={`${id}-titulo`} className={cn('font-brand font-semibold', perigo ? 'text-loss' : 'text-[var(--color-ink)]')}>{titulo}</h2>
       {descricao && <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">{descricao}</p>}
       <div className="mt-5">{children}</div>
@@ -582,6 +606,16 @@ function ExcluirConta() {
 }
 
 function ProfileContent() {
+  const [ativa, setAtiva] = useSecaoAtiva();
+  const indiceRef = React.useRef<HTMLElement>(null);
+  // no celular o índice é uma faixa rolável: mantém a seção atual à vista
+  React.useEffect(() => {
+    const nav = indiceRef.current;
+    // o li (não o link) mede a posição: o li é relative e viraria a referência do offsetLeft
+    const link = nav?.querySelector<HTMLElement>('[aria-current]')?.parentElement;
+    if (!nav || !link || nav.scrollWidth <= nav.clientWidth) return;
+    nav.scrollTo({ left: link.offsetLeft - nav.clientWidth / 2 + link.offsetWidth / 2, behavior: 'smooth' });
+  }, [ativa]);
   const { user, logout } = useAuth();
 
   return (
@@ -606,22 +640,49 @@ function ProfileContent() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[12rem_minmax(0,1fr)]">
-        {/* Índice das configurações (no celular vira uma faixa rolável) */}
-        <nav aria-label="Configurações" className="lg:sticky lg:top-24 lg:self-start -mx-4 px-4 lg:mx-0 lg:px-0 overflow-x-auto">
-          <ul className="flex gap-1 lg:flex-col">
-            {SECOES.map((s) => (
-              <li key={s.id}>
-                <a
-                  href={`#${s.id}`}
-                  className={cn(
-                    'block whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 hover:bg-[var(--color-surface)]',
-                    s.id === 'excluir' ? 'text-loss' : 'text-[var(--color-ink-soft)] hover:text-[var(--color-ink)]'
+        {/* Índice das configurações (no celular vira uma faixa rolável). Marca a seção que está na tela. */}
+        <nav
+          ref={indiceRef}
+          aria-label="Configurações"
+          className="sticky top-16 z-10 -mx-4 bg-[var(--color-bg)]/85 px-4 py-2 backdrop-blur-md lg:top-24 lg:mx-0 lg:self-start lg:bg-transparent lg:p-0 lg:backdrop-blur-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-x-auto"
+        >
+          <ul className="flex gap-1 lg:flex-col lg:border-l lg:border-[var(--color-line)]">
+            {SECOES.map((s) => {
+              const atual = s.id === ativa;
+              return (
+                <li key={s.id} className="relative">
+                  <a
+                    href={`#${s.id}`}
+                    aria-current={atual ? 'location' : undefined}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setAtiva(s.id);
+                      document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      history.replaceState(null, '', `#${s.id}`);
+                    }}
+                    className={cn(
+                      'pressable block whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-colors duration-150 lg:ml-3 lg:rounded-lg',
+                      s.id === 'excluir'
+                        ? cn('text-loss hover:bg-loss-soft', atual && 'bg-loss-soft')
+                        : atual
+                          ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+                          : 'text-[var(--color-ink-soft)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]'
+                    )}
+                  >
+                    {s.titulo}
+                  </a>
+                  {/* trilho do índice no computador: a barrinha acompanha a seção atual */}
+                  {atual && (
+                    <motion.span
+                      layoutId="indice-perfil"
+                      aria-hidden
+                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                      className={cn('absolute -left-px top-1.5 bottom-1.5 hidden w-0.5 rounded-full lg:block', s.id === 'excluir' ? 'bg-[var(--color-finance-error)]' : 'bg-[var(--color-accent)]')}
+                    />
                   )}
-                >
-                  {s.titulo}
-                </a>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </nav>
 
